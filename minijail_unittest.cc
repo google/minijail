@@ -34,8 +34,10 @@ class MiniJailTest : public ::testing::Test { };
 TEST(MiniJailTest, TrueJail) {
   TrueEnv *env = new TrueEnv;
   MiniJailOptions options;
-  options.set_env(env);
+  options.set_env(env);  // takes ownership
+  options.set_executable_path("/no/where");
   MiniJail jail;
+  jail.Initialize(&options);
   // This does basically nothing since the options default to false.
   // Only ChangeUser is actually called.
   EXPECT_TRUE(jail.Jail());

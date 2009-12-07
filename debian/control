@@ -1,0 +1,20 @@
+# Copyright (c) 2009 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+Source: chromeos-minijail
+Priority: extra
+Maintainer: The Chromium OS Authors <chromium-os-dev@googlegroups.com>
+Build-Depends: libcap-dev (>= 2.15), debhelper (>= 7)
+Standards-Version: 3.8.0
+Section: libs
+
+Package: chromeos-minijail
+Section: libs
+Architecture: any
+Depends: libc6, libgcc1, libcap2 (>= 2.15), ${shlibs:Depends}, ${misc:Depends}
+Description: Sandboxing utility for lightweight jails
+ A standalone binary and shared library that allows for the
+ creation of per-process and per-process tree "jails" using
+ File Capabilities, securebits, control groups, rlimits, and
+ namespacing.

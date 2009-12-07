@@ -36,6 +36,7 @@ class MiniJail : public minijail::Interface {
  public:
   MiniJail() { }
   ~MiniJail() { }
+  const char *name() { return "MiniJail"; }
   bool Jail() const;
  private:
   DISALLOW_COPY_AND_ASSIGN(MiniJail);

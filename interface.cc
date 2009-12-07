@@ -13,7 +13,14 @@ namespace chromeos {
 namespace minijail {
 
 bool Interface::Run() const {
-  LOG_IF(FATAL, !options()->executable_path()) << "No executable path given.";
+  if (!options() || !options()->env()) {
+    LOG(ERROR) << "Initialize() not called or called with bad Env";
+    return false;
+  }
+  if (!options()->executable_path()) {
+    LOG(ERROR) << "No executable path given.";
+    return false;
+  }
   return options()->env()->Run(options()->executable_path(),
                                options()->arguments(),
                                options()->environment());

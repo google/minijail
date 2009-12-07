@@ -1,0 +1,5 @@
+chromeos-minijail (0.1) unstable; urgency=low
+
+  * Initial release
+
+ -- The Chromium OS Authors <chromium-os-dev@googlegroups.com>  Mon, 07 Dec 2009 13:36:35 -0800

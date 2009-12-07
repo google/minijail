@@ -15,6 +15,11 @@ bool MiniJail::Jail() const {
   // XXX This is a very early implementation of the jailing logic.
   // XXX Many features are missing or will be made more tunable.
   const minijail::Options *opts = options();
+  if (!opts) {
+    LOG(ERROR) << "No Options given. Initialize must be called first "
+               << "with a valid Option pointer.";
+    return false;
+  }
   const minijail::Env *env = opts->env();
 
   int namespaces = 0;
