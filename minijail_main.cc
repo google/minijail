@@ -44,7 +44,7 @@ static const char kHelpMessage[] = "Available Switches:\n"
 "  --disable-tracing\n"
 "    Disables ptrace() and core dumps.\n"
 "    This may break debugging helpers\n"
-"  --enforce-syscall-benchmark-source\n"
+"  --enforce-syscall-benchmark\n"
 "    Runs system call filtering in a pass-through capacity only for\n"
 "    benchmarking\n"
 "  --enforce-syscall-by-source\n"
@@ -86,6 +86,8 @@ static void ProcessSwitches(CommandLine *cl,
   jail_opts->set_add_readonly_mounts(
     cl->HasSwitch(switches::kAddReadonlyMounts));
   jail_opts->set_disable_tracing(cl->HasSwitch(switches::kDisableTracing));
+  jail_opts->set_enforce_syscalls_benchmark(
+    cl->HasSwitch(switches::kEnforceSyscallsBenchmark));
   jail_opts->set_enforce_syscalls_by_source(
     cl->HasSwitch(switches::kEnforceSyscallsBySource));
   jail_opts->set_use_capabilities(cl->HasSwitch(switches::kUseCapabilities));
