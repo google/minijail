@@ -14,7 +14,7 @@ NUM_JOBS=`cat /proc/cpuinfo | grep processor | awk '{a++} END {print a}'`
 build: build-stamp
 build-stamp:
 	dh_testdir
-	scons -j$(NUM_JOBS) minijail libminijail.so minijail_benchmarks
+	scons -j$(NUM_JOBS) minijail libminijail.so # minijail_benchmarks
 	touch $@
 
 clean:
@@ -36,8 +36,8 @@ install: build
 	 cp $(CURDIR)/minijail $(CURDIR)/debian/chromeos-minijail/sbin/minijail
 	 # TODO(wad) make a separate benchmarks package since we don't need
 	 #           them on every install.
-	 mkdir -p $(CURDIR)/debian/chromeos-minijail/usr/share/chromeos-minijail
-	 cp $(CURDIR)/minijail_benchmarks $(CURDIR)/debian/chromeos-minijail/usr/share/chromeos-minijail/minijail_benchmarks
+	 #mkdir -p $(CURDIR)/debian/chromeos-minijail/usr/share/chromeos-minijail
+	 #cp $(CURDIR)/minijail_benchmarks $(CURDIR)/debian/chromeos-minijail/usr/share/chromeos-minijail/minijail_benchmarks
 
 # Build architecture-dependent files here.
 binary-arch: install
