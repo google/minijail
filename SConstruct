@@ -24,6 +24,10 @@ env.Append(
     LIBPATH=['../../third_party/chrome'],
     LIBS=['cap', 'base', 'pthread', 'rt'],
 )
+for key in Split('CC CXX AR RANLIB LD NM CFLAGS CCFLAGS'):
+  value = os.environ.get(key)
+  if value != None:
+    env[key] = value
 
 env_lib = env.Clone()
 env_lib.SharedLibrary('minijail', lib_sources)

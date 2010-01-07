@@ -1,0 +1,6 @@
+# TODO(wad) add versioning to minijail to match the package version.
+libminijail.so lib
+minijail sbin
+# TODO(wad) make a separate benchmarks package since we don't need
+#           them on every install.
+#minijail_benchmarks usr/share/chromeos-minijail

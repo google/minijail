@@ -3,56 +3,8 @@
 # Copyright (c) 2009 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+%:
+	dh --buildsystem=scons_chromeos $@
 
-# Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
-
-# The number of jobs to pass to tools that can run in parallel (such as make
-# and dpkg-buildpackage
-NUM_JOBS=`cat /proc/cpuinfo | grep processor | awk '{a++} END {print a}'`
-
-build: build-stamp
-build-stamp:
-	dh_testdir
-	scons -j$(NUM_JOBS) minijail libminijail.so # minijail_benchmarks
-	touch $@
-
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-stamp
-	scons -c
-	dh_clean
-
-install: build
-	 dh_testdir
-	 dh_testroot
-	 dh_prep
-	 dh_installdirs
-	 mkdir -p $(CURDIR)/debian/chromeos-minijail/lib/security
-	 # TODO(wad) add versioning to minijail to match the package version.
-	 cp $(CURDIR)/libminijail.so $(CURDIR)/debian/chromeos-minijail/lib/libminijail.so
-	 mkdir -p $(CURDIR)/debian/chromeos-minijail/sbin
-	 cp $(CURDIR)/minijail $(CURDIR)/debian/chromeos-minijail/sbin/minijail
-	 # TODO(wad) make a separate benchmarks package since we don't need
-	 #           them on every install.
-	 #mkdir -p $(CURDIR)/debian/chromeos-minijail/usr/share/chromeos-minijail
-	 #cp $(CURDIR)/minijail_benchmarks $(CURDIR)/debian/chromeos-minijail/usr/share/chromeos-minijail/minijail_benchmarks
-
-# Build architecture-dependent files here.
-binary-arch: install
-	     dh_testdir
-	     dh_testroot
-	     dh_link
-	     dh_strip
-	     dh_compress
-	     dh_fixperms
-	     dh_installdeb
-	     dh_shlibdeps
-	     dh_gencontrol
-	     dh_md5sums
-	     dh_builddeb
-
-binary: binary-arch
-
-.PHONY: build clean install binary-arch binary
+override_dh_auto_build:
+	dh_auto_build -- minijail libminijail.so # minijail_benchmarks

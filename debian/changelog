@@ -1,3 +1,13 @@
+chromeos-minijail (0.2) UNRELEASED; urgency=low
+
+  * Use dh(1) and dh-chromeos.
+  * Unhardcode a couple of runtime dependencies. I've left libcap2 hardcoded
+    since we're specifying a higher version than would be generated
+    automatically.
+  * Use cross-tools from environment if set.
+
+ -- Colin Watson <cjwatson@canonical.com>  Thu, 07 Jan 2010 13:49:29 +0000
+
 chromeos-minijail (0.1) unstable; urgency=low
 
   * Initial release

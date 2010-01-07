@@ -5,14 +5,14 @@
 Source: chromeos-minijail
 Priority: extra
 Maintainer: The Chromium OS Authors <chromium-os-dev@googlegroups.com>
-Build-Depends: libcap-dev (>= 2.15), debhelper (>= 7)
+Build-Depends: libcap-dev (>= 2.15), debhelper (>= 7.3.0), dh-chromeos
 Standards-Version: 3.8.0
 Section: libs
 
 Package: chromeos-minijail
 Section: libs
 Architecture: any
-Depends: libc6, libgcc1, libcap2 (>= 2.15), ${shlibs:Depends}, ${misc:Depends}
+Depends: libcap2 (>= 2.15), ${shlibs:Depends}, ${misc:Depends}
 Description: Sandboxing utility for lightweight jails
  A standalone binary and shared library that allows for the
  creation of per-process and per-process tree "jails" using
