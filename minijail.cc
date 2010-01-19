@@ -27,19 +27,30 @@ bool MiniJail::Jail() const {
     namespaces |= CLONE_NEWPID;
   if (opts->namespace_vfs())
     namespaces |= CLONE_NEWNS;
-  // Dumb forced exit on failure.
-  LOG_IF(FATAL, !env->EnterNamespace(namespaces));
-
-  if (opts->namespace_vfs() && opts->add_readonly_mounts())
-    LOG_IF(FATAL, !env->Mount()); // TODO(wad) add flags
-
-  if (opts->use_capabilities()) {
-    LOG_IF(FATAL, !env->KeepRootCapabilities());
-    LOG_IF(FATAL, !env->DisableDefaultRootPrivileges());
+  if (namespaces && !env->EnterNamespace(namespaces)) {
+    return false;
   }
 
-  if (opts->disable_tracing())
-    LOG_IF(FATAL, !env->DisableTracing());
+  if (opts->namespace_vfs() && opts->add_readonly_mounts()) {
+    if (!env->Mount()) {  // TODO(wad) add flags
+      return false;
+    }
+  }
+
+  if (opts->use_capabilities()) {
+    if (!env->KeepRootCapabilities()) {
+      return false;
+    }
+    if (!env->DisableDefaultRootPrivileges()) {
+      return false;
+    }
+  }
+
+  if (opts->disable_tracing()) {
+    if (!env->DisableTracing()) {
+      return false;
+    }
+  }
 
   uid_t uid = getuid();
   if (opts->change_uid()) {
@@ -51,19 +62,30 @@ bool MiniJail::Jail() const {
   }
   // TODO(wad) separate group and user changes
   if (opts->change_uid() || opts->change_gid()) {
-    LOG_IF(FATAL, !env->ChangeUser(uid, gid));
+    DLOG(INFO) << "Attempting to change user and/or groups...";
+    if (!env->ChangeUser(uid, gid)) {
+      return false;
+    }
   }
 
   if (opts->enforce_syscalls_by_source()) {
-    LOG_IF(FATAL, !env->FilterSyscallsBySource());
+    if (!env->FilterSyscallsBySource()) {
+      return false;
+    }
   } else if (opts->enforce_syscalls_benchmark()) {
-    LOG_IF(FATAL, !env->FilterSyscallsBenchmarkOnly());
+    if (!env->FilterSyscallsBenchmarkOnly()) {
+      return false;
+    }
   }
 
   if (opts->use_capabilities()) {
     // TODO(wad) use helpers to read caps from flags
-    LOG_IF(FATAL, !env->SanitizeCapabilities(0));
-    LOG_IF(FATAL, !env->SanitizeBoundingSet(0));
+    if (!env->SanitizeCapabilities(0)) {
+      return false;
+    }
+    if (!env->SanitizeBoundingSet(0)) {
+      return false;
+    }
   }
   return true;
 }
