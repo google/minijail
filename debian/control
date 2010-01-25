@@ -5,7 +5,7 @@
 Source: chromeos-minijail
 Priority: extra
 Maintainer: The Chromium OS Authors <chromium-os-dev@googlegroups.com>
-Build-Depends: libcap-dev (>= 2.15), debhelper (>= 7.3.0), dh-chromeos, chromeos-microbenchmark, libgtest-dev, libgmock-dev
+Build-Depends: libcap-dev (>= 2.15), debhelper (>= 7.3.0), dh-chromeos, libchromeos-microbenchmark-dev, libgtest-dev, libgmock-dev
 Standards-Version: 3.8.0
 Section: libs
 
