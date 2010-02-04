@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <pwd.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -82,8 +83,15 @@ bool Env::DisableDefaultRootPrivileges() const {
 bool Env::ChangeUser(uid_t uid, gid_t gid) const {
   // TODO(wad) support supplemental groups
   DLOG(INFO) << "Dropping root...";
-  if (setgroups(0, NULL)) {
-    PLOG(FATAL) << "Failed to drop supplementary groups";
+  struct passwd* entry = getpwuid(uid);
+  endpwent();
+  if (!entry) {
+    LOG(INFO) << "UID is unknown. Clearing all supplemental groups";
+    PLOG_IF(FATAL, setgroups(0, NULL))
+        << "Failed to clear supplementary groups";
+  } else {
+    PLOG_IF(FATAL, initgroups(entry->pw_name, entry->pw_gid))
+      << "Failed to set supplementary groups";
   }
   if (setresgid(gid, gid, gid)) {
     PLOG(FATAL) << "Failed to change to gid " << gid;
