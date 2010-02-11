@@ -21,14 +21,20 @@ benchmark_sources = glob.glob("*_microbenchmark.cc")
 
 env.Append(
     CPPPATH=['..', '../../third_party/chrome/files', '../../common'],
-    CCFLAGS=['-g', '-fno-exceptions', '-Wall', '-Werror'],
+    CCFLAGS=['-g'],
     LIBPATH=['../../third_party/chrome'],
     LIBS=['cap', 'base', 'pthread', 'rt'],
 )
 for key in Split('CC CXX AR RANLIB LD NM CFLAGS CCFLAGS'):
   value = os.environ.get(key)
   if value != None:
-    env[key] = value
+    env[key] = Split(value)
+env['CCFLAGS'] += ['-fno-exceptions', '-Wall', '-Werror']
+
+# Fix issue with scons not passing some vars through the environment.
+for key in Split('PKG_CONFIG_LIBDIR PKG_CONFIG_PATH SYSROOT'):
+  if os.environ.has_key(key):
+    env['ENV'][key] = os.environ[key]
 
 env_lib = env.Clone()
 env_lib.SharedLibrary('minijail', lib_sources)
