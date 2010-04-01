@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <base/logging.h>
@@ -203,9 +204,20 @@ bool Env::EnterNamespace(int namespaces) const {
     return false;
   }
   if (pid) {
+    // We want to wait on the child pid to ensure that pid-tracking code
+    // isn't completely broken.
+    int status = 0;
+    waitpid(pid, &status, 0);
     // Kill the original process without atexit handlers.
-    DLOG(INFO) << "original process death:" << pid;
-    _exit(0);
+    DLOG(INFO) << "jailed process death:" << pid;
+    if (WIFEXITED(status)) {
+      _exit(WEXITSTATUS(status));
+    }
+    if (WIFSIGNALED(status)) {
+      _exit(WTERMSIG(status));
+    }
+    DLOG(INFO) << "unknown terminal condition for child";
+    _exit(1);
   }
   DLOG(INFO) << "Success: " << getpid();
   return true;
