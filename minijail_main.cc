@@ -116,16 +116,13 @@ static void ProcessSwitches(CommandLine *cl,
 
   // Grab the loose args to use as the command line.
   // We have to wstring->argv[][] manually. Ugh.
-  std::vector<std::wstring> loose_wide_args = cl->GetLooseValues();
-  std::vector<std::string> loose_args(loose_wide_args.size());
-  char const* *jailed_argv = new char const*[loose_wide_args.size() + 1];
-  std::vector<std::wstring>::const_iterator arg_it = loose_wide_args.begin();
+  std::vector<std::string> loose_args = cl->args();
+  char const* *jailed_argv = new char const*[loose_args.size() + 1];
+  std::vector<std::string>::const_iterator arg_it = loose_args.begin();
   char const* *ja = jailed_argv;
-  for (; arg_it != loose_wide_args.end(); ++arg_it) {
-    std::string arg = WideToASCII(*arg_it);
-    loose_args.push_back(arg);
+  for (; arg_it != loose_args.end(); ++arg_it) {
     // XXX: clean up this leak even though it doesn't matter.
-    *ja++ = strdup(arg.c_str());
+    *ja++ = strdup(arg_it->c_str());
   }
   *ja = 0;
 
@@ -155,4 +152,3 @@ int main(int argc, char *argv[], char **envp) {
   bool ok = jail.Jail() && jail.Run();
   return !ok;
 }
-
