@@ -24,6 +24,7 @@ class Options {
               arguments_(NULL),
               environment_(NULL),
               add_readonly_mounts_(false),
+              caps_bitmask_(0),
               change_gid_(false),
               change_uid_(false),
               disable_tracing_(false),
@@ -110,6 +111,9 @@ class Options {
   // removed from the effective, inherited, permitted and bounding sets.
   virtual void set_use_capabilities(bool val) { use_capabilities_ = val; }
   virtual bool use_capabilities() const { return use_capabilities_; }
+  // The set of caps to use when use_capabilities is set.
+  virtual void set_caps_bitmask(uint64 val) { caps_bitmask_ = val; }
+  virtual uint64 caps_bitmask() const { return caps_bitmask_; }
 
 #if 0
   TODO(wad): additional functionality:
@@ -120,9 +124,6 @@ class Options {
     { supplemental_groups_ = val; }
   virtual const std::vector<std::string> *supplemental_groups() const
     { return supplemental_groups_; }
-
-  virtual void set_bounding_set(uint64 val) { bounding_set_ = val; }
-  virtual uint64 bounding_set() const { return bounding_set_; }
 
   virtual void set_use_delayed_chroot(bool val) { use_delayed_chroot_ = val; }
   virtual bool use_delayed_chroot() const { return use_delayed_chroot_; }
@@ -163,6 +164,7 @@ class Options {
   char * const *environment_;
 
   bool add_readonly_mounts_;
+  uint64 caps_bitmask_;
   bool change_gid_;
   bool change_uid_;
   bool disable_tracing_;

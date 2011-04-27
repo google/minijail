@@ -1,4 +1,4 @@
-// Copyright (c) 2009 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 // Some portions Copyright (c) 2009 The Chromium Authors.
@@ -79,11 +79,10 @@ bool MiniJail::Jail() const {
   }
 
   if (opts->use_capabilities()) {
-    // TODO(wad) use helpers to read caps from flags
-    if (!env->SanitizeCapabilities(0)) {
+    if (!env->SanitizeCapabilities(opts->caps_bitmask())) {
       return false;
     }
-    if (!env->SanitizeBoundingSet(0)) {
+    if (!env->SanitizeBoundingSet(opts->caps_bitmask())) {
       return false;
     }
   }

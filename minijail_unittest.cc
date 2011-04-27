@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2010 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 // Some portions Copyright (c) 2009 The Chromium Authors.
@@ -118,6 +118,33 @@ TEST_F(MiniJailTest, NamespaceFlagsAll) {
     .Times(1)
     .WillOnce(Return(true));
   EXPECT_TRUE(jail.Jail());  // all works on first call
+}
+
+TEST_F(MiniJailTest, UseCapabilities) {
+  MiniJail jail;
+  jail.Initialize(options_.get());
+
+  uint64 caps = 7;
+  EXPECT_CALL(*env_, EnterNamespace(CLONE_NEWPID))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*env_, KeepRootCapabilities())
+      .WillOnce(Return(true));
+  EXPECT_CALL(*env_, DisableDefaultRootPrivileges())
+      .WillOnce(Return(true));
+  EXPECT_CALL(*env_, SanitizeCapabilities(caps))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*env_, SanitizeBoundingSet(caps))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*options_, namespace_pid())
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(*options_, namespace_vfs())
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(*options_, use_capabilities())
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(*options_, caps_bitmask())
+      .WillRepeatedly(Return(caps));
+  EXPECT_TRUE(jail.Jail());
 }
 
 // TODO(wad) finish up test cases for each conditional

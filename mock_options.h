@@ -29,6 +29,7 @@ class MockOptions : public Options {
   MOCK_CONST_METHOD0(environment, char * const *());
 
   MOCK_METHOD1(set_add_readonly_mounts, void(bool));
+  MOCK_METHOD1(set_caps_bitmask, void(uint64));
   MOCK_METHOD1(set_disable_tracing, void(bool));
   MOCK_METHOD1(set_enforce_syscalls_benchmark, void(bool));
   MOCK_METHOD1(set_enforce_syscalls_by_source, void(bool));
@@ -40,6 +41,7 @@ class MockOptions : public Options {
   MOCK_METHOD1(set_use_capabilities, void(bool));
 
   MOCK_CONST_METHOD0(add_readonly_mounts, bool());
+  MOCK_CONST_METHOD0(caps_bitmask, uint64());
   MOCK_CONST_METHOD0(disable_tracing, bool());
   MOCK_CONST_METHOD0(enforce_syscalls_benchmark, bool());
   MOCK_CONST_METHOD0(enforce_syscalls_by_source, bool());

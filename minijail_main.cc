@@ -1,7 +1,7 @@
-// Copyright (c) 2009 The Chromium OS Authors. All rights reserved.
+// Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-// Some portions Copyright (c) 2009 The Chromium Authors.
+// Some portions Copyright (c) 2011 The Chromium Authors.
 //
 // Driver program for applying a minijail from the commandline to
 // a process and its children (depending on the feature).
@@ -22,6 +22,7 @@
 #include <base/basictypes.h>
 #include <base/command_line.h>
 #include <base/logging.h>
+#include <base/string_number_conversions.h>
 #include <base/string_util.h>
 
 namespace switches {
@@ -63,7 +64,7 @@ static const char kHelpMessage[] = "Available Switches:\n"
 "    (Note, this is a blacklist and not a whitelist so it may need attention)\n"
 "  --uid [number]\n"
 "    Numeric uid to transition to prior to execution.\n"
-"  --use-capabilities\n"
+"  --use-capabilities [uint64 bitmask]\n"
 "    Restricts all root-level capabilities to CAP_SETPCAP and enables\n"
 "    SECURE_NOROOT.\n"
 "  -- /path/to/program [arg1 [arg2 [ . . . ] ] ]\n"
@@ -93,6 +94,17 @@ static void ProcessSwitches(CommandLine *cl,
   jail_opts->set_use_capabilities(cl->HasSwitch(switches::kUseCapabilities));
   jail_opts->set_sanitize_environment(
     cl->HasSwitch(switches::kSanitizeEnvironment));
+
+  if (jail_opts->use_capabilities()) {
+    jail_opts->set_caps_bitmask(0);
+    // TODO(cmasone): switch to something that parses unsigned ints.
+    int64 caps = 0;
+    if (base::StringToInt64(
+            cl->GetSwitchValueASCII(switches::kUseCapabilities), &caps)) {
+      uint64 bitmask = (caps < 0 ? 0 : caps);
+      jail_opts->set_caps_bitmask(bitmask);
+    }
+  }
 
   std::string uid_string = cl->GetSwitchValueASCII(switches::kUid);
   if (!uid_string.empty()) {
