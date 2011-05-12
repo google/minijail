@@ -150,7 +150,8 @@ int main(int argc, char *argv[], char **envp) {
   logging::InitLogging(NULL,
                        logging::LOG_ONLY_TO_SYSTEM_DEBUG_LOG,
                        logging::DONT_LOCK_LOG_FILE,
-                       logging::APPEND_TO_OLD_LOG_FILE);
+                       logging::APPEND_TO_OLD_LOG_FILE,
+                       logging::DISABLE_DCHECK_FOR_NON_OFFICIAL_RELEASE_BUILDS);
 
   chromeos::MiniJailOptions jail_opts;
   CommandLine *cl = CommandLine::ForCurrentProcess();

@@ -9,7 +9,7 @@
 #define __CHROMEOS_MINIJAIL_INTERFACE_H
 
 #include <base/basictypes.h>
-#include <base/scoped_ptr.h>
+#include <base/memory/scoped_ptr.h>
 
 namespace chromeos {
 namespace minijail {
