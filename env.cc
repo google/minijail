@@ -224,6 +224,8 @@ bool Env::EnterNamespace(int namespaces) const {
 }
 
 bool Env::Mount() const {
+  DLOG(INFO) << "Unmounting existing /proc";
+  umount("/proc");
   DLOG(INFO) << "Attempting to mount /proc RO.";
   if (mount("proc",
             "/proc",
