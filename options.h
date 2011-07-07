@@ -151,7 +151,7 @@ class Options {
   // Indicate if the uid was set.
   virtual bool change_uid() const { return change_uid_; }
   // Indicate if the gid was set.
-  virtual bool change_gid() const { return change_uid_; }
+  virtual bool change_gid() const { return change_gid_; }
   // Ensures that all inter-dependent options are properly set.
   virtual bool FixUpDependencies();
 
