@@ -9,9 +9,12 @@
 #include "minijail/minijail.h"
 
 #include <errno.h>
+#include <grp.h>
 #include <linux/capability.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <sys/prctl.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <iostream>
@@ -74,6 +77,46 @@ static const char kHelpMessage[] = "Available Switches:\n"
 
 }  // namespace switches
 
+static bool ParseUid(const std::string& str, uid_t *uid) {
+  int32 v;
+  if (base::StringToInt(str, &v)) {
+    *uid = v;
+    return true;
+  }
+
+  // Not an integer. Let's try for a user.
+  // Any character except ':' is valid in a username.
+  if (strchr(str.c_str(), ':'))
+    return false;
+  struct passwd *user = getpwnam(str.c_str());
+  if (user) {
+    *uid = user->pw_uid;
+    return true;
+  }
+
+  return false;
+}
+
+static bool ParseGid(const std::string& str, gid_t *gid) {
+  int32 v;
+  if (base::StringToInt(str, &v)) {
+    *gid = v;
+    return true;
+  }
+
+  // Not an integer, look for a group
+  // Any character except ':' is valid in a group name.
+  if (strchr(str.c_str(), ':'))
+    return false;
+  struct group *group = getgrnam(str.c_str());
+  if (group) {
+    *gid = group->gr_gid;
+    return true;
+  }
+
+  return false;
+}
+
 static void ProcessSwitches(CommandLine *cl,
                             chromeos::MiniJailOptions *jail_opts) {
   if (cl->HasSwitch(switches::kHelp)) {
@@ -108,17 +151,21 @@ static void ProcessSwitches(CommandLine *cl,
 
   std::string uid_string = cl->GetSwitchValueASCII(switches::kUid);
   if (!uid_string.empty()) {
-    errno = 0;
-    uid_t uid = static_cast<uid_t>(strtol(uid_string.c_str(), NULL, 0));
-    PLOG_IF(WARNING, errno) << "failed to parse uid";
+    uid_t uid;
+    if (!ParseUid(uid_string.c_str(), &uid)) {
+      LOG(ERROR) << "Failed to parse uid: " << uid_string;
+      exit(1);
+    }
     jail_opts->set_uid(uid);
   }
 
   std::string gid_string = cl->GetSwitchValueASCII(switches::kGid);
   if (!gid_string.empty()) {
-    errno = 0;
-    gid_t gid = static_cast<gid_t>(strtol(gid_string.c_str(), NULL, 0));
-    PLOG_IF(WARNING, errno) << "failed to parse gid";
+    gid_t gid;
+    if (!ParseGid(gid_string.c_str(), &gid)) {
+      LOG(ERROR) << "Failed to parse gid: " << gid_string;
+      exit(1);
+    }
     jail_opts->set_gid(gid);
   }
 
