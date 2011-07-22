@@ -1,0 +1,71 @@
+.TH MINIJAIL0 "1" "July 2011" "Chromium OS" "User Commands"
+.SH NAME
+minijail0 \- sandbox a process
+.SH SYNOPSIS
+.B minijail0
+[\fIOPTION\fR]... <\fIprogram\fR> [\fIargs\fR]...
+.SH DESCRIPTION
+.PP
+Runs PROGRAM inside a sandbox.
+.TP
+\fB-c <caps>\fR
+Restrict capabilities to \fIcaps\fR. When used in conjunction with \fB-u\fR and
+\fB-g\fR, this allows a program to have access to only certain parts of root's
+default privileges while running as another user and group ID altogether. Note
+that these capabilities are not inherited by subprocesses of the process given
+capabilities unless those subprocesses have POSIX file capabilities. See
+\fBcapabilities\fR(7).
+.TP
+\fB-G\fR
+Inherit all the supplementary groups of the user specified with \fB-u\fR. It
+is an error to use this option without having specified a \fBuser name\fR to
+\fB-u\fR.
+.TP
+\fB-g <group>\fR
+Change groups to \fIgroup\fR, which may be either a group name or a numeric
+group ID.
+.TP
+\fB-h\fR
+Print a help message.
+.TP
+\fB-p\fR
+Run inside a new PID namespace. This option will make it impossible for the
+program to see or affect processes that are not its descendants.
+.TP
+\fB-r\fR
+Remount certain filesystems readonly. Currently this only remounts /proc. This
+implies \fB-v\fR. Remounting /proc readonly means that even if the process has
+write access to a system config knob in /proc (e.g., in /sys/kernel), it cannot
+change the value.
+.TP
+\fB-s\fR
+Enable seccomp(2) in mode 1, which restricts the child process to a very small
+set of system calls. Support for more elaborate syscall filtering is coming.
+.TP
+\fB-u <user>\fR
+Change users to \fIuser\fR, which may be either a user name or a numeric user
+ID.
+.TP
+\fB-v\fR
+Run inside a new VFS namespace. This option makes the program's mountpoints
+independent of the rest of the system's.
+.SH IMPLEMENTATION
+This program is broken up into two parts: \fBminijail0\fR (the frontend) and a helper
+library called \fBlibminijailpreload\fR. Some jailings can only be achieved from
+the process to which they will actually apply - specifically capability use
+(since capabilities are not inherited to an exec'd process unless the exec'd
+process has POSIX file capabilities), seccomp (since we can't exec() once we're
+seccomp'd), and ptrace-disable (which is always cleared on exec().
+
+To this end, \fBlibminijailpreload\fR is forcibly loaded into all
+dynamically-linked target programs if any of these restrictions are in effect;
+we pass the specific restrictions in an environment variable which the preloaded
+library looks for. The forcibly-loaded library then applies the restrictions
+to the newly-loaded program.
+.SH AUTHOR
+Written by Elly Jones (ellyjones@chromium.org)
+.SH COPYRIGHT
+Copyright \(co 2011 The Chromium OS Authors
+License BSD-like.
+.SH "SEE ALSO"
+\fBlibminijail.h\fR
