@@ -14,7 +14,3 @@ libminijailpreload.so : libminijailpreload.c libminijail.o
 	$(CC) $(CFLAGS) -shared -o $@ $^ -ldl -lcap
 
 libminijail.o : libminijail.c libminijail.h
-
-install : minijail0 libminijailpreload.so
-	install -D minijail0 $(DESTDIR)usr/sbin/minijail0
-	install -D libminijailpreload.so $(DESTDIR)lib/libminijailpreload.so
