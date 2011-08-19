@@ -13,4 +13,6 @@
 static const char *kCommandEnvVar = "__MINIJAIL_PRELOAD";
 static const char *kLdPreloadEnvVar = "LD_PRELOAD";
 
+#define MINIJAIL_MAX_SECCOMP_FILTER_LINE 512
+
 #endif /* !LIBMINIJAIL_PRIVATE_H */

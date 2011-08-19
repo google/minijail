@@ -40,7 +40,12 @@ change the value.
 .TP
 \fB-s\fR
 Enable seccomp(2) in mode 1, which restricts the child process to a very small
-set of system calls. Support for more elaborate syscall filtering is coming.
+set of system calls.
+.TP
+\fB-S <arch-specific seccomp_filter policy file>\fR
+Enable seccomp(2) in mode 13 which restricts the child process to a set of
+system calls defined in the policy file.  Note that system calls often change
+names based on the architecture or mode. (uname -m is your friend.)
 .TP
 \fB-u <user>\fR
 Change users to \fIuser\fR, which may be either a user name or a numeric user
@@ -68,4 +73,4 @@ Written by Elly Jones (ellyjones@chromium.org)
 Copyright \(co 2011 The Chromium OS Authors
 License BSD-like.
 .SH "SEE ALSO"
-\fBlibminijail.h\fR
+\fBlibminijail.h\fR \fBminijail0(5)\fR
