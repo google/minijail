@@ -1,6 +1,7 @@
 /* Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file. */
+ * found in the LICENSE file.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +9,7 @@
 #include <unistd.h>
 
 #include "libminijail.h"
+#include "libsyscalls.h"
 
 static void set_user(struct minijail *j, const char *arg) {
   char *end = NULL;
@@ -49,23 +51,36 @@ static void use_caps(struct minijail *j, const char *arg) {
 }
 
 static void usage(const char *progn) {
-  printf("Usage: %s [-Ghprsv] [-c <caps>] [-g <group>] [-u <user>] <program> [args...]\n"
+  printf("Usage: %s [-Ghprsv] [-c <caps>] [-g <group>] [-S <file>] [-u <user>] "
+         "<program> [args...]\n"
          "  -c: restrict caps to <caps>\n"
          "  -G: inherit groups from uid\n"
          "  -g: change gid to <group>\n"
          "  -h: help (this message)\n"
+         "  -H: seccomp filter help message\n"
          "  -p: use pid namespace\n"
          "  -r: remount filesystems readonly (implies -v)\n"
          "  -s: use seccomp\n"
+         "  -S: set seccomp filters using <file>\n"
+         "      E.g., -S /usr/share/blah/seccomp_filters.$(uname -m)\n"
          "  -u: change uid to <user>\n"
          "  -v: use vfs namespace\n", progn);
+}
+
+static void seccomp_filter_usage(const char *progn) {
+  const struct syscall_entry *entry = syscall_table;
+  printf("Usage: %s -S <policy.file> <program> [args...]\n\n"
+         "System call names supported:\n", progn);
+  for (; entry->name && entry->nr >= 0; ++entry)
+    printf("  %s [%d]\n", entry->name, entry->nr);
+  printf("\nSee minijail0(5) for example policies.\n");
 }
 
 int main(int argc, char *argv[]) {
   struct minijail *j = minijail_new();
 
   int opt;
-  while ((opt = getopt(argc, argv, "u:g:sc:vrGhp")) != -1) {
+  while ((opt = getopt(argc, argv, "u:g:sS:c:vrGhHp")) != -1) {
     switch (opt) {
       case 'u':
         set_user(j, optarg);
@@ -75,6 +90,10 @@ int main(int argc, char *argv[]) {
         break;
       case 's':
         minijail_use_seccomp(j);
+        break;
+      case 'S':
+        minijail_parse_seccomp_filters(j, optarg);
+        minijail_use_seccomp_filter(j);
         break;
       case 'c':
         use_caps(j, optarg);
@@ -91,6 +110,9 @@ int main(int argc, char *argv[]) {
       case 'p':
         minijail_namespace_pids(j);
         break;
+      case 'H':
+        seccomp_filter_usage(argv[0]);
+        exit(1);
       default:
         usage(argv[0]);
         exit(1);

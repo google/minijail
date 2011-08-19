@@ -1,9 +1,11 @@
 /* Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file. */
+ * found in the LICENSE file.
+ */
 
 #define _BSD_SOURCE
 #define _GNU_SOURCE
+#include <ctype.h>
 #include <errno.h>
 #include <grp.h>
 #include <inttypes.h>
@@ -24,7 +26,23 @@
 #include <unistd.h>
 
 #include "libminijail.h"
+#include "libsyscalls.h"
 #include "libminijail-private.h"
+
+/* Until these are reliably available in linux/prctl.h */
+#ifndef PR_SET_SECCOMP_FILTER
+#  define PR_SECCOMP_FILTER_SYSCALL 0
+#  define PR_SECCOMP_FILTER_EVENT 1
+#  define PR_GET_SECCOMP_FILTER 35
+#  define PR_SET_SECCOMP_FILTER 36
+#  define PR_CLEAR_SECCOMP_FILTER 37
+#endif
+
+struct seccomp_filter {
+  int nr;
+  char *filter;
+  struct seccomp_filter *next, *prev;
+};
 
 struct minijail {
   struct {
@@ -37,6 +55,7 @@ struct minijail {
     int readonly : 1;
     int usergroups : 1;
     int ptrace : 1;
+    int seccomp_filter : 1;
   } flags;
   uid_t uid;
   gid_t gid;
@@ -44,17 +63,19 @@ struct minijail {
   const char *user;
   uint64_t caps;
   pid_t initpid;
+  struct seccomp_filter *filters;
 };
 
-static void pdie(const char *failed) {
-  syslog(LOG_ERR, "libminijail: %s failed: %s", failed, strerror(errno));
-  abort();
-}
+#define die(_msg, ...) do { \
+  syslog(LOG_ERR, "libminijail: " _msg, ## __VA_ARGS__); \
+  abort(); \
+} while (0)
 
-static void die(const char *failed) {
-  syslog(LOG_ERR, "libminijail: %s", failed);
-  abort();
-}
+#define pdie(_msg, ...) \
+  die(_msg ": %s", ## __VA_ARGS__, strerror(errno))
+
+#define warn(_msg, ...) \
+  syslog(LOG_WARNING, "libminijail: " _msg, ## __VA_ARGS__)
 
 struct minijail *minijail_new(void) {
   struct minijail *j = malloc(sizeof(*j));
@@ -117,6 +138,10 @@ void minijail_use_seccomp(struct minijail *j) {
   j->flags.seccomp = 1;
 }
 
+void minijail_use_seccomp_filter(struct minijail *j) {
+  j->flags.seccomp_filter = 1;
+}
+
 void minijail_use_caps(struct minijail *j, uint64_t capmask) {
   j->caps = capmask;
   j->flags.caps = 1;
@@ -141,6 +166,104 @@ void minijail_inherit_usergroups(struct minijail *j) {
 
 void minijail_disable_ptrace(struct minijail *j) {
   j->flags.ptrace = 1;
+}
+
+int minijail_add_seccomp_filter(struct minijail *j, int nr,
+                                const char *filter) {
+  struct seccomp_filter *sf;
+  if (!filter || nr < 0)
+    return -EINVAL;
+
+  sf = malloc(sizeof(*sf));
+  if (!sf)
+    return -ENOMEM;
+  sf->nr = nr;
+  sf->filter = strndup(filter, MINIJAIL_MAX_SECCOMP_FILTER_LINE);
+  if (!sf->filter) {
+    free(sf);
+    return -ENOMEM;
+  }
+
+  if (!j->filters) {
+    j->filters = sf;
+    sf->next = sf;
+    sf->prev = sf;
+    return 0;
+  }
+  sf->next = j->filters;
+  sf->prev = j->filters->prev;
+  sf->prev->next = sf;
+  j->filters->prev = sf;
+  return 0;
+}
+
+int minijail_lookup_syscall(const char *name) {
+  const struct syscall_entry *entry = syscall_table;
+  for (; entry->name && entry->nr >= 0; ++entry)
+    if (!strcmp(entry->name, name))
+      return entry->nr;
+  return -1;
+}
+
+static char *strip(char *s) {
+  char *end;
+  while (*s && isblank(*s))
+    s++;
+  end = s + strlen(s) - 1;
+  while (*end && (isblank(*end) || *end == '\n'))
+    end--;
+  *(end+1) = '\0';
+  return s;
+}
+
+void minijail_parse_seccomp_filters(struct minijail *j, const char *path) {
+  FILE *file = fopen(path, "r");
+  char line[MINIJAIL_MAX_SECCOMP_FILTER_LINE];
+  int count = 1;
+  if (!file)
+    pdie("failed to open seccomp filters file");
+
+  /* Format is simple:
+   * syscall_name<COLON><FILTER STRING>[\n|EOF]
+   * #...comment...
+   * <empty line?
+   */
+  while (fgets(line, sizeof(line), file)) {
+    char *filter = line;
+    char *name = strsep(&filter, ":");
+    char *name_end = NULL;
+    int nr = -1;
+
+    if (!name)
+      die("invalid filter on line %d", count);
+
+    name = strip(name);
+
+    if (!filter) {
+      if (strlen(name))
+        die("invalid filter on line %d", count);
+      /* Allow empty lines */
+      continue;
+    }
+
+    /* Allow comment lines */
+    if (*name == '#')
+      continue;
+
+    filter = strip(filter);
+
+    /* Take direct syscall numbers */
+    nr = strtol(name, &name_end, 0);
+    /* Or fail-over to using names */
+    if (*name_end != '\0')
+      nr = minijail_lookup_syscall(name);
+    if (nr < 0)
+      die("syscall '%s' unknown", name);
+
+    if (minijail_add_seccomp_filter(j, nr, filter))
+      pdie("failed to add filter for syscall '%s'", name);
+  }
+  fclose(file);
 }
 
 static int remount_readonly(void) {
@@ -191,9 +314,58 @@ static void drop_caps(const struct minijail *j) {
   }
 }
 
+static int setup_seccomp_filters(const struct minijail *j) {
+  const struct seccomp_filter *sf = j->filters;
+  int ret = 0;
+  int broaden = 0;
+
+  /* No filters installed isn't necessarily an error. */
+  if (!sf)
+    return ret;
+
+  do {
+    errno = 0;
+    ret = prctl(PR_SET_SECCOMP_FILTER, PR_SECCOMP_FILTER_SYSCALL,
+                    sf->nr, broaden ? "1" : sf->filter);
+    if (ret) {
+      switch (errno) {
+        case ENOSYS:
+          /* TODO(wad) make this a config option */
+          if (broaden)
+            die("CONFIG_SECCOMP_FILTER is not supported by your kernel");
+          warn("missing CONFIG_FTRACE_SYSCALLS; relaxing the filter for %d",
+               sf->nr);
+          broaden = 1;
+          continue;
+        case E2BIG:
+          warn("seccomp filter too long: %d", sf->nr);
+          pdie("filter too long");
+        case ENOSPC:
+          pdie("too many seccomp filters");
+        case EPERM:
+          warn("syscall filter disallowed for %d", sf->nr);
+          pdie("failed to install seccomp filter");
+        case EINVAL:
+          warn("seccomp filter or call method is invalid. %d:'%s'",
+               sf->nr, sf->filter);
+        default:
+          pdie("failed to install seccomp filter");
+      }
+    }
+    sf = sf->next;
+    broaden = 0;
+  } while (sf != j->filters);
+  return ret;
+}
+
 void minijail_enter(const struct minijail *j) {
+  int ret;
   if (j->flags.pids)
     die("tried to enter a pid-namespaced jail; try minijail_run()?");
+
+  ret = setup_seccomp_filters(j);
+  if (j->flags.seccomp_filter && ret)
+    die("failed to configure seccomp filters");
 
   if (j->flags.usergroups && !j->user)
     die("usergroup inheritance without username");
@@ -217,10 +389,11 @@ void minijail_enter(const struct minijail *j) {
       pdie("prctl(PR_SET_SECUREBITS)");
   }
 
-  if (j->flags.usergroups && initgroups(j->user, j->usergid))
+  if (j->flags.usergroups && initgroups(j->user, j->usergid)) {
     pdie("initgroups");
-  else if (!j->flags.usergroups && setgroups(0, NULL))
+  } else if (!j->flags.usergroups && setgroups(0, NULL)) {
     pdie("setgroups");
+  }
 
   if (j->flags.gid && setresgid(j->gid, j->gid, j->gid))
     pdie("setresgid");
@@ -233,6 +406,9 @@ void minijail_enter(const struct minijail *j) {
 
   /* seccomp has to come last since it cuts off all the other
    * privilege-dropping syscalls :) */
+  if (j->flags.seccomp_filter && prctl(PR_SET_SECCOMP, 13))
+        pdie("prctl(PR_SET_SECCOMP, 13)");
+
   if (j->flags.seccomp && prctl(PR_SET_SECCOMP, 1))
     pdie("prctl(PR_SET_SECCOMP)");
 }
@@ -291,6 +467,10 @@ static int move_commands_to_env(struct minijail *j) {
   j->flags.caps = 0;
   j->flags.ptrace = 0;
   j->flags.seccomp = 0;
+
+  if (j->flags.seccomp_filter)
+    warn("TODO(wad) seccomp_filter is installed in the parent which "
+         "requires overly permissive rules for execve(2)ing.");
 
   r = snprintf(envbuf, kEnvBufSize, "%s%s%s%s", setuid, ptrace, seccomp, caps);
   if (!r) {
@@ -405,5 +585,15 @@ int minijail_wait(struct minijail *j) {
 }
 
 void minijail_destroy(struct minijail *j) {
+  struct seccomp_filter *f = j->filters;
+  /* Unlink the tail and head */
+  if (f)
+    f->prev->next = NULL;
+  while (f) {
+    struct seccomp_filter *next = f->next;
+    free(f->filter);
+    free(f);
+    f = next;
+  }
   free(j);
 }

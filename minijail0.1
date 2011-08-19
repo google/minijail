@@ -28,6 +28,11 @@ group ID.
 \fB-h\fR
 Print a help message.
 .TP
+\fB-H\fR
+Print a help message detailing supported system call names for seccomp_filter.
+(Other direct numbers may be specified if minijail0 is not in sync with the
+ host kernel or something like 32/64-bit compatibility issues exist.)
+.TP
 \fB-p\fR
 Run inside a new PID namespace. This option will make it impossible for the
 program to see or affect processes that are not its descendants.
@@ -40,7 +45,12 @@ change the value.
 .TP
 \fB-s\fR
 Enable seccomp(2) in mode 1, which restricts the child process to a very small
-set of system calls. Support for more elaborate syscall filtering is coming.
+set of system calls.
+.TP
+\fB-S <arch-specific seccomp_filter policy file>\fR
+Enable seccomp(2) in mode 13 which restricts the child process to a set of
+system calls defined in the policy file.  Note that system calls often change
+names based on the architecture or mode. (uname -m is your friend.)
 .TP
 \fB-u <user>\fR
 Change users to \fIuser\fR, which may be either a user name or a numeric user
@@ -68,4 +78,4 @@ Written by Elly Jones (ellyjones@chromium.org)
 Copyright \(co 2011 The Chromium OS Authors
 License BSD-like.
 .SH "SEE ALSO"
-\fBlibminijail.h\fR
+\fBlibminijail.h\fR \fBminijail0(5)\fR
