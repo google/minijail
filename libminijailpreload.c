@@ -77,6 +77,10 @@ static int fake_main(int argc, char **argv, char **envp) {
       v = atoi(val);
       minijail_change_uid(j, v);
     }
+    else if (!strcmp(key, "gid")) {
+      v = atoi(val);
+      minijail_change_gid(j, v);
+    }
     else if (!strcmp(key, "seccomp"))
       minijail_use_seccomp(j);
   }
