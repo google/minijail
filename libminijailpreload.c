@@ -87,7 +87,7 @@ static int fake_main(int argc, char **argv, char **envp) {
   /* TODO(ellyjones): this trashes existing preloads, so one can't do:
    * LD_PRELOAD="/tmp/test.so libminijailpreload.so" prog; the descendants of
    * prog will have no LD_PRELOAD set at all. */
-  unset_in_env(envp, "LD_PRELOAD");
+  unset_in_env(envp, kLdPreloadEnvVar);
   minijail_enter(j);
   minijail_destroy(j);
   free(oldcopy);

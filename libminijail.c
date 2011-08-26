@@ -303,7 +303,7 @@ static int move_commands_to_env(struct minijail *j) {
     return -E2BIG;
   }
 
-  oldenv = getenv("LD_PRELOAD") ? : "";
+  oldenv = getenv(kLdPreloadEnvVar) ? : "";
   newenv = malloc(strlen(oldenv) + 2 + strlen(PRELOADPATH));
   if (!newenv) {
     free(envbuf);
@@ -314,7 +314,7 @@ static int move_commands_to_env(struct minijail *j) {
   sprintf(newenv, "%s%s%s", oldenv, strlen(oldenv) ? " " : "", PRELOADPATH);
 
   /* setenv() makes a copy of the string we give it */
-  setenv("LD_PRELOAD", newenv, 1);
+  setenv(kLdPreloadEnvVar, newenv, 1);
   setenv(kCommandEnvVar, envbuf, 1);
   free(newenv);
   free(envbuf);
@@ -323,16 +323,39 @@ static int move_commands_to_env(struct minijail *j) {
 
 int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
   unsigned int pidns = j->flags.pids ? CLONE_NEWPID : 0;
+  char *oldenv, *oldenv_copy = NULL;
   pid_t r;
+
+  oldenv = getenv(kLdPreloadEnvVar);
+  if (oldenv) {
+    oldenv_copy = strdup(oldenv);
+    if (!oldenv_copy)
+      return -ENOMEM;
+  }
+
   r = move_commands_to_env(j);
-  if (r)
+  if (r) {
+    /* No environment variable is modified if move_commands_to_env returns
+     * a non-zero value. */
+    free(oldenv_copy);
     return r;
+  }
 
   r = syscall(SYS_clone, pidns | SIGCHLD, NULL);
   if (r > 0) {
+    if (oldenv_copy) {
+      setenv(kLdPreloadEnvVar, oldenv_copy, 1);
+      free(oldenv_copy);
+    } else {
+      unsetenv(kLdPreloadEnvVar);
+    }
+    unsetenv(kCommandEnvVar);
     j->initpid = r;
     return 0;
   }
+
+  free(oldenv_copy);
+
   if (r < 0)
     return r;
 
@@ -384,4 +407,3 @@ int minijail_wait(struct minijail *j) {
 void minijail_destroy(struct minijail *j) {
   free(j);
 }
-

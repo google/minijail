@@ -11,5 +11,6 @@
 #define LIBMINIJAIL_PRIVATE_H
 
 static const char *kCommandEnvVar = "__MINIJAIL_PRELOAD";
+static const char *kLdPreloadEnvVar = "LD_PRELOAD";
 
 #endif /* !LIBMINIJAIL_PRIVATE_H */
