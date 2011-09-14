@@ -1,7 +1,6 @@
 /* Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file.
- */
+ * found in the LICENSE file. */
 
 /* The general pattern of use here:
  * 1) Construct a minijail with minijail_new()
@@ -42,23 +41,12 @@ int minijail_change_user(struct minijail *j, const char *user);
 /* 'group' should be kept valid until minijail_destroy() */
 int minijail_change_group(struct minijail *j, const char *group);
 void minijail_use_seccomp(struct minijail *j);
-void minijail_use_seccomp_filter(struct minijail *j);
-void minijail_parse_seccomp_filters(struct minijail *j, const char *path);
-int minijail_add_seccomp_filter(struct minijail *j, int nr,
-                                const char *filter);
 void minijail_use_caps(struct minijail *j, uint64_t capmask);
 void minijail_namespace_vfs(struct minijail *j);
 void minijail_namespace_pids(struct minijail *j);
 void minijail_remount_readonly(struct minijail *j);
 void minijail_inherit_usergroups(struct minijail *j);
 void minijail_disable_ptrace(struct minijail *j);
-
-/* Exposes minijail's name-to-int mapping for system calls for the
- * architecture it was built on.  This is primarily exposed for
- * minijail_add_seccomp_filter() and testing.
- * Returns the system call number on success or -1 on failure.
- */
-int minijail_lookup_syscall(const char *name);
 
 /* Lock this process into the given minijail. Note that this procedure cannot fail,
  * since there is no way to undo privilege-dropping; therefore, if any part of

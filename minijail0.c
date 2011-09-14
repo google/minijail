@@ -1,7 +1,6 @@
 /* Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file.
- */
+ * found in the LICENSE file. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,8 +49,7 @@ static void use_caps(struct minijail *j, const char *arg) {
 }
 
 static void usage(const char *progn) {
-  printf("Usage: %s [-Ghprsv] [-c <caps>] [-g <group>] [-S <file>] [-u <user>] "
-         "<program> [args...]\n"
+  printf("Usage: %s [-Ghprsv] [-c <caps>] [-g <group>] [-u <user>] <program> [args...]\n"
          "  -c: restrict caps to <caps>\n"
          "  -G: inherit groups from uid\n"
          "  -g: change gid to <group>\n"
@@ -59,8 +57,6 @@ static void usage(const char *progn) {
          "  -p: use pid namespace\n"
          "  -r: remount filesystems readonly (implies -v)\n"
          "  -s: use seccomp\n"
-         "  -S: set seccomp filters using <file>\n"
-         "      E.g., -S /usr/share/blah/seccomp_filters.$(uname -m)\n"
          "  -u: change uid to <user>\n"
          "  -v: use vfs namespace\n", progn);
 }
@@ -69,7 +65,7 @@ int main(int argc, char *argv[]) {
   struct minijail *j = minijail_new();
 
   int opt;
-  while ((opt = getopt(argc, argv, "u:g:sS:c:vrGhp")) != -1) {
+  while ((opt = getopt(argc, argv, "u:g:sc:vrGhp")) != -1) {
     switch (opt) {
       case 'u':
         set_user(j, optarg);
@@ -79,10 +75,6 @@ int main(int argc, char *argv[]) {
         break;
       case 's':
         minijail_use_seccomp(j);
-        break;
-      case 'S':
-        minijail_parse_seccomp_filters(j, optarg);
-        minijail_use_seccomp_filter(j);
         break;
       case 'c':
         use_caps(j, optarg);
