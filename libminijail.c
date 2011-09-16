@@ -39,34 +39,6 @@
 #  define PR_CLEAR_SECCOMP_FILTER 37
 #endif
 
-struct seccomp_filter {
-  int nr;
-  char *filter;
-  struct seccomp_filter *next, *prev;
-};
-
-struct minijail {
-  struct {
-    int uid : 1;
-    int gid : 1;
-    int caps : 1;
-    int vfs : 1;
-    int pids : 1;
-    int seccomp : 1;
-    int readonly : 1;
-    int usergroups : 1;
-    int ptrace : 1;
-    int seccomp_filter : 1;
-  } flags;
-  uid_t uid;
-  gid_t gid;
-  gid_t usergid;
-  const char *user;
-  uint64_t caps;
-  pid_t initpid;
-  struct seccomp_filter *filters;
-};
-
 #define die(_msg, ...) do { \
   syslog(LOG_ERR, "libminijail: " _msg, ## __VA_ARGS__); \
   abort(); \
@@ -113,7 +85,9 @@ int minijail_change_user(struct minijail *j, const char *user) {
   if (!pw)
     return errno;
   minijail_change_uid(j, pw->pw_uid);
-  j->user = user;
+  j->user = strdup(user);
+  if (!j->user)
+    return -ENOMEM;
   j->usergid = pw->pw_gid;
   return 0;
 }
@@ -265,6 +239,65 @@ void minijail_parse_seccomp_filters(struct minijail *j, const char *path) {
       pdie("failed to add filter for syscall '%s'", name);
   }
   fclose(file);
+}
+
+size_t minijail_size(const struct minijail *j) {
+  size_t bytes = sizeof(*j);
+  if (j->user)
+    bytes += strlen(j->user) + 1;
+  /* TODO(wad) if (seccomp_filter) */
+  return bytes;
+}
+
+void minijail_preenter(struct minijail *j) {
+  /* Strip out options which are minijail_run() only. */
+  j->flags.pids = 0;
+  j->flags.vfs = 0;
+  j->flags.readonly = 0;
+}
+
+int minijail_marshal(const struct minijail *j, char *buf, size_t available) {
+  size_t total = sizeof(*j);
+  if (available < total)
+    return -ENOSPC;
+  available -= total;
+  memcpy(buf, (void *) j, sizeof(*j));
+  if (j->user) {
+    size_t len = strlen(j->user) + 1;
+    if (available < len)
+      return -ENOSPC;
+    memcpy(buf + total, j->user, len);
+    available -= len;
+    total += len;
+  }
+  return 0;
+}
+
+int minijail_unmarshal(struct minijail *j, char *serialized, size_t length) {
+  if (length < sizeof(*j))
+    return -EINVAL;
+  memcpy((void *) j, serialized, sizeof(*j));
+  serialized += sizeof(*j);
+  length -= sizeof(*j);
+  if (j->user) { /* stale pointer */
+    if (!length)
+      return -EINVAL;
+    j->user = strndup(serialized, length);
+    length -= strlen(j->user) + 1;
+  }
+  return 0;
+}
+
+void minijail_prefork(struct minijail *j) {
+  j->flags.uid = 0;
+  j->flags.caps = 0;
+  j->flags.seccomp = 0;
+  j->flags.usergroups = 0;
+  j->flags.ptrace = 0;
+  j->flags.seccomp_filter = 0;
+  if (j->user)
+    free(j->user);
+  j->user = NULL;
 }
 
 static int remount_readonly(void) {
@@ -615,5 +648,7 @@ void minijail_destroy(struct minijail *j) {
     free(f);
     f = next;
   }
+  if (j->user)
+    free(j->user);
   free(j);
 }

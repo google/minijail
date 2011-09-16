@@ -37,9 +37,9 @@ struct minijail *minijail_new(void);
  * explanations in detail of what the restrictions do. */
 void minijail_change_uid(struct minijail *j, uid_t uid);
 void minijail_change_gid(struct minijail *j, gid_t gid);
-/* 'user' should be kept valid until minijail_destroy() */
+/* Stores user to change to and copies |user| for internal consistency. */
 int minijail_change_user(struct minijail *j, const char *user);
-/* 'group' should be kept valid until minijail_destroy() */
+/* Does not take ownership of |group|. */
 int minijail_change_group(struct minijail *j, const char *group);
 void minijail_use_seccomp(struct minijail *j);
 void minijail_use_seccomp_filter(struct minijail *j);
