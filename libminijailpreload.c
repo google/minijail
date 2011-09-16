@@ -34,11 +34,6 @@ static void unset_in_env(char **envp, const char *name) {
       envp[i][0] = '\0';
 }
 
-static void splitarg(char *str, char **key, char **val) {
-  *key = strsep(&str, "=");
-  *val = strsep(&str, "");
-}
-
 /** @brief Fake main(), spliced in before the real call to main() by
  *         __libc_start_main (see below).
  *  We get serialized commands from our invoking process over an fd specified
@@ -48,10 +43,7 @@ static void splitarg(char *str, char **key, char **val) {
  */
 static int fake_main(int argc, char **argv, char **envp) {
   char *fd_name = getenv(kFdEnvVar);
-  char *arg = NULL;
-  size_t arg_len;
   int fd = -1;
-  FILE *args;
   struct minijail *j;
   if (geteuid() != getuid() || getegid() != getgid())
     /* If we didn't do this check, an attacker could set kFdEnvVar for
@@ -64,43 +56,20 @@ static int fake_main(int argc, char **argv, char **envp) {
   fd = atoi(fd_name);
   if (fd < 0)
     return MINIJAIL_ERR_PRELOAD;
-  args = fdopen(fd, "r");
-  if (!args)
-    return MINIJAIL_ERR_PRELOAD;
 
   j = minijail_new();
   if (!j)
     die("preload: out of memory");
-  while (getline(&arg, &arg_len, args) > 0) {
-    char *key, *val;
-    unsigned long v;
-    splitarg(arg, &key, &val);
-    if (!strcmp(arg, "eom\n")) {
-      break;
-    } else if (!strcmp(key, "caps")) {
-      v = strtoul(val, NULL, 16);
-      minijail_use_caps(j, v);
-    } else if (!strcmp(key, "ptrace")) {
-      minijail_disable_ptrace(j);
-    } else if (!strcmp(key, "uid")) {
-      v = atoi(val);
-      minijail_change_uid(j, v);
-    } else if (!strcmp(key, "gid")) {
-      v = atoi(val);
-      minijail_change_gid(j, v);
-    } else if (!strcmp(key, "seccomp")) {
-      minijail_use_seccomp(j);
-    }
-    free(arg);
-    arg = NULL;
-  }
-  if (!feof(args) && ferror(args))
-    die("preload: unexpected failure during unmarshalling");
-  fclose(args);
+  if (minijail_from_fd(fd, j))
+    die("preload: failed to parse minijail from parent");
+  close(fd);
+
   /* TODO(ellyjones): this trashes existing preloads, so one can't do:
    * LD_PRELOAD="/tmp/test.so libminijailpreload.so" prog; the descendants of
    * prog will have no LD_PRELOAD set at all. */
   unset_in_env(envp, kLdPreloadEnvVar);
+  /* Strip out flags meant for the parent. */
+  minijail_preenter(j);
   minijail_enter(j);
   minijail_destroy(j);
   dlclose(libc_handle);

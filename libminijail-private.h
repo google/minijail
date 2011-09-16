@@ -66,8 +66,12 @@ extern int minijail_marshal(const struct minijail *j,
 extern int minijail_unmarshal(struct minijail *j,
                               char *serialized,
                               size_t length);
-/* minijail_prefork: strips |j| of all options handled by minijail_enter(). */
-extern void minijail_prefork(struct minijail *j);
+/* Using minijail_unmarshal, build |j| from |fd|. */
+extern int minijail_from_fd(int fd, struct minijail *j);
+/* Using minijail_marshal, sends |j| to |fd|. */
+extern int minijail_to_fd(struct minijail *j, int fd);
+/* minijail_preexec: strips |j| of all options handled by minijail_enter(). */
+extern void minijail_preexec(struct minijail *j);
 /* minijail_preenter: strips |j| of all options handled by minijail_run(). */
 extern void minijail_preenter(struct minijail *j);
 

@@ -54,7 +54,7 @@ static void usage(const char *progn) {
   printf("Usage: %s [-Ghprsv] [-c <caps>] [-g <group>] [-S <file>] [-u <user>] "
          "<program> [args...]\n"
          "  -c: restrict caps to <caps>\n"
-         "  -G: inherit groups from uid\n"
+         "  -G: inherit secondary groups from uid\n"
          "  -g: change gid to <group>\n"
          "  -h: help (this message)\n"
          "  -H: seccomp filter help message\n"

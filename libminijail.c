@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <grp.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <linux/capability.h>
 #include <linux/securebits.h>
 #include <pwd.h>
@@ -249,13 +250,6 @@ size_t minijail_size(const struct minijail *j) {
   return bytes;
 }
 
-void minijail_preenter(struct minijail *j) {
-  /* Strip out options which are minijail_run() only. */
-  j->flags.pids = 0;
-  j->flags.vfs = 0;
-  j->flags.readonly = 0;
-}
-
 int minijail_marshal(const struct minijail *j, char *buf, size_t available) {
   size_t total = sizeof(*j);
   if (available < total)
@@ -288,16 +282,25 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length) {
   return 0;
 }
 
-void minijail_prefork(struct minijail *j) {
-  j->flags.uid = 0;
-  j->flags.caps = 0;
-  j->flags.seccomp = 0;
-  j->flags.usergroups = 0;
-  j->flags.ptrace = 0;
-  j->flags.seccomp_filter = 0;
+void minijail_preenter(struct minijail *j) {
+  /* Strip out options which are minijail_run() only. */
+  j->flags.vfs = 0;
+  j->flags.readonly = 0;
+  j->flags.pids = 0;
+}
+
+void minijail_preexec(struct minijail *j) {
+  int vfs = j->flags.vfs;
+  int readonly = j->flags.readonly;
   if (j->user)
     free(j->user);
   j->user = NULL;
+
+  memset(&j->flags, 0, sizeof(j->flags));
+  /* Now restore anything we meant to keep. */
+  j->flags.vfs = vfs;
+  j->flags.readonly = readonly;
+  /* Note, pidns will already have been used before this call. */
 }
 
 static int remount_readonly(void) {
@@ -468,50 +471,57 @@ static int init(pid_t rootpid) {
   _exit(WEXITSTATUS(init_exitstatus));
 }
 
-static int write_cmd(int fd, const char *fmt, ...) {
-  char cmd[MINIJAIL_MAX_ARG_LINE];
-  ssize_t written;
+int minijail_from_fd(int fd, struct minijail *j) {
+  size_t sz = 0;
+  size_t bytes = read(fd, &sz, sizeof(sz));
+  char *buf;
   int r;
-  va_list ap;
-
-  va_start(ap, fmt);
-  r = vsnprintf(cmd, sizeof(cmd), fmt, ap);
-  va_end(ap);
-
-  if (r <= 0)
-    return -EFAULT;
-  if ((size_t) r >= sizeof(cmd))
+  if (sizeof(sz) != bytes)
+    return -EINVAL;
+  if (sz > USHRT_MAX)  /* Arbitrary sanity check */
     return -E2BIG;
-
-  written = write(fd, cmd, r);
-  if (written != r)
-    return -EFAULT;
-  return 0;
+  buf = malloc(sz);
+  if (!buf)
+    return -ENOMEM;
+  bytes = read(fd, buf, sz);
+  if (bytes != sz) {
+    free(buf);
+    return -EINVAL;
+  }
+  r = minijail_unmarshal(j, buf, sz);
+  free(buf);
+  return r;
 }
 
-/** @brief Move any commands that need to be done post-exec into an environment
- *         variable
- *  @param j Jail to move commands from.
- *
- *  Serializes post-exec() commands into a string, removes them from the jail,
- *  and adds them to the environment; they will be deserialized later (see
- *  __minijail_preloaded) and executed inside the execve()'d process.
- */
-static int send_commands_to_child(struct minijail *j, int fd) {
-  if (j->flags.caps && write_cmd(fd, "caps=%" PRIx64 "\n", j->caps))
-    return -EFAULT;
-  if (j->flags.uid && write_cmd(fd, "uid=%d\n", j->uid))
-    return -EFAULT;
-  if (j->flags.ptrace && write_cmd(fd, "ptrace\n"))
-    return -EFAULT;
-  if (j->flags.seccomp && write_cmd(fd, "seccomp\n"))
-    return -EFAULT;
+int minijail_to_fd(struct minijail *j, int fd) {
+  char *buf;
+  size_t sz = minijail_size(j);
+  ssize_t written;
+  int r;
 
   if (j->flags.seccomp_filter)
     warn("TODO(wad) seccomp_filter is installed in the parent which "
          "requires overly permissive rules for execve(2)ing.");
-
-  return write_cmd(fd, "eom\n");
+  if (!sz)
+    return -EINVAL;
+  buf = malloc(sz);
+  if ((r = minijail_marshal(j, buf, sz))) {
+    free(buf);
+    return r;
+  }
+  /* Sends [size][minijail]. */
+  written = write(fd, &sz, sizeof(sz));
+  if (written != sizeof(sz)) {
+    free(buf);
+    return -EFAULT;
+  }
+  written = write(fd, buf, sz);
+  if (written < 0 || (size_t) written != sz) {
+    free(buf);
+    return -EFAULT;
+  }
+  free(buf);
+  return 0;
 }
 
 static int setup_preload(void) {
@@ -568,7 +578,7 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
     unsetenv(kFdEnvVar);
     j->initpid = r;
     close(pipe_fds[0]);
-    r = send_commands_to_child(j, pipe_fds[1]);
+    r = minijail_to_fd(j, pipe_fds[1]);
     close(pipe_fds[1]);
     if (r) {
       kill(j->initpid, SIGKILL);
@@ -582,16 +592,8 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
   if (r < 0)
     return r;
 
-  j->flags.uid = 0;
-  /* TODO(wad) gid should be sent over preload and not done in advance.
-   * j->flags.gid = 0;
-   */
-  j->flags.usergroups = 0;
-  j->flags.caps = 0;
-  j->flags.ptrace = 0;
-  j->flags.seccomp = 0;
-
-  j->flags.pids = 0;
+  /* Drop everything that cannot be inherited across execve. */
+  minijail_preexec(j);
 
   /* Jail this process and its descendants... */
   minijail_enter(j);
