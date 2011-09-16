@@ -14,36 +14,8 @@ static const char *kFdEnvVar = "__MINIJAIL_FD";
 static const char *kLdPreloadEnvVar = "LD_PRELOAD";
 
 #define MINIJAIL_MAX_SECCOMP_FILTER_LINE 512
-#define MINIJAIL_MAX_ARG_LINE (MINIJAIL_MAX_SECCOMP_FILTER_LINE + 64)
 
-struct seccomp_filter {
-  int nr;
-  char *filter;
-  struct seccomp_filter *next, *prev;
-};
-
-struct minijail {
-  struct {
-    int uid : 1;
-    int gid : 1;
-    int caps : 1;
-    int vfs : 1;
-    int pids : 1;
-    int seccomp : 1;
-    int readonly : 1;
-    int usergroups : 1;
-    int ptrace : 1;
-    int seccomp_filter : 1;
-  } flags;
-  uid_t uid;
-  gid_t gid;
-  gid_t usergid;
-  char *user;
-  uint64_t caps;
-  pid_t initpid;
-  struct seccomp_filter *filters;
-};
-
+struct minijail;
 /* minijail_size returns the size of |j| if marshalled.
  * 0 is returned on error.
  */

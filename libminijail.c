@@ -22,6 +22,7 @@
 #include <syscall.h>
 #include <sys/capability.h>
 #include <sys/mount.h>
+#include <sys/param.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
 #include <syslog.h>
@@ -50,6 +51,35 @@
 
 #define warn(_msg, ...) \
   syslog(LOG_WARNING, "libminijail: " _msg, ## __VA_ARGS__)
+
+struct seccomp_filter {
+  int nr;
+  char *filter;
+  struct seccomp_filter *next, *prev;
+};
+
+struct minijail {
+  struct {
+    int uid : 1;
+    int gid : 1;
+    int caps : 1;
+    int vfs : 1;
+    int pids : 1;
+    int seccomp : 1;
+    int readonly : 1;
+    int usergroups : 1;
+    int ptrace : 1;
+    int seccomp_filter : 1;
+  } flags;
+  uid_t uid;
+  gid_t gid;
+  gid_t usergid;
+  char *user;
+  uint64_t caps;
+  pid_t initpid;
+  int filter_count;
+  struct seccomp_filter *filters;
+};
 
 struct minijail *minijail_new(void) {
   struct minijail *j = malloc(sizeof(*j));
@@ -160,6 +190,8 @@ int minijail_add_seccomp_filter(struct minijail *j, int nr,
     return -ENOMEM;
   }
 
+  j->filter_count++;
+
   if (!j->filters) {
     j->filters = sf;
     sf->next = sf;
@@ -242,29 +274,62 @@ void minijail_parse_seccomp_filters(struct minijail *j, const char *path) {
   fclose(file);
 }
 
-size_t minijail_size(const struct minijail *j) {
-  size_t bytes = sizeof(*j);
+struct marshal_state {
+  size_t available;
+  size_t total;
+  char *buf;
+};
+
+static void marshal_state_init(struct marshal_state *state,
+                            char *buf,
+                            size_t available) {
+  state->available = available;
+  state->buf = buf;
+  state->total = 0;
+}
+
+static void marshal_append(struct marshal_state *state,
+                          char *src,
+                          size_t length) {
+  size_t copy_len = MIN(state->available, length);
+
+  /* Up to |available| will be written. */
+  if (copy_len) {
+    memcpy(state->buf, src, copy_len);
+    state->buf += copy_len;
+    state->available -= copy_len;
+  }
+  /* |total| will contain the expected length. */
+  state->total += length;
+}
+
+static void minijail_marshal_helper(struct marshal_state *state,
+                                    const struct minijail *j) {
+  marshal_append(state, (char *) j, sizeof(*j));
   if (j->user)
-    bytes += strlen(j->user) + 1;
-  /* TODO(wad) if (seccomp_filter) */
-  return bytes;
+    marshal_append(state, j->user, strlen(j->user) + 1);
+  if (j->flags.seccomp_filter && j->filters) {
+    struct seccomp_filter *f = j->filters;
+    do {
+      marshal_append(state, (char *) &f->nr, sizeof(f->nr));
+      marshal_append(state, f->filter, strlen(f->filter) + 1);
+      f = f->next;
+    } while (f != j->filters);
+  }
+}
+
+size_t minijail_size(const struct minijail *j) {
+  struct marshal_state state;
+  marshal_state_init(&state, NULL, 0);
+  minijail_marshal_helper(&state, j);
+  return state.total;
 }
 
 int minijail_marshal(const struct minijail *j, char *buf, size_t available) {
-  size_t total = sizeof(*j);
-  if (available < total)
-    return -ENOSPC;
-  available -= total;
-  memcpy(buf, (void *) j, sizeof(*j));
-  if (j->user) {
-    size_t len = strlen(j->user) + 1;
-    if (available < len)
-      return -ENOSPC;
-    memcpy(buf + total, j->user, len);
-    available -= len;
-    total += len;
-  }
-  return 0;
+  struct marshal_state state;
+  marshal_state_init(&state, buf, available);
+  minijail_marshal_helper(&state, j);
+  return (state.total > available);
 }
 
 int minijail_unmarshal(struct minijail *j, char *serialized, size_t length) {
@@ -273,11 +338,35 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length) {
   memcpy((void *) j, serialized, sizeof(*j));
   serialized += sizeof(*j);
   length -= sizeof(*j);
+
   if (j->user) { /* stale pointer */
     if (!length)
       return -EINVAL;
     j->user = strndup(serialized, length);
     length -= strlen(j->user) + 1;
+    serialized += strlen(j->user) + 1;
+  }
+
+  if (j->flags.seccomp_filter && j->filter_count) {
+    int count = j->filter_count;
+    /* Let add_seccomp_filter recompute the value. */
+    j->filter_count = 0;
+    j->filters = NULL;  /* Don't follow the stale pointer. */
+    for ( ; count > 0; --count) {
+      int *nr = (int *) serialized;
+      char *filter;
+      if (length < sizeof(*nr))
+        return -EINVAL;
+      length -= sizeof(*nr);
+      serialized += sizeof(*nr);
+      if (!length)
+        return -EINVAL;
+      filter = serialized;
+      if (minijail_add_seccomp_filter(j, *nr, filter))
+        return -EINVAL;
+      length -= strlen(filter) + 1;
+      serialized += strlen(filter) + 1;
+    }
   }
   return 0;
 }
@@ -295,7 +384,6 @@ void minijail_preexec(struct minijail *j) {
   if (j->user)
     free(j->user);
   j->user = NULL;
-
   memset(&j->flags, 0, sizeof(j->flags));
   /* Now restore anything we meant to keep. */
   j->flags.vfs = vfs;
@@ -396,13 +484,11 @@ static int setup_seccomp_filters(const struct minijail *j) {
 }
 
 void minijail_enter(const struct minijail *j) {
-  int ret;
   if (j->flags.pids)
     die("tried to enter a pid-namespaced jail; try minijail_run()?");
 
-  ret = setup_seccomp_filters(j);
-  if (j->flags.seccomp_filter && ret)
-    die("failed to configure seccomp filters");
+  if (j->flags.seccomp_filter && setup_seccomp_filters(j))
+    pdie("failed to configure seccomp filters");
 
   if (j->flags.usergroups && !j->user)
     die("usergroup inheritance without username");
@@ -460,6 +546,7 @@ static int init(pid_t rootpid) {
   pid_t pid;
   int status;
   signal(SIGTERM, init_term); /* so that we exit with the right status */
+  /* TODO(wad) self jail with seccomp_filters here. */
   while ((pid = wait(&status)) > 0) {
     /* This loop will only end when either there are no processes left inside
      * our pid namespace or we get a signal. */
@@ -499,9 +586,6 @@ int minijail_to_fd(struct minijail *j, int fd) {
   ssize_t written;
   int r;
 
-  if (j->flags.seccomp_filter)
-    warn("TODO(wad) seccomp_filter is installed in the parent which "
-         "requires overly permissive rules for execve(2)ing.");
   if (!sz)
     return -EINVAL;
   buf = malloc(sz);
@@ -539,12 +623,24 @@ static int setup_preload(void) {
   return 0;
 }
 
+static int setup_pipe(int fds[2]) {
+  int r = pipe(fds);
+  char fd_buf[11];
+  if (r)
+    return r;
+  r = snprintf(fd_buf, sizeof(fd_buf), "%d", fds[0]);
+  if (r <= 0)
+    return -EINVAL;
+  setenv(kFdEnvVar, fd_buf, 1);
+  return 0;
+}
+
 int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
   unsigned int pidns = j->flags.pids ? CLONE_NEWPID : 0;
   char *oldenv, *oldenv_copy = NULL;
-  pid_t r;
+  pid_t child_pid;
   int pipe_fds[2];
-  char fd_buf[11];
+  int ret;
 
   oldenv = getenv(kLdPreloadEnvVar);
   if (oldenv) {
@@ -552,23 +648,24 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
     if (!oldenv_copy)
       return -ENOMEM;
   }
-  r = setup_preload();
-  if (r)
-    return r;
+
+  if (setup_preload())
+    return -EFAULT;
 
   /* Before we fork(2) and execve(2) the child process, we need to open
    * a pipe(2) to send the minijail configuration over.
    */
-  r = pipe(pipe_fds);
-  if (r)
-    return r;
-  r = snprintf(fd_buf, sizeof(fd_buf), "%d", pipe_fds[0]);
-  if (r <= 0)
-    return -EINVAL;
-  setenv(kFdEnvVar, fd_buf, 1);
+  if (setup_pipe(pipe_fds))
+    return -EFAULT;
 
-  r = syscall(SYS_clone, pidns | SIGCHLD, NULL);
-  if (r > 0) {
+  child_pid = syscall(SYS_clone, pidns | SIGCHLD, NULL);
+  if (child_pid < 0) {
+    free(oldenv_copy);
+    return child_pid;
+  }
+
+  if (child_pid) {
+    /* Restore parent's LD_PRELOAD. */
     if (oldenv_copy) {
       setenv(kLdPreloadEnvVar, oldenv_copy, 1);
       free(oldenv_copy);
@@ -576,25 +673,20 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
       unsetenv(kLdPreloadEnvVar);
     }
     unsetenv(kFdEnvVar);
-    j->initpid = r;
-    close(pipe_fds[0]);
-    r = minijail_to_fd(j, pipe_fds[1]);
-    close(pipe_fds[1]);
-    if (r) {
+    j->initpid = child_pid;
+    close(pipe_fds[0]);  /* read endpoint */
+    ret = minijail_to_fd(j, pipe_fds[1]);
+    close(pipe_fds[1]);  /* write endpoint */
+    if (ret) {
       kill(j->initpid, SIGKILL);
       die("failed to send marshalled minijail");
     }
     return 0;
   }
-
   free(oldenv_copy);
-
-  if (r < 0)
-    return r;
 
   /* Drop everything that cannot be inherited across execve. */
   minijail_preexec(j);
-
   /* Jail this process and its descendants... */
   minijail_enter(j);
 
@@ -602,13 +694,12 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
     /* pid namespace: this process will become init inside the new namespace, so
      * fork off a child to actually run the program (we don't want all programs
      * we might exec to have to know how to be init). */
-    r = fork();
-    if (r < 0)
-      _exit(r);
-    else if (r > 0)
-      init(r);  /* never returns */
+    child_pid = fork();
+    if (child_pid < 0)
+      _exit(child_pid);
+    else if (child_pid > 0)
+      init(child_pid);  /* never returns */
   }
-
 
   /* If we aren't pid-namespaced:
    *   calling process
