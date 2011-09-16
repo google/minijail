@@ -14,6 +14,7 @@
 #include <pwd.h>
 #include <sched.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -434,6 +435,27 @@ static int init(pid_t rootpid) {
   _exit(WEXITSTATUS(init_exitstatus));
 }
 
+static int write_cmd(int fd, const char *fmt, ...) {
+  char cmd[MINIJAIL_MAX_ARG_LINE];
+  ssize_t written;
+  int r;
+  va_list ap;
+
+  va_start(ap, fmt);
+  r = vsnprintf(cmd, sizeof(cmd), fmt, ap);
+  va_end(ap);
+
+  if (r <= 0)
+    return -EFAULT;
+  if ((size_t) r >= sizeof(cmd))
+    return -E2BIG;
+
+  written = write(fd, cmd, r);
+  if (written != r)
+    return -EFAULT;
+  return 0;
+}
+
 /** @brief Move any commands that need to be done post-exec into an environment
  *         variable
  *  @param j Jail to move commands from.
@@ -442,62 +464,35 @@ static int init(pid_t rootpid) {
  *  and adds them to the environment; they will be deserialized later (see
  *  __minijail_preloaded) and executed inside the execve()'d process.
  */
-static int move_commands_to_env(struct minijail *j) {
-  const int kEnvBufSize = 256;
-  const char *ptrace = j->flags.ptrace ? "ptrace " : "";
-  const char *seccomp = j->flags.seccomp ? "seccomp " : "";
-  char setuid[64] = "";
-  char caps[32] = "";
-  char *newenv;
-  char *oldenv;
-  char *envbuf = malloc(kEnvBufSize);
-  int r;
-
-  if (!envbuf)
-    return -ENOMEM;
-
-  if (j->flags.caps)
-    snprintf(caps, sizeof(caps), "caps=%" PRIx64 " ", j->caps);
-
-  if (j->flags.uid && j->flags.caps) {
-    snprintf(setuid, sizeof(setuid), "uid=%d ", j->uid);
-    j->flags.uid = 0;
-  }
-
-  j->flags.caps = 0;
-  j->flags.ptrace = 0;
-  j->flags.seccomp = 0;
+static int send_commands_to_child(struct minijail *j, int fd) {
+  if (j->flags.caps && write_cmd(fd, "caps=%" PRIx64 "\n", j->caps))
+    return -EFAULT;
+  if (j->flags.uid && write_cmd(fd, "uid=%d\n", j->uid))
+    return -EFAULT;
+  if (j->flags.ptrace && write_cmd(fd, "ptrace\n"))
+    return -EFAULT;
+  if (j->flags.seccomp && write_cmd(fd, "seccomp\n"))
+    return -EFAULT;
 
   if (j->flags.seccomp_filter)
     warn("TODO(wad) seccomp_filter is installed in the parent which "
          "requires overly permissive rules for execve(2)ing.");
 
-  r = snprintf(envbuf, kEnvBufSize, "%s%s%s%s", setuid, ptrace, seccomp, caps);
-  if (!r) {
-    /* No commands generated, so no preload needed :) */
-    free(envbuf);
-    return 0;
-  }
-  if (r == kEnvBufSize) {
-    free(envbuf);
-    return -E2BIG;
-  }
+  return write_cmd(fd, "eom\n");
+}
 
-  oldenv = getenv(kLdPreloadEnvVar) ? : "";
-  newenv = malloc(strlen(oldenv) + 2 + strlen(PRELOADPATH));
-  if (!newenv) {
-    free(envbuf);
+static int setup_preload(void) {
+  char *oldenv = getenv(kLdPreloadEnvVar) ? : "";
+  char *newenv = malloc(strlen(oldenv) + 2 + strlen(PRELOADPATH));
+  if (!newenv)
     return -ENOMEM;
-  }
 
   /* Only insert a separating space if we have something to separate... */
   sprintf(newenv, "%s%s%s", oldenv, strlen(oldenv) ? " " : "", PRELOADPATH);
 
   /* setenv() makes a copy of the string we give it */
   setenv(kLdPreloadEnvVar, newenv, 1);
-  setenv(kCommandEnvVar, envbuf, 1);
   free(newenv);
-  free(envbuf);
   return 0;
 }
 
@@ -505,6 +500,8 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
   unsigned int pidns = j->flags.pids ? CLONE_NEWPID : 0;
   char *oldenv, *oldenv_copy = NULL;
   pid_t r;
+  int pipe_fds[2];
+  char fd_buf[11];
 
   oldenv = getenv(kLdPreloadEnvVar);
   if (oldenv) {
@@ -512,14 +509,20 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
     if (!oldenv_copy)
       return -ENOMEM;
   }
-
-  r = move_commands_to_env(j);
-  if (r) {
-    /* No environment variable is modified if move_commands_to_env returns
-     * a non-zero value. */
-    free(oldenv_copy);
+  r = setup_preload();
+  if (r)
     return r;
-  }
+
+  /* Before we fork(2) and execve(2) the child process, we need to open
+   * a pipe(2) to send the minijail configuration over.
+   */
+  r = pipe(pipe_fds);
+  if (r)
+    return r;
+  r = snprintf(fd_buf, sizeof(fd_buf), "%d", pipe_fds[0]);
+  if (r <= 0)
+    return -EINVAL;
+  setenv(kFdEnvVar, fd_buf, 1);
 
   r = syscall(SYS_clone, pidns | SIGCHLD, NULL);
   if (r > 0) {
@@ -529,8 +532,15 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
     } else {
       unsetenv(kLdPreloadEnvVar);
     }
-    unsetenv(kCommandEnvVar);
+    unsetenv(kFdEnvVar);
     j->initpid = r;
+    close(pipe_fds[0]);
+    r = send_commands_to_child(j, pipe_fds[1]);
+    close(pipe_fds[1]);
+    if (r) {
+      kill(j->initpid, SIGKILL);
+      die("failed to send marshalled minijail");
+    }
     return 0;
   }
 
@@ -538,6 +548,15 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
 
   if (r < 0)
     return r;
+
+  j->flags.uid = 0;
+  /* TODO(wad) gid should be sent over preload and not done in advance.
+   * j->flags.gid = 0;
+   */
+  j->flags.usergroups = 0;
+  j->flags.caps = 0;
+  j->flags.ptrace = 0;
+  j->flags.seccomp = 0;
 
   j->flags.pids = 0;
 
@@ -554,6 +573,7 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
     else if (r > 0)
       init(r);  /* never returns */
   }
+
 
   /* If we aren't pid-namespaced:
    *   calling process

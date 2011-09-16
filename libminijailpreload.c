@@ -12,6 +12,7 @@
 #include "libminijail-private.h"
 
 #include <dlfcn.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -40,57 +41,68 @@ static void splitarg(char *str, char **key, char **val) {
 
 /** @brief Fake main(), spliced in before the real call to main() by
  *         __libc_start_main (see below).
- *  We get serialized commands from our invoking process in an environment
- *  variable (kCommandEnvVar). The environment variable is a list of key=value
- *  pairs (see move_commands_to_env); we use them to construct a jail, then
- *  enter it.
+ *  We get serialized commands from our invoking process over an fd specified
+ *  by an environment variable (kFdEnvVar). The environment variable is a list
+ *  of key=value pairs (see move_commands_to_env); we use them to construct a
+ *  jail, then enter it.
  */
 static int fake_main(int argc, char **argv, char **envp) {
-  char *args = getenv(kCommandEnvVar);
-  char *copy, *oldcopy;
-  char *arg;
+  char *fd_name = getenv(kFdEnvVar);
+  char *arg = NULL;
+  size_t arg_len;
+  int fd = -1;
+  FILE *args;
   struct minijail *j;
   if (geteuid() != getuid() || getegid() != getgid())
-    /* If we didn't do this check, an attacker could set kCommandEnvVar for
+    /* If we didn't do this check, an attacker could set kFdEnvVar for
      * any setuid program that uses libminijail to cause it to get capabilities
      * or a uid it did not expect. */
+    /* TODO(wad) why would libminijail interact here? */
     return MINIJAIL_ERR_PRELOAD;
+  if (!fd_name)
+    return MINIJAIL_ERR_PRELOAD;
+  fd = atoi(fd_name);
+  if (fd < 0)
+    return MINIJAIL_ERR_PRELOAD;
+  args = fdopen(fd, "r");
   if (!args)
     return MINIJAIL_ERR_PRELOAD;
-  if (!(copy = strdup(args)))
-    die("preload: out of memory");
-  oldcopy = copy;
+
   j = minijail_new();
   if (!j)
     die("preload: out of memory");
-  while ((arg = strsep(&copy, " "))) {
+  while (getline(&arg, &arg_len, args) > 0) {
     char *key, *val;
     unsigned long v;
     splitarg(arg, &key, &val);
-    if (!strcmp(key, "caps")) {
+    if (!strcmp(arg, "eom\n")) {
+      break;
+    } else if (!strcmp(key, "caps")) {
       v = strtoul(val, NULL, 16);
       minijail_use_caps(j, v);
-    }
-    else if (!strcmp(key, "ptrace"))
+    } else if (!strcmp(key, "ptrace")) {
       minijail_disable_ptrace(j);
-    else if (!strcmp(key, "uid")) {
+    } else if (!strcmp(key, "uid")) {
       v = atoi(val);
       minijail_change_uid(j, v);
-    }
-    else if (!strcmp(key, "gid")) {
+    } else if (!strcmp(key, "gid")) {
       v = atoi(val);
       minijail_change_gid(j, v);
-    }
-    else if (!strcmp(key, "seccomp"))
+    } else if (!strcmp(key, "seccomp")) {
       minijail_use_seccomp(j);
+    }
+    free(arg);
+    arg = NULL;
   }
+  if (!feof(args) && ferror(args))
+    die("preload: unexpected failure during unmarshalling");
+  fclose(args);
   /* TODO(ellyjones): this trashes existing preloads, so one can't do:
    * LD_PRELOAD="/tmp/test.so libminijailpreload.so" prog; the descendants of
    * prog will have no LD_PRELOAD set at all. */
   unset_in_env(envp, kLdPreloadEnvVar);
   minijail_enter(j);
   minijail_destroy(j);
-  free(oldcopy);
   dlclose(libc_handle);
   return real_main(argc, argv, envp);
 }
