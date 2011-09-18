@@ -512,10 +512,13 @@ void minijail_enter(const struct minijail *j) {
       pdie("prctl(PR_SET_SECUREBITS)");
   }
 
-  if (j->flags.usergroups && initgroups(j->user, j->usergid)) {
-    pdie("initgroups");
-  } else if (!j->flags.usergroups && setgroups(0, NULL)) {
-    pdie("setgroups");
+  if (j->flags.usergroups) {
+    if (initgroups(j->user, j->usergid))
+      pdie("initgroups");
+  } else {
+    /* Only attempt to clear supplemental groups if we are changing users. */
+    if ((j->uid || j->gid) && setgroups(0, NULL))
+      pdie("setgroups");
   }
 
   if (j->flags.gid && setresgid(j->gid, j->gid, j->gid))
