@@ -103,40 +103,48 @@ void minijail_change_gid(struct minijail *j, gid_t gid) {
 }
 
 int minijail_change_user(struct minijail *j, const char *user) {
-  /* In principle this should use getpwnam(), but:
-   * 1) getpwnam_r() isn't actually reentrant anyway, since it uses a
-   *    statically-allocated file descriptor internally
-   * 2) fgetpwnam() (by analogy with fgetpwent) would solve (1) except that it
-   *    doesn't exist
-   * 3) sysconf() (see getpwnam_r(3)) is allowed to return a size that is not
-   *    large enough, which means having to loop on growing the buffer we pass
-   *    in
-   */
-  struct passwd *pw = getpwnam(user);
-  if (!pw)
+  char *buf = NULL;
+  struct passwd pw;
+  struct passwd *ppw = NULL;
+  ssize_t sz = sysconf(_SC_GETPW_R_SIZE_MAX);
+  if (sz == -1)
+    sz = 65536;   /* your guess is as good as mine... */
+
+  /* sysconf(_SC_GETPW_R_SIZE_MAX), under glibc, is documented to return the
+   * maximum needed size of the buffer, so we don't have to search. */
+  buf = malloc(sz);
+  if (!buf)
+    return -ENOMEM;
+  getpwnam_r(user, &pw, buf, sz, &ppw);
+  free(buf);
+  if (!ppw)
     return errno;
-  minijail_change_uid(j, pw->pw_uid);
+  minijail_change_uid(j, ppw->pw_uid);
   j->user = strdup(user);
   if (!j->user)
     return -ENOMEM;
-  j->usergid = pw->pw_gid;
+  j->usergid = ppw->pw_gid;
   return 0;
 }
 
 int minijail_change_group(struct minijail *j, const char *group) {
-  /* In principle this should use getgrnam(), but:
-   * 1) getgrnam_r() isn't actually reentrant anyway, since it uses a
-   *    statically-allocated file descriptor internally
-   * 2) fgetgrnam() (by analogy with fgetgrent) would solve (1) except that it
-   *    doesn't exist
-   * 3) sysconf() (see getgrnam_r(3)) is allowed to return a size that is not
-   *    large enough, which means having to loop on growing the buffer we pass
-   *    in
-   */
-  struct group *gr = getgrnam(group);
-  if (!gr)
+  char *buf = NULL;
+  struct group gr;
+  struct group *pgr = NULL;
+  ssize_t sz = sysconf(_SC_GETGR_R_SIZE_MAX);
+  if (sz == -1)
+    sz = 65536;   /* and mine is as good as yours, really */
+
+  /* sysconf(_SC_GETGR_R_SIZE_MAX), under glibc, is documented to return the
+   * maximum needed size of the buffer, so we don't have to search. */
+  buf = malloc(sz);
+  if (!buf)
+    return -ENOMEM;
+  getgrnam_r(group, &gr, buf, sz, &pgr);
+  free(buf);
+  if (!pgr)
     return errno;
-  minijail_change_gid(j, gr->gr_gid);
+  minijail_change_gid(j, pgr->gr_gid);
   return 0;
 }
 
