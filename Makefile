@@ -13,10 +13,16 @@ minijail0 : libsyscalls.gen.o libminijail.o minijail0.c
 libminijail.so : libminijail.o libsyscalls.gen.o
 	$(CC) $(CFLAGS) -shared -o $@ $^ -lcap
 
+libminijail_unittest : libminijail_unittest.o libminijail.o libsyscalls.gen.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lcap
+
 libminijailpreload.so : libminijailpreload.c libsyscalls.gen.o libminijail.o
 	$(CC) $(CFLAGS) -shared -o $@ $^ -ldl -lcap
 
 libminijail.o : libminijail.c libminijail.h
+
+libminijail_unittest.o : libminijail_unittest.c test_harness.h
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 libsyscalls.gen.o : libsyscalls.gen.c libsyscalls.h
 
@@ -61,4 +67,5 @@ libsyscalls.gen.c : Makefile libsyscalls.h
 
 clean :
 	@rm -f libminijail.o libminijailpreload.so minijail0
+	@rm -f libminijail_unittest libminijail_unittest.o
 	@rm -f libsyscalls.gen.c libsyscalls.gen.o
