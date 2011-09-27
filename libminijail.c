@@ -118,7 +118,7 @@ int minijail_change_user(struct minijail *j, const char *user) {
   getpwnam_r(user, &pw, buf, sz, &ppw);
   free(buf);
   if (!ppw)
-    return errno;
+    return -errno;
   minijail_change_uid(j, ppw->pw_uid);
   j->user = strdup(user);
   if (!j->user)
@@ -143,7 +143,7 @@ int minijail_change_group(struct minijail *j, const char *group) {
   getgrnam_r(group, &gr, buf, sz, &pgr);
   free(buf);
   if (!pgr)
-    return errno;
+    return -errno;
   minijail_change_gid(j, pgr->gr_gid);
   return 0;
 }
@@ -407,9 +407,9 @@ static int remount_readonly(void) {
    * mount as well, even though we're in a VFS namespace (!). Instead, remove
    * their mount from our namespace and make our own. */
   if (umount(kProcPath))
-    return errno;
+    return -errno;
   if (mount("", kProcPath, "proc", kSafeFlags | MS_RDONLY, ""))
-    return errno;
+    return -errno;
   return 0;
 }
 
@@ -726,16 +726,16 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[]) {
 int minijail_kill(struct minijail *j) {
   int st;
   if (kill(j->initpid, SIGTERM))
-    return errno;
+    return -errno;
   if (waitpid(j->initpid, &st, 0) < 0)
-    return errno;
+    return -errno;
   return st;
 }
 
 int minijail_wait(struct minijail *j) {
   int st;
   if (waitpid(j->initpid, &st, 0) < 0)
-    return errno;
+    return -errno;
   if (!WIFEXITED(st))
     return MINIJAIL_ERR_JAIL;
   return WEXITSTATUS(st);
