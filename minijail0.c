@@ -11,122 +11,127 @@
 #include "libminijail.h"
 #include "libsyscalls.h"
 
-static void set_user(struct minijail *j, const char *arg) {
-  char *end = NULL;
-  int uid = strtod(arg, &end);
-  if (!*end && *arg) {
-    minijail_change_uid(j, uid);
-    return;
-  }
+static void set_user(struct minijail *j, const char *arg)
+{
+	char *end = NULL;
+	int uid = strtod(arg, &end);
+	if (!*end && *arg) {
+		minijail_change_uid(j, uid);
+		return;
+	}
 
-  if (minijail_change_user(j, arg)) {
-    fprintf(stderr, "Bad user: '%s'\n", arg);
-    exit(1);
-  }
+	if (minijail_change_user(j, arg)) {
+		fprintf(stderr, "Bad user: '%s'\n", arg);
+		exit(1);
+	}
 }
 
-static void set_group(struct minijail *j, const char *arg) {
-  char *end = NULL;
-  int gid = strtod(arg, &end);
-  if (!*end && *arg) {
-    minijail_change_gid(j, gid);
-    return;
-  }
+static void set_group(struct minijail *j, const char *arg)
+{
+	char *end = NULL;
+	int gid = strtod(arg, &end);
+	if (!*end && *arg) {
+		minijail_change_gid(j, gid);
+		return;
+	}
 
-  if (minijail_change_group(j, arg)) {
-    fprintf(stderr, "Bad group: '%s'\n", arg);
-    exit(1);
-  }
+	if (minijail_change_group(j, arg)) {
+		fprintf(stderr, "Bad group: '%s'\n", arg);
+		exit(1);
+	}
 }
 
-static void use_caps(struct minijail *j, const char *arg) {
-  uint64_t caps;
-  char *end = NULL;
-  caps = strtoull(arg, &end, 16);
-  if (*end) {
-    fprintf(stderr, "Invalid cap set: '%s'\n", arg);
-    exit(1);
-  }
-  minijail_use_caps(j, caps);
+static void use_caps(struct minijail *j, const char *arg)
+{
+	uint64_t caps;
+	char *end = NULL;
+	caps = strtoull(arg, &end, 16);
+	if (*end) {
+		fprintf(stderr, "Invalid cap set: '%s'\n", arg);
+		exit(1);
+	}
+	minijail_use_caps(j, caps);
 }
 
-static void usage(const char *progn) {
-  printf("Usage: %s [-Ghprsv] [-c <caps>] [-g <group>] [-S <file>] [-u <user>] "
-         "<program> [args...]\n"
-         "  -c: restrict caps to <caps>\n"
-         "  -G: inherit secondary groups from uid\n"
-         "  -g: change gid to <group>\n"
-         "  -h: help (this message)\n"
-         "  -H: seccomp filter help message\n"
-         "  -p: use pid namespace\n"
-         "  -r: remount filesystems readonly (implies -v)\n"
-         "  -s: use seccomp\n"
-         "  -S: set seccomp filters using <file>\n"
-         "      E.g., -S /usr/share/blah/seccomp_filters.$(uname -m)\n"
-         "  -u: change uid to <user>\n"
-         "  -v: use vfs namespace\n", progn);
+static void usage(const char *progn)
+{
+	printf("Usage: %s [options...] <program> [args...]\n"
+	       "  -c <caps>:  restrict caps to <caps>\n"
+	       "  -G:         inherit secondary groups from uid\n"
+	       "  -g <group>: change gid to <group>\n"
+	       "  -h:         help (this message)\n"
+	       "  -H:         seccomp filter help message\n"
+	       "  -p:         use pid namespace\n"
+	       "  -r:         remount filesystems readonly (implies -v)\n"
+	       "  -s:         use seccomp\n"
+	       "  -S <file>:  set seccomp filters using <file>\n"
+	       "              E.g., -S /usr/share/filters/<prog>.$(uname -m)\n"
+	       "  -u <user>:  change uid to <user>\n"
+	       "  -v:         use vfs namespace\n", progn);
 }
 
-static void seccomp_filter_usage(const char *progn) {
-  const struct syscall_entry *entry = syscall_table;
-  printf("Usage: %s -S <policy.file> <program> [args...]\n\n"
-         "System call names supported:\n", progn);
-  for (; entry->name && entry->nr >= 0; ++entry)
-    printf("  %s [%d]\n", entry->name, entry->nr);
-  printf("\nSee minijail0(5) for example policies.\n");
+static void seccomp_filter_usage(const char *progn)
+{
+	const struct syscall_entry *entry = syscall_table;
+	printf("Usage: %s -S <policy.file> <program> [args...]\n\n"
+	       "System call names supported:\n", progn);
+	for (; entry->name && entry->nr >= 0; ++entry)
+		printf("  %s [%d]\n", entry->name, entry->nr);
+	printf("\nSee minijail0(5) for example policies.\n");
 }
 
-int main(int argc, char *argv[]) {
-  struct minijail *j = minijail_new();
+int main(int argc, char *argv[])
+{
+	struct minijail *j = minijail_new();
 
-  int opt;
-  while ((opt = getopt(argc, argv, "u:g:sS:c:vrGhHp")) != -1) {
-    switch (opt) {
-      case 'u':
-        set_user(j, optarg);
-        break;
-      case 'g':
-        set_group(j, optarg);
-        break;
-      case 's':
-        minijail_use_seccomp(j);
-        break;
-      case 'S':
-        minijail_parse_seccomp_filters(j, optarg);
-        minijail_use_seccomp_filter(j);
-        break;
-      case 'c':
-        use_caps(j, optarg);
-        break;
-      case 'v':
-        minijail_namespace_vfs(j);
-        break;
-      case 'r':
-        minijail_remount_readonly(j);
-        break;
-      case 'G':
-        minijail_inherit_usergroups(j);
-        break;
-      case 'p':
-        minijail_namespace_pids(j);
-        break;
-      case 'H':
-        seccomp_filter_usage(argv[0]);
-        exit(1);
-      default:
-        usage(argv[0]);
-        exit(1);
-    }
-  }
+	int opt;
+	while ((opt = getopt(argc, argv, "u:g:sS:c:vrGhHp")) != -1) {
+		switch (opt) {
+		case 'u':
+			set_user(j, optarg);
+			break;
+		case 'g':
+			set_group(j, optarg);
+			break;
+		case 's':
+			minijail_use_seccomp(j);
+			break;
+		case 'S':
+			minijail_parse_seccomp_filters(j, optarg);
+			minijail_use_seccomp_filter(j);
+			break;
+		case 'c':
+			use_caps(j, optarg);
+			break;
+		case 'v':
+			minijail_namespace_vfs(j);
+			break;
+		case 'r':
+			minijail_remount_readonly(j);
+			break;
+		case 'G':
+			minijail_inherit_usergroups(j);
+			break;
+		case 'p':
+			minijail_namespace_pids(j);
+			break;
+		case 'H':
+			seccomp_filter_usage(argv[0]);
+			exit(1);
+		default:
+			usage(argv[0]);
+			exit(1);
+		}
+	}
 
-  if (argc == optind) {
-    usage(argv[0]);
-    exit(1);
-  }
+	if (argc == optind) {
+		usage(argv[0]);
+		exit(1);
+	}
 
-  argc -= optind;
-  argv += optind;
+	argc -= optind;
+	argv += optind;
 
-  minijail_run(j, argv[0], argv);
-  return minijail_wait(j);
+	minijail_run(j, argv[0], argv);
+	return minijail_wait(j);
 }

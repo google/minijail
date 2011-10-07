@@ -16,11 +16,21 @@ static const char *kLdPreloadEnvVar = "LD_PRELOAD";
 #define MINIJAIL_MAX_SECCOMP_FILTER_LINE 512
 
 struct minijail;
-/* minijail_size returns the size of |j| if marshalled.
- * 0 is returned on error.
+
+/* minijail_size: returns the size (in bytes) of @j if marshalled
+ * @j jail to compute size of
+ *
+ * Returns 0 on error.
  */
 extern size_t minijail_size(const struct minijail *j);
-/* minijail_marshal: serializes |j| to |buf|
+
+/* minijail_marshal: serializes @j to @buf
+ * @j    minijail to serialize
+ * @buf  buffer to serialize to
+ * @size size of @buf
+ *
+ * Returns 0 on success.
+ *
  * Writes |j| to |buf| such that it can be reparsed by the same
  * library on the same architecture.  This is meant to be used
  * by minijail0.c and libminijailpreload.c.  minijail flags that
@@ -28,23 +38,46 @@ extern size_t minijail_size(const struct minijail *j);
  *
  * The marshalled data is not robust to differences between the child
  * and parent process (personality, etc).
- *
- * Returns 0 on success.
  */
 extern int minijail_marshal(const struct minijail *j,
                             char *buf,
-                            size_t available);
-/* minijail_unmarshal: initializes minijail |j| from |serialized|. */
+                            size_t size);
+
+/* minijail_unmarshal: initializes @j from @serialized
+ * @j          minijail to initialize
+ * @serialized serialized jail buffer
+ * @length     length of buffer
+ *
+ * Returns 0 on success.
+ */
 extern int minijail_unmarshal(struct minijail *j,
                               char *serialized,
                               size_t length);
-/* Using minijail_unmarshal, build |j| from |fd|. */
+
+/* minijail_from_fd: builds @j from @fd
+ * @j  minijail to initialize
+ * @fd fd to initialize from
+ *
+ * Returns 0 on success.
+ */
 extern int minijail_from_fd(int fd, struct minijail *j);
-/* Using minijail_marshal, sends |j| to |fd|. */
+
+/* minijail_to_fd: sends @j over @fd
+ * @j  minijail to send
+ * @fd fd to send over
+ *
+ * Returns 0 on success.
+ */
 extern int minijail_to_fd(struct minijail *j, int fd);
-/* minijail_preexec: strips |j| of all options handled by minijail_enter(). */
+
+/* minijail_preexec: strips @j of all options handled by minijail_enter()
+ * @j jail to strip
+ */
 extern void minijail_preexec(struct minijail *j);
-/* minijail_preenter: strips |j| of all options handled by minijail_run(). */
+
+/* minijail_preenter: strips @j of all options handled by minijail_run()
+ * @j jail to strip
+ */
 extern void minijail_preenter(struct minijail *j);
 
 #endif /* !LIBMINIJAIL_PRIVATE_H */

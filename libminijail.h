@@ -11,8 +11,8 @@
  * 4) Destroy it.
  */
 
-#ifndef LIBMINIJAIL_H_
-#define LIBMINIJAIL_H_
+#ifndef _LIBMINIJAIL_H_
+#define _LIBMINIJAIL_H_
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -22,9 +22,9 @@ extern "C" {
 #endif
 
 enum {
-  MINIJAIL_ERR_PRELOAD = 252,
-  MINIJAIL_ERR_JAIL = 253,
-  MINIJAIL_ERR_INIT = 254,
+	MINIJAIL_ERR_PRELOAD = 252,
+	MINIJAIL_ERR_JAIL = 253,
+	MINIJAIL_ERR_INIT = 254,
 };
 
 struct minijail;
@@ -34,7 +34,8 @@ struct minijail *minijail_new(void);
 
 /* These functions add restrictions to the minijail. They are not applied until
  * minijail_enter() is called. See the documentation in minijail0.1 for
- * explanations in detail of what the restrictions do. */
+ * explanations in detail of what the restrictions do.
+ */
 void minijail_change_uid(struct minijail *j, uid_t uid);
 void minijail_change_gid(struct minijail *j, gid_t gid);
 /* Stores user to change to and copies |user| for internal consistency. */
@@ -45,7 +46,7 @@ void minijail_use_seccomp(struct minijail *j);
 void minijail_use_seccomp_filter(struct minijail *j);
 void minijail_parse_seccomp_filters(struct minijail *j, const char *path);
 int minijail_add_seccomp_filter(struct minijail *j, int nr,
-                                const char *filter);
+				const char *filter);
 void minijail_use_caps(struct minijail *j, uint64_t capmask);
 void minijail_namespace_vfs(struct minijail *j);
 void minijail_namespace_pids(struct minijail *j);
@@ -70,15 +71,19 @@ int minijail_lookup_syscall(const char *name);
 void minijail_enter(const struct minijail *j);
 
 /* Run the specified command in the given minijail, execve(3)-style. This is
- * required if minijail_namespace_pids() was used. */
-int minijail_run(struct minijail *j, const char *filename, char *const argv[]);
+ * required if minijail_namespace_pids() was used.
+ */
+int minijail_run(struct minijail *j, const char *filename,
+		 char *const argv[]);
 
 /* Kill the specified minijail. The minijail must have been created with pid
- * namespacing; if it was, all processes inside it are atomically killed. */
+ * namespacing; if it was, all processes inside it are atomically killed.
+ */
 int minijail_kill(struct minijail *j);
 
 /* Wait for all processed in the specified minijail to exit. Returns the exit
- * status of the _first_ process spawned in the jail. */
+ * status of the _first_ process spawned in the jail.
+ */
 int minijail_wait(struct minijail *j);
 
 /* Frees the given minijail. It does not matter if the process is inside the minijail or
@@ -86,7 +91,7 @@ int minijail_wait(struct minijail *j);
 void minijail_destroy(struct minijail *j);
 
 #ifdef __cplusplus
-};  /* extern "C" */
+}; /* extern "C" */
 #endif
 
-#endif /* !LIBMINIJAIL_H_ */
+#endif /* !_LIBMINIJAIL_H_ */
