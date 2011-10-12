@@ -8,8 +8,15 @@ minijail0 \- sandbox a process
 .PP
 Runs PROGRAM inside a sandbox.
 .TP
+\fB-b <src>,<dest>[,<writeable>]
+Bind-mount <src> into the chroot directory at <dest>, optionally writeable.
+.TP
 \fB-c <caps>\fR
 Restrict capabilities to \fIcaps\fR. When used in conjunction with \fB-u\fR and
+.TP
+\fB-C <dir>\fR
+Change root (using chroot(2)) to <dir>.
+.TP
 \fB-g\fR, this allows a program to have access to only certain parts of root's
 default privileges while running as another user and group ID altogether. Note
 that these capabilities are not inherited by subprocesses of the process given

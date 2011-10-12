@@ -58,6 +58,13 @@ struct seccomp_filter {
 	struct seccomp_filter *next, *prev;
 };
 
+struct binding {
+	char *src;
+	char *dest;
+	int writeable;
+	struct binding *next;
+};
+
 struct minijail {
 	struct {
 		int uid:1;
@@ -70,6 +77,7 @@ struct minijail {
 		int usergroups:1;
 		int ptrace:1;
 		int seccomp_filter:1;
+		int chroot:1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -78,15 +86,16 @@ struct minijail {
 	uint64_t caps;
 	pid_t initpid;
 	int filter_count;
+	int binding_count;
+	char *chrootdir;
 	struct seccomp_filter *filters;
+	struct binding *bindings_head;
+	struct binding *bindings_tail;
 };
 
 struct minijail *minijail_new(void)
 {
-	struct minijail *j = malloc(sizeof(*j));
-	if (j)
-		memset(j, 0, sizeof(*j));
-	return j;
+	return calloc(1, sizeof(struct minijail));
 }
 
 void minijail_change_uid(struct minijail *j, uid_t uid)
@@ -195,6 +204,56 @@ void minijail_inherit_usergroups(struct minijail *j)
 void minijail_disable_ptrace(struct minijail *j)
 {
 	j->flags.ptrace = 1;
+}
+
+int minijail_enter_chroot(struct minijail *j, const char *dir) {
+	if (j->chrootdir)
+		return -EINVAL;
+	j->chrootdir = strdup(dir);
+	if (!j->chrootdir)
+		return -ENOMEM;
+	j->flags.chroot = 1;
+	return 0;
+}
+
+int minijail_bind(struct minijail *j, const char *src, const char *dest,
+                  int writeable) {
+	struct binding *b;
+
+	if (*dest != '/')
+		return -EINVAL;
+	b = calloc(1, sizeof(*b));
+	if (!b)
+		return -ENOMEM;
+	b->dest = strdup(dest);
+	if (!b->dest)
+		goto error;
+	b->src = strdup(src);
+	if (!b->src)
+		goto error;
+	b->writeable = writeable;
+
+	syslog(LOG_INFO, "libminijail: bind %s -> %s", src, dest);
+
+	/* Force vfs namespacing so the bind mounts don't leak out into the
+	 * containing vfs namespace.
+	 */
+	minijail_namespace_vfs(j);
+
+	if (j->bindings_tail)
+		j->bindings_tail->next = b;
+	else
+		j->bindings_head = b;
+	j->bindings_tail = b;
+	j->binding_count++;
+
+	return 0;
+
+error:
+	free(b->src);
+	free(b->dest);
+	free(b);
+	return -ENOMEM;
 }
 
 int minijail_add_seccomp_filter(struct minijail *j, int nr, const char *filter)
@@ -332,9 +391,12 @@ static void marshal_append(struct marshal_state *state,
 static void minijail_marshal_helper(struct marshal_state *state,
 				    const struct minijail *j)
 {
+	struct binding *b = NULL;
 	marshal_append(state, (char *)j, sizeof(*j));
 	if (j->user)
 		marshal_append(state, j->user, strlen(j->user) + 1);
+	if (j->chrootdir)
+		marshal_append(state, j->chrootdir, strlen(j->chrootdir) + 1);
 	if (j->flags.seccomp_filter && j->filters) {
 		struct seccomp_filter *f = j->filters;
 		do {
@@ -342,6 +404,11 @@ static void minijail_marshal_helper(struct marshal_state *state,
 			marshal_append(state, f->filter, strlen(f->filter) + 1);
 			f = f->next;
 		} while (f != j->filters);
+	}
+	for (b = j->bindings_head; b; b = b->next) {
+		marshal_append(state, b->src, strlen(b->src) + 1);
+		marshal_append(state, b->dest, strlen(b->dest) + 1);
+		marshal_append(state, (char *)&b->writeable, sizeof(b->writeable));
 	}
 }
 
@@ -361,8 +428,40 @@ int minijail_marshal(const struct minijail *j, char *buf, size_t available)
 	return (state.total > available);
 }
 
+/* consumebytes: consumes @length bytes from a buffer @buf of length @buflength
+ * @length    Number of bytes to consume
+ * @buf       Buffer to consume from
+ * @buflength Size of @buf
+ *
+ * Returns a pointer to the base of the bytes, or NULL for errors.
+ */
+static void *consumebytes(size_t length, char **buf, size_t *buflength) {
+	char *p = *buf;
+	if (length > *buflength)
+		return NULL;
+	*buf += length;
+	*buflength -= length;
+	return p;
+}
+
+/* consumestr: consumes a C string from a buffer @buf of length @length
+ * @buf    Buffer to consume
+ * @length Length of buffer
+ *
+ * Returns a pointer to the base of the string, or NULL for errors.
+ */
+static char *consumestr(char **buf, size_t *buflength) {
+	size_t len = strnlen(*buf, *buflength);
+	if (len == *buflength)
+		/* There's no null-terminator */
+		return NULL;
+	return consumebytes(len + 1, buf, buflength);
+}
+
 int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 {
+	int i;
+	int count;
 	if (length < sizeof(*j))
 		return -EINVAL;
 	memcpy((void *)j, serialized, sizeof(*j));
@@ -370,34 +469,51 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 	length -= sizeof(*j);
 
 	if (j->user) {		/* stale pointer */
-		if (!length)
+		char *user = consumestr(&serialized, &length);
+		if (!user)
 			return -EINVAL;
-		j->user = strndup(serialized, length);
-		length -= strlen(j->user) + 1;
-		serialized += strlen(j->user) + 1;
+		j->user = strdup(user);
 	}
 
 	if (j->flags.seccomp_filter && j->filter_count) {
-		int count = j->filter_count;
+		count = j->filter_count;
 		/* Let add_seccomp_filter recompute the value. */
 		j->filter_count = 0;
 		j->filters = NULL;	/* Don't follow the stale pointer. */
 		for (; count > 0; --count) {
-			int *nr = (int *)serialized;
+			int *nr = (int *)consumebytes(sizeof(*nr), &serialized,
+			                              &length);
 			char *filter;
-			if (length < sizeof(*nr))
+			if (!nr)
 				return -EINVAL;
-			length -= sizeof(*nr);
-			serialized += sizeof(*nr);
-			if (!length)
+			filter = consumestr(&serialized, &length);
+			if (!filter)
 				return -EINVAL;
-			filter = serialized;
 			if (minijail_add_seccomp_filter(j, *nr, filter))
 				return -EINVAL;
-			length -= strlen(filter) + 1;
-			serialized += strlen(filter) + 1;
 		}
 	}
+
+	count = j->binding_count;
+	j->bindings_head = NULL;
+	j->bindings_tail = NULL;
+	j->binding_count = 0;
+	for (i = 0; i < count; ++i) {
+		int *writeable;
+		const char *dest;
+		const char *src = consumestr(&serialized, &length);
+		if (!src)
+			return -EINVAL;
+		dest = consumestr(&serialized, &length);
+		if (!dest)
+			return -EINVAL;
+		writeable = consumebytes(sizeof(*writeable), &serialized, &length);
+		if (!writeable)
+			return -EINVAL;
+		if (minijail_bind(j, src, dest, *writeable))
+			return -EINVAL;
+	}
+
 	return 0;
 }
 
@@ -422,6 +538,46 @@ void minijail_preexec(struct minijail *j)
 	j->flags.readonly = readonly;
 	/* Note, pidns will already have been used before this call. */
 }
+
+/* bind_one: Applies bindings from @b for @j, recursing as needed.
+ * @j Minijail these bindings are for
+ * @b Head of list of bindings
+ *
+ * Returns 0 for success.
+ */
+static int bind_one(const struct minijail *j, struct binding *b) {
+	int ret = 0;
+	char *dest = NULL;
+	int mflags = MS_BIND | (b->writeable ? 0 : MS_RDONLY);
+	if (ret)
+		return ret;
+	/* dest has a leading "/" */
+	if (asprintf(&dest, "%s%s", j->chrootdir, b->dest) < 0)
+		return -ENOMEM;
+	ret = mount(b->src, dest, NULL, mflags, NULL);
+	if (ret)
+		pdie("bind: %s -> %s", b->src, dest);
+	free(dest);
+	if (b->next)
+		return bind_one(j, b->next);
+	return ret;
+}
+
+static int enter_chroot(const struct minijail *j) {
+	int ret;
+	if (j->bindings_head && (ret = bind_one(j, j->bindings_head)))
+		return ret;
+
+	if (chroot(j->chrootdir))
+		return -errno;
+
+	if (chdir("/"))
+		return -errno;
+
+	return 0;
+}
+
+
 
 static int remount_readonly(void)
 {
@@ -540,6 +696,9 @@ void minijail_enter(const struct minijail *j)
 	 */
 	if (j->flags.vfs && unshare(CLONE_NEWNS))
 		pdie("unshare");
+
+	if (j->flags.chroot && enter_chroot(j))
+		pdie("chroot");
 
 	if (j->flags.readonly && remount_readonly())
 		pdie("remount");
@@ -807,6 +966,14 @@ void minijail_destroy(struct minijail *j)
 		free(f);
 		f = next;
 	}
+	while (j->bindings_head) {
+		struct binding *b = j->bindings_head;
+		j->bindings_head = j->bindings_head->next;
+		free(b->dest);
+		free(b->src);
+		free(b);
+	}
+	j->bindings_tail = NULL;
 	if (j->user)
 		free(j->user);
 	free(j);

@@ -53,9 +53,26 @@ static void use_caps(struct minijail *j, const char *arg)
 	minijail_use_caps(j, caps);
 }
 
+static void add_binding(struct minijail *j, char *arg) {
+	char *src = strtok(arg, ",");
+	char *dest = strtok(arg, ",");
+	char *flags = strtok(arg, ",");
+	if (!src || !dest) {
+		fprintf(stderr, "Bad binding: %s %s\n", src, dest);
+		exit(1);
+	}
+	if (minijail_bind(j, src, dest, flags ? atoi(flags) : 0)) {
+		fprintf(stderr, "Bind failure\n");
+		exit(1);
+	}
+}
+
 static void usage(const char *progn)
 {
-	printf("Usage: %s [options...] <program> [args...]\n"
+	printf("Usage: %s [-Ghprsv] [-b <src>,<dest>[,<writeable>]] [-c <caps>] "
+	       "[-C <dir>] [-g <group>] [-S <file>] [-u <user>] <program> "
+	       "[args...]\n"
+	       "  -b: binds <src> to <dest> in chroot. Multiple instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
@@ -100,8 +117,14 @@ int main(int argc, char *argv[])
 			minijail_parse_seccomp_filters(j, optarg);
 			minijail_use_seccomp_filter(j);
 			break;
+		case 'b':
+			add_binding(j, optarg);
+			break;
 		case 'c':
 			use_caps(j, optarg);
+			break;
+		case 'C':
+			minijail_enter_chroot(j, optarg);
 			break;
 		case 'v':
 			minijail_namespace_vfs(j);

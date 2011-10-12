@@ -54,6 +54,30 @@ void minijail_remount_readonly(struct minijail *j);
 void minijail_inherit_usergroups(struct minijail *j);
 void minijail_disable_ptrace(struct minijail *j);
 
+/* minijail_enter_chroot: enables chroot() restriction for @j
+ * @j   minijail to apply restriction to
+ * @dir directory to chroot() to. Owned by caller.
+ *
+ * Enters @dir, binding all bind mounts specified with minijail_bind() into
+ * place. Requires @dir to contain all necessary directories for bind mounts
+ * (i.e., if you have requested a bind mount at /etc, /etc must exist in @dir.)
+ *
+ * Returns 0 on success.
+ */
+int minijail_enter_chroot(struct minijail *j, const char *dir);
+
+/* minijail_bind: bind-mounts @src into @j as @dest, optionally writeable
+ * @j         minijail to bind inside
+ * @src       source to bind
+ * @dest      location to bind (inside chroot)
+ * @writeable 1 if the bind mount should be writeable
+ *
+ * This may be called multiple times; all bindings will be applied in the order
+ * of minijail_bind() calls.
+ */
+int minijail_bind(struct minijail *j, const char *src, const char *dest,
+                  int writeable);
+
 /* Exposes minijail's name-to-int mapping for system calls for the
  * architecture it was built on.  This is primarily exposed for
  * minijail_add_seccomp_filter() and testing.
