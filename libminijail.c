@@ -312,7 +312,7 @@ void minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
 	FILE *file = fopen(path, "r");
 	char line[MINIJAIL_MAX_SECCOMP_FILTER_LINE];
-	int count = 1;
+	int count = 0;
 	if (!file)
 		pdie("failed to open seccomp filters file");
 
@@ -326,9 +326,11 @@ void minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 		char *name = strsep(&filter, ":");
 		char *name_end = NULL;
 		int nr = -1;
+		count++;
 
-		if (!name)
-			die("invalid filter on line %d", count);
+		/* Allow comment lines */
+		if (*name == '#')
+			continue;
 
 		name = strip(name);
 
@@ -338,10 +340,6 @@ void minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 			/* Allow empty lines */
 			continue;
 		}
-
-		/* Allow comment lines */
-		if (*name == '#')
-			continue;
 
 		filter = strip(filter);
 
