@@ -96,7 +96,7 @@ static int fake_main(int argc, char **argv, char **envp)
  *  so we can't rely on things like malloc() being available yet.
  */
 
-int __libc_start_main(int (*main) (int, char **, char **),
+int API __libc_start_main(int (*main) (int, char **, char **),
 		      int argc, char **ubp_av, void (*init) (void),
 		      void (*fini) (void), void (*rtld_fini) (void),
 		      void (*stack_end))

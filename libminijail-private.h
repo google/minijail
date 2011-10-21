@@ -10,6 +10,11 @@
 #ifndef LIBMINIJAIL_PRIVATE_H
 #define LIBMINIJAIL_PRIVATE_H
 
+/* Explicitly declare exported functions so that -fvisibility tricks
+ * can be used for testing and minimal symbol leakage occurs.
+ */
+#define API __attribute__ ((visibility("default")))
+
 static const char *kFdEnvVar = "__MINIJAIL_FD";
 static const char *kLdPreloadEnvVar = "LD_PRELOAD";
 

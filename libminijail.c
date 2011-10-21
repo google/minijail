@@ -93,12 +93,12 @@ struct minijail {
 	struct binding *bindings_tail;
 };
 
-struct minijail *minijail_new(void)
+struct minijail API *minijail_new(void)
 {
 	return calloc(1, sizeof(struct minijail));
 }
 
-void minijail_change_uid(struct minijail *j, uid_t uid)
+void API minijail_change_uid(struct minijail *j, uid_t uid)
 {
 	if (uid == 0)
 		die("useless change to uid 0");
@@ -106,7 +106,7 @@ void minijail_change_uid(struct minijail *j, uid_t uid)
 	j->flags.uid = 1;
 }
 
-void minijail_change_gid(struct minijail *j, gid_t gid)
+void API minijail_change_gid(struct minijail *j, gid_t gid)
 {
 	if (gid == 0)
 		die("useless change to gid 0");
@@ -114,7 +114,7 @@ void minijail_change_gid(struct minijail *j, gid_t gid)
 	j->flags.gid = 1;
 }
 
-int minijail_change_user(struct minijail *j, const char *user)
+int API minijail_change_user(struct minijail *j, const char *user)
 {
 	char *buf = NULL;
 	struct passwd pw;
@@ -141,7 +141,7 @@ int minijail_change_user(struct minijail *j, const char *user)
 	return 0;
 }
 
-int minijail_change_group(struct minijail *j, const char *group)
+int API minijail_change_group(struct minijail *j, const char *group)
 {
 	char *buf = NULL;
 	struct group gr;
@@ -164,49 +164,49 @@ int minijail_change_group(struct minijail *j, const char *group)
 	return 0;
 }
 
-void minijail_use_seccomp(struct minijail *j)
+void API minijail_use_seccomp(struct minijail *j)
 {
 	j->flags.seccomp = 1;
 }
 
-void minijail_use_seccomp_filter(struct minijail *j)
+void API minijail_use_seccomp_filter(struct minijail *j)
 {
 	j->flags.seccomp_filter = 1;
 }
 
-void minijail_use_caps(struct minijail *j, uint64_t capmask)
+void API minijail_use_caps(struct minijail *j, uint64_t capmask)
 {
 	j->caps = capmask;
 	j->flags.caps = 1;
 }
 
-void minijail_namespace_vfs(struct minijail *j)
+void API minijail_namespace_vfs(struct minijail *j)
 {
 	j->flags.vfs = 1;
 }
 
-void minijail_namespace_pids(struct minijail *j)
+void API minijail_namespace_pids(struct minijail *j)
 {
 	j->flags.pids = 1;
 }
 
-void minijail_remount_readonly(struct minijail *j)
+void API minijail_remount_readonly(struct minijail *j)
 {
 	j->flags.vfs = 1;
 	j->flags.readonly = 1;
 }
 
-void minijail_inherit_usergroups(struct minijail *j)
+void API minijail_inherit_usergroups(struct minijail *j)
 {
 	j->flags.usergroups = 1;
 }
 
-void minijail_disable_ptrace(struct minijail *j)
+void API minijail_disable_ptrace(struct minijail *j)
 {
 	j->flags.ptrace = 1;
 }
 
-int minijail_enter_chroot(struct minijail *j, const char *dir) {
+int API minijail_enter_chroot(struct minijail *j, const char *dir) {
 	if (j->chrootdir)
 		return -EINVAL;
 	j->chrootdir = strdup(dir);
@@ -216,8 +216,8 @@ int minijail_enter_chroot(struct minijail *j, const char *dir) {
 	return 0;
 }
 
-int minijail_bind(struct minijail *j, const char *src, const char *dest,
-                  int writeable) {
+int API minijail_bind(struct minijail *j, const char *src, const char *dest,
+                      int writeable) {
 	struct binding *b;
 
 	if (*dest != '/')
@@ -256,7 +256,8 @@ error:
 	return -ENOMEM;
 }
 
-int minijail_add_seccomp_filter(struct minijail *j, int nr, const char *filter)
+int API minijail_add_seccomp_filter(struct minijail *j, int nr,
+                                    const char *filter)
 {
 	struct seccomp_filter *sf;
 	if (!filter || nr < 0)
@@ -287,7 +288,7 @@ int minijail_add_seccomp_filter(struct minijail *j, int nr, const char *filter)
 	return 0;
 }
 
-int minijail_lookup_syscall(const char *name)
+int API minijail_lookup_syscall(const char *name)
 {
 	const struct syscall_entry *entry = syscall_table;
 	for (; entry->name && entry->nr >= 0; ++entry)
@@ -296,7 +297,7 @@ int minijail_lookup_syscall(const char *name)
 	return -1;
 }
 
-static char *strip(char *s)
+char *strip(char *s)
 {
 	char *end;
 	while (*s && isblank(*s))
@@ -308,7 +309,7 @@ static char *strip(char *s)
 	return s;
 }
 
-void minijail_parse_seccomp_filters(struct minijail *j, const char *path)
+void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
 	FILE *file = fopen(path, "r");
 	char line[MINIJAIL_MAX_SECCOMP_FILTER_LINE];
@@ -363,16 +364,16 @@ struct marshal_state {
 	char *buf;
 };
 
-static void marshal_state_init(struct marshal_state *state,
-			       char *buf, size_t available)
+void marshal_state_init(struct marshal_state *state,
+			char *buf, size_t available)
 {
 	state->available = available;
 	state->buf = buf;
 	state->total = 0;
 }
 
-static void marshal_append(struct marshal_state *state,
-			   char *src, size_t length)
+void marshal_append(struct marshal_state *state,
+		    char *src, size_t length)
 {
 	size_t copy_len = MIN(state->available, length);
 
@@ -386,8 +387,8 @@ static void marshal_append(struct marshal_state *state,
 	state->total += length;
 }
 
-static void minijail_marshal_helper(struct marshal_state *state,
-				    const struct minijail *j)
+void minijail_marshal_helper(struct marshal_state *state,
+			     const struct minijail *j)
 {
 	struct binding *b = NULL;
 	marshal_append(state, (char *)j, sizeof(*j));
@@ -410,7 +411,7 @@ static void minijail_marshal_helper(struct marshal_state *state,
 	}
 }
 
-size_t minijail_size(const struct minijail *j)
+size_t API minijail_size(const struct minijail *j)
 {
 	struct marshal_state state;
 	marshal_state_init(&state, NULL, 0);
@@ -433,7 +434,7 @@ int minijail_marshal(const struct minijail *j, char *buf, size_t available)
  *
  * Returns a pointer to the base of the bytes, or NULL for errors.
  */
-static void *consumebytes(size_t length, char **buf, size_t *buflength) {
+void *consumebytes(size_t length, char **buf, size_t *buflength) {
 	char *p = *buf;
 	if (length > *buflength)
 		return NULL;
@@ -448,7 +449,7 @@ static void *consumebytes(size_t length, char **buf, size_t *buflength) {
  *
  * Returns a pointer to the base of the string, or NULL for errors.
  */
-static char *consumestr(char **buf, size_t *buflength) {
+char *consumestr(char **buf, size_t *buflength) {
 	size_t len = strnlen(*buf, *buflength);
 	if (len == *buflength)
 		/* There's no null-terminator */
@@ -571,7 +572,7 @@ void minijail_preexec(struct minijail *j)
  *
  * Returns 0 for success.
  */
-static int bind_one(const struct minijail *j, struct binding *b) {
+int bind_one(const struct minijail *j, struct binding *b) {
 	int ret = 0;
 	char *dest = NULL;
 	int mflags = MS_BIND | (b->writeable ? 0 : MS_RDONLY);
@@ -589,7 +590,7 @@ static int bind_one(const struct minijail *j, struct binding *b) {
 	return ret;
 }
 
-static int enter_chroot(const struct minijail *j) {
+int enter_chroot(const struct minijail *j) {
 	int ret;
 	if (j->bindings_head && (ret = bind_one(j, j->bindings_head)))
 		return ret;
@@ -603,7 +604,7 @@ static int enter_chroot(const struct minijail *j) {
 	return 0;
 }
 
-static int remount_readonly(void)
+int remount_readonly(void)
 {
 	const char *kProcPath = "/proc";
 	const unsigned int kSafeFlags = MS_NODEV | MS_NOEXEC | MS_NOSUID;
@@ -620,7 +621,7 @@ static int remount_readonly(void)
 	return 0;
 }
 
-static void drop_caps(const struct minijail *j)
+void drop_caps(const struct minijail *j)
 {
 	cap_t caps = cap_get_proc();
 	cap_value_t raise_flag[1];
@@ -655,7 +656,7 @@ static void drop_caps(const struct minijail *j)
 	}
 }
 
-static int setup_seccomp_filters(const struct minijail *j)
+int setup_seccomp_filters(const struct minijail *j)
 {
 	const struct seccomp_filter *sf = j->filters;
 	int ret = 0;
@@ -702,7 +703,7 @@ static int setup_seccomp_filters(const struct minijail *j)
 	return ret;
 }
 
-void minijail_enter(const struct minijail *j)
+void API minijail_enter(const struct minijail *j)
 {
 	if (j->flags.pids)
 		die("tried to enter a pid-namespaced jail;"
@@ -769,14 +770,15 @@ void minijail_enter(const struct minijail *j)
 		pdie("prctl(PR_SET_SECCOMP)");
 }
 
+/* TODO(wad) will visibility affect this variable? */
 static int init_exitstatus = 0;
 
-static void init_term(int __attribute__ ((unused)) sig)
+void init_term(int __attribute__ ((unused)) sig)
 {
 	_exit(init_exitstatus);
 }
 
-static int init(pid_t rootpid)
+int init(pid_t rootpid)
 {
 	pid_t pid;
 	int status;
@@ -795,7 +797,7 @@ static int init(pid_t rootpid)
 	_exit(WEXITSTATUS(init_exitstatus));
 }
 
-int minijail_from_fd(int fd, struct minijail *j)
+int API minijail_from_fd(int fd, struct minijail *j)
 {
 	size_t sz = 0;
 	size_t bytes = read(fd, &sz, sizeof(sz));
@@ -818,7 +820,7 @@ int minijail_from_fd(int fd, struct minijail *j)
 	return r;
 }
 
-int minijail_to_fd(struct minijail *j, int fd)
+int API minijail_to_fd(struct minijail *j, int fd)
 {
 	char *buf;
 	size_t sz = minijail_size(j);
@@ -848,7 +850,7 @@ int minijail_to_fd(struct minijail *j, int fd)
 	return 0;
 }
 
-static int setup_preload(void)
+int setup_preload(void)
 {
 	char *oldenv = getenv(kLdPreloadEnvVar) ? : "";
 	char *newenv = malloc(strlen(oldenv) + 2 + strlen(PRELOADPATH));
@@ -865,7 +867,7 @@ static int setup_preload(void)
 	return 0;
 }
 
-static int setup_pipe(int fds[2])
+int setup_pipe(int fds[2])
 {
 	int r = pipe(fds);
 	char fd_buf[11];
@@ -878,7 +880,8 @@ static int setup_pipe(int fds[2])
 	return 0;
 }
 
-int minijail_run(struct minijail *j, const char *filename, char *const argv[])
+int API minijail_run(struct minijail *j, const char *filename,
+		     char *const argv[])
 {
 	unsigned int pidns = j->flags.pids ? CLONE_NEWPID : 0;
 	char *oldenv, *oldenv_copy = NULL;
@@ -958,7 +961,7 @@ int minijail_run(struct minijail *j, const char *filename, char *const argv[])
 	_exit(execve(filename, argv, environ));
 }
 
-int minijail_kill(struct minijail *j)
+int API minijail_kill(struct minijail *j)
 {
 	int st;
 	if (kill(j->initpid, SIGTERM))
@@ -968,7 +971,7 @@ int minijail_kill(struct minijail *j)
 	return st;
 }
 
-int minijail_wait(struct minijail *j)
+int API minijail_wait(struct minijail *j)
 {
 	int st;
 	if (waitpid(j->initpid, &st, 0) < 0)
@@ -978,7 +981,7 @@ int minijail_wait(struct minijail *j)
 	return WEXITSTATUS(st);
 }
 
-void minijail_destroy(struct minijail *j)
+void API minijail_destroy(struct minijail *j)
 {
 	struct seccomp_filter *f = j->filters;
 	/* Unlink the tail and head */

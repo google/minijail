@@ -5,8 +5,11 @@
 LIBDIR = lib
 PRELOADPATH = \"/$(LIBDIR)/libminijailpreload.so\"
 CFLAGS += -fPIC -Wall -Wextra -Werror -DPRELOADPATH="$(PRELOADPATH)"
+CFLAGS += -fvisibility=internal
 
 all : minijail0 libminijail.so libminijailpreload.so
+
+tests : libminijail_unittest.wrapper
 
 minijail0 : libsyscalls.gen.o libminijail.o minijail0.c
 	$(CC) $(CFLAGS) -o $@ $^ -lcap
@@ -14,8 +17,15 @@ minijail0 : libsyscalls.gen.o libminijail.o minijail0.c
 libminijail.so : libminijail.o libsyscalls.gen.o
 	$(CC) $(CFLAGS) -shared -o $@ $^ -lcap
 
+# Allow unittests to access what are normally internal symbols.
+libminijail_unittest.wrapper :
+	$(MAKE) $(MAKEARGS) test-clean
+	$(MAKE) $(MAKEARGS) libminijail_unittest
+	$(MAKE) $(MAKEARGS) test-clean
+
+libminijail_unittest : CFLAGS := $(filter-out -fvisibility=%,$(CFLAGS))
 libminijail_unittest : libminijail_unittest.o libminijail.o libsyscalls.gen.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lcap
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(filter-out $(CFLAGS_FILE),$^) -lcap
 
 libminijailpreload.so : libminijailpreload.c libsyscalls.gen.o libminijail.o
 	$(CC) $(CFLAGS) -shared -o $@ $^ -ldl -lcap
@@ -66,7 +76,12 @@ libsyscalls.gen.c : Makefile libsyscalls.h
 	@$(call gen_syscalls,$@)
 	@printf "done.\n"
 
-clean :
+# Only clean up files affected by the CFLAGS change for testing.
+test-clean :
+	@rm -f libminijail.o libminijail_unittest.o libsyscalls.gen.o
+
+clean : test-clean
 	@rm -f libminijail.o libminijailpreload.so minijail0
-	@rm -f libminijail_unittest libminijail_unittest.o
-	@rm -f libsyscalls.gen.c libsyscalls.gen.o
+	@rm -f libminijail.so
+	@rm -f libminijail_unittest
+	@rm -f libsyscalls.gen.c
