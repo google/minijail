@@ -417,8 +417,13 @@ static int test_harness_run(int __attribute__((unused)) argc,
       waitpid(child_pid, &status, 0);
       if (WIFEXITED(status))
         t->passed = WEXITSTATUS(status);
-      if (WIFSIGNALED(status))
+      if (WIFSIGNALED(status)) {
         t->passed = 0;
+        fprintf(TH_LOG_STREAM,
+                "%s: Test terminated unexpectedly by signal %d\n",
+               t->name,
+               WTERMSIG(status));
+      }
     }
     printf("[     %4s ] %s\n", (t->passed ? "OK" : "FAIL"), t->name);
     if (!t->passed)
