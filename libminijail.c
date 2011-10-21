@@ -473,6 +473,13 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 		j->user = strdup(user);
 	}
 
+	if (j->chrootdir) {	/* stale pointer */
+		char *chrootdir = consumestr(&serialized, &length);
+		if (!chrootdir)
+			return -EINVAL;
+		j->chrootdir = strdup(chrootdir);
+	}
+
 	if (j->flags.seccomp_filter && j->filter_count) {
 		count = j->filter_count;
 		/* Let add_seccomp_filter recompute the value. */

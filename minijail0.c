@@ -72,8 +72,10 @@ static void usage(const char *progn)
 	printf("Usage: %s [-Ghprsv] [-b <src>,<dest>[,<writeable>]] [-c <caps>] "
 	       "[-C <dir>] [-g <group>] [-S <file>] [-u <user>] <program> "
 	       "[args...]\n"
-	       "  -b: binds <src> to <dest> in chroot. Multiple instances allowed\n"
+	       "  -b:         binds <src> to <dest> in chroot. Multiple "
+	       "instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
+	       "  -C <dir>:   chroot to <dir>\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
@@ -102,7 +104,7 @@ int main(int argc, char *argv[])
 	struct minijail *j = minijail_new();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:vrGhHp")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHp")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
