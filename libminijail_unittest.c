@@ -6,6 +6,8 @@
  * Test platform independent logic of minijail.
  */
 
+#include <errno.h>
+
 #include "test_harness.h"
 
 #include "libminijail.h"
@@ -47,8 +49,8 @@ TEST_F(marshal, empty) {
 
 TEST_F(marshal, 0xff) {
   memset(self->buf, 0xff, sizeof(self->buf));
-  /* It should parse, but the results will be a ... surprise. */
-  EXPECT_EQ(0, minijail_unmarshal(self->j, self->buf, sizeof(self->buf)));
+  /* Should fail on the first consumestr since a NUL will never be found. */
+  EXPECT_EQ(-EINVAL, minijail_unmarshal(self->j, self->buf, sizeof(self->buf)));
 }
 
 TEST_F(marshal, short) {
