@@ -460,66 +460,87 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 {
 	int i;
 	int count;
+	int ret = -EINVAL;
+
 	if (length < sizeof(*j))
-		return -EINVAL;
+		goto out;
 	memcpy((void *)j, serialized, sizeof(*j));
 	serialized += sizeof(*j);
 	length -= sizeof(*j);
 
+	/* Potentially stale pointers not used as signals. */
+	j->bindings_head = NULL;
+	j->bindings_tail = NULL;
+	j->filters = NULL;
+
 	if (j->user) {		/* stale pointer */
 		char *user = consumestr(&serialized, &length);
 		if (!user)
-			return -EINVAL;
+			goto clear_pointers;
 		j->user = strdup(user);
+		if (!j->user)
+			goto clear_pointers;
 	}
 
 	if (j->chrootdir) {	/* stale pointer */
 		char *chrootdir = consumestr(&serialized, &length);
 		if (!chrootdir)
-			return -EINVAL;
+			goto bad_chrootdir;
 		j->chrootdir = strdup(chrootdir);
+		if (!j->chrootdir)
+			goto bad_chrootdir;
 	}
 
 	if (j->flags.seccomp_filter && j->filter_count) {
 		count = j->filter_count;
 		/* Let add_seccomp_filter recompute the value. */
 		j->filter_count = 0;
-		j->filters = NULL;	/* Don't follow the stale pointer. */
 		for (; count > 0; --count) {
 			int *nr = (int *)consumebytes(sizeof(*nr), &serialized,
 			                              &length);
 			char *filter;
 			if (!nr)
-				return -EINVAL;
+				goto bad_filters;
 			filter = consumestr(&serialized, &length);
 			if (!filter)
-				return -EINVAL;
+				goto bad_filters;
 			if (minijail_add_seccomp_filter(j, *nr, filter))
-				return -EINVAL;
+				goto bad_filters;
 		}
 	}
 
 	count = j->binding_count;
-	j->bindings_head = NULL;
-	j->bindings_tail = NULL;
 	j->binding_count = 0;
 	for (i = 0; i < count; ++i) {
 		int *writeable;
 		const char *dest;
 		const char *src = consumestr(&serialized, &length);
 		if (!src)
-			return -EINVAL;
+			goto bad_bindings;
 		dest = consumestr(&serialized, &length);
 		if (!dest)
-			return -EINVAL;
+			goto bad_bindings;
 		writeable = consumebytes(sizeof(*writeable), &serialized, &length);
 		if (!writeable)
-			return -EINVAL;
+			goto bad_bindings;
 		if (minijail_bind(j, src, dest, *writeable))
-			return -EINVAL;
+			goto bad_bindings;
 	}
 
 	return 0;
+
+bad_bindings:
+bad_filters:
+	if (j->chrootdir)
+		free(j->chrootdir);
+bad_chrootdir:
+	if (j->user)
+		free(j->user);
+clear_pointers:
+	j->user = NULL;
+	j->chrootdir = NULL;
+out:
+	return ret;
 }
 
 void minijail_preenter(struct minijail *j)
@@ -581,8 +602,6 @@ static int enter_chroot(const struct minijail *j) {
 
 	return 0;
 }
-
-
 
 static int remount_readonly(void)
 {
@@ -981,5 +1000,7 @@ void minijail_destroy(struct minijail *j)
 	j->bindings_tail = NULL;
 	if (j->user)
 		free(j->user);
+	if (j->chrootdir)
+		free(j->chrootdir);
 	free(j);
 }
