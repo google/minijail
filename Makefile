@@ -2,8 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-LIBDIR ?= "/lib"
-PRELOADPATH = \"$LIBDIR/libminijailpreload.so\"
+PRELOADPATH ?= \"/lib/libminijailpreload.so\"
 CFLAGS += -fPIC -Wall -Wextra -Werror -DPRELOADPATH="$(PRELOADPATH)"
 
 all : minijail0 libminijail.so libminijailpreload.so
