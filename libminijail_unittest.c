@@ -13,11 +13,98 @@
 #include "libminijail.h"
 #include "libminijail-private.h"
 
+/* Prototypes needed only by test. */
+void *consumebytes(size_t length, char **buf, size_t *buflength);
+char *consumestr(char **buf, size_t *buflength);
+
 /* Silence unused variable warnings. */
 TEST(silence_unused) {
   EXPECT_STREQ(kLdPreloadEnvVar, kLdPreloadEnvVar);
   EXPECT_STREQ(kFdEnvVar, kFdEnvVar);
   EXPECT_STRNE(kFdEnvVar, kLdPreloadEnvVar);
+}
+
+TEST(consumebytes_zero) {
+  char buf[1024];
+  size_t len = sizeof(buf);
+  char *pos = &buf[0];
+  EXPECT_NE(NULL, consumebytes(0, &pos, &len));
+  EXPECT_EQ(&buf[0], pos);
+  EXPECT_EQ(sizeof(buf), len);
+}
+
+TEST(consumebytes_exact) {
+  char buf[1024];
+  size_t len = sizeof(buf);
+  char *pos = &buf[0];
+  /* One past the end since it consumes the whole buffer. */
+  char *end = &buf[sizeof(buf)];
+  EXPECT_NE(NULL, consumebytes(len, &pos, &len));
+  EXPECT_EQ((size_t)0, len);
+  EXPECT_EQ(end, pos);
+}
+
+TEST(consumebytes_half) {
+  char buf[1024];
+  size_t len = sizeof(buf);
+  char *pos = &buf[0];
+  /* One past the end since it consumes the whole buffer. */
+  char *end = &buf[sizeof(buf) / 2];
+  EXPECT_NE(NULL, consumebytes(len / 2, &pos, &len));
+  EXPECT_EQ(sizeof(buf) / 2, len);
+  EXPECT_EQ(end, pos);
+}
+
+TEST(consumebytes_toolong) {
+  char buf[1024];
+  size_t len = sizeof(buf);
+  char *pos = &buf[0];
+  /* One past the end since it consumes the whole buffer. */
+  EXPECT_EQ(NULL, consumebytes(len + 1, &pos, &len));
+  EXPECT_EQ(sizeof(buf), len);
+  EXPECT_EQ(&buf[0], pos);
+}
+
+TEST(consumestr_zero) {
+  char buf[1024];
+  size_t len = 0;
+  char *pos = &buf[0];
+  memset(buf, 0xff, sizeof(buf));
+  EXPECT_EQ(NULL, consumestr(&pos, &len));
+  EXPECT_EQ((size_t)0, len);
+  EXPECT_EQ(&buf[0], pos);
+}
+
+TEST(consumestr_nonul) {
+  char buf[1024];
+  size_t len = sizeof(buf);
+  char *pos = &buf[0];
+  memset(buf, 0xff, sizeof(buf));
+  EXPECT_EQ(NULL, consumestr(&pos, &len));
+  EXPECT_EQ(sizeof(buf), len);
+  EXPECT_EQ(&buf[0], pos);
+}
+
+TEST(consumestr_full) {
+  char buf[1024];
+  size_t len = sizeof(buf);
+  char *pos = &buf[0];
+  memset(buf, 0xff, sizeof(buf));
+  buf[sizeof(buf)-1] = '\0';
+  EXPECT_EQ((void *)buf, consumestr(&pos, &len));
+  EXPECT_EQ((size_t)0, len);
+  EXPECT_EQ(&buf[sizeof(buf)], pos);
+}
+
+TEST(consumestr_trailing_nul) {
+  char buf[1024];
+  size_t len = sizeof(buf) - 1;
+  char *pos = &buf[0];
+  memset(buf, 0xff, sizeof(buf));
+  buf[sizeof(buf)-1] = '\0';
+  EXPECT_EQ(NULL, consumestr(&pos, &len));
+  EXPECT_EQ(sizeof(buf) - 1, len);
+  EXPECT_EQ(&buf[0], pos);
 }
 
 FIXTURE(marshal) {
