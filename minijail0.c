@@ -55,8 +55,8 @@ static void use_caps(struct minijail *j, const char *arg)
 
 static void add_binding(struct minijail *j, char *arg) {
 	char *src = strtok(arg, ",");
-	char *dest = strtok(arg, ",");
-	char *flags = strtok(arg, ",");
+	char *dest = strtok(NULL, ",");
+	char *flags = strtok(NULL, ",");
 	if (!src || !dest) {
 		fprintf(stderr, "Bad binding: %s %s\n", src, dest);
 		exit(1);
