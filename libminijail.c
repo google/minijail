@@ -575,15 +575,20 @@ void minijail_preexec(struct minijail *j)
 int bind_one(const struct minijail *j, struct binding *b) {
 	int ret = 0;
 	char *dest = NULL;
-	int mflags = MS_BIND | (b->writeable ? 0 : MS_RDONLY);
 	if (ret)
 		return ret;
 	/* dest has a leading "/" */
 	if (asprintf(&dest, "%s%s", j->chrootdir, b->dest) < 0)
 		return -ENOMEM;
-	ret = mount(b->src, dest, NULL, mflags, NULL);
+	ret = mount(b->src, dest, NULL, MS_BIND, NULL);
 	if (ret)
 		pdie("bind: %s -> %s", b->src, dest);
+	if (!b->writeable) {
+		ret = mount(b->src, dest, NULL,
+		            MS_BIND | MS_REMOUNT | MS_RDONLY, NULL);
+		if (ret)
+			pdie("bind ro: %s -> %s", b->src, dest);
+	}
 	free(dest);
 	if (b->next)
 		return bind_one(j, b->next);
