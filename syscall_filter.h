@@ -22,6 +22,8 @@ struct filter_block {
 	size_t total_len;
 };
 
+struct bpf_labels;
+
 struct filter_block *compile_section(int nr, const char *policy_line,
 		unsigned int label_id, struct bpf_labels *labels);
 int compile_filter(FILE *policy, struct sock_fprog *prog);

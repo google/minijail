@@ -18,8 +18,6 @@
 static const char *kFdEnvVar = "__MINIJAIL_FD";
 static const char *kLdPreloadEnvVar = "LD_PRELOAD";
 
-#define MINIJAIL_MAX_SECCOMP_FILTER_LINE 512
-
 struct minijail;
 
 /* minijail_size: returns the size (in bytes) of @j if marshalled

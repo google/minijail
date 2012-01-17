@@ -12,4 +12,5 @@ struct syscall_entry {
 };
 
 extern const struct syscall_entry syscall_table[];
+
 #endif  /* MINIJAIL_LIBSYSCALLS_H_ */
