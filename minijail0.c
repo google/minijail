@@ -81,7 +81,7 @@ static void usage(const char *progn)
 	       "  -h:         help (this message)\n"
 	       "  -H:         seccomp filter help message\n"
 	       "  -p:         use pid namespace (implies -vr)\n"
-	       "  -r:         remount filesystems readonly (implies -v)\n"
+	       "  -r:         remount /proc readonly (implies -v)\n"
 	       "  -s:         use seccomp\n"
 	       "  -S <file>:  set seccomp filters using <file>\n"
 	       "              E.g., -S /usr/share/filters/<prog>.$(uname -m)\n"
