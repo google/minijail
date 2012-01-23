@@ -1,4 +1,5 @@
-/* Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+/*
+ * Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
@@ -123,13 +124,19 @@ int API minijail_change_user(struct minijail *j, const char *user)
 	if (sz == -1)
 		sz = 65536;	/* your guess is as good as mine... */
 
-	/* sysconf(_SC_GETPW_R_SIZE_MAX), under glibc, is documented to return
+	/*
+	 * sysconf(_SC_GETPW_R_SIZE_MAX), under glibc, is documented to return
 	 * the maximum needed size of the buffer, so we don't have to search.
 	 */
 	buf = malloc(sz);
 	if (!buf)
 		return -ENOMEM;
 	getpwnam_r(user, &pw, buf, sz, &ppw);
+	/*
+	 * We're safe to free the buffer here. The strings inside pw point
+	 * inside buf, but we don't use any of them; this leaves the pointers
+	 * dangling but it's safe. ppw points at pw if getpwnam_r succeeded.
+	 */
 	free(buf);
 	if (!ppw)
 		return -errno;
@@ -150,13 +157,19 @@ int API minijail_change_group(struct minijail *j, const char *group)
 	if (sz == -1)
 		sz = 65536;	/* and mine is as good as yours, really */
 
-	/* sysconf(_SC_GETGR_R_SIZE_MAX), under glibc, is documented to return
+	/*
+	 * sysconf(_SC_GETGR_R_SIZE_MAX), under glibc, is documented to return
 	 * the maximum needed size of the buffer, so we don't have to search.
 	 */
 	buf = malloc(sz);
 	if (!buf)
 		return -ENOMEM;
 	getgrnam_r(group, &gr, buf, sz, &pgr);
+	/*
+	 * We're safe to free the buffer here. The strings inside gr point
+	 * inside buf, but we don't use any of them; this leaves the pointers
+	 * dangling but it's safe. pgr points at gr if getgrnam_r succeeded.
+	 */
 	free(buf);
 	if (!pgr)
 		return -errno;
@@ -237,7 +250,8 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 
 	syslog(LOG_INFO, "libminijail: bind %s -> %s", src, dest);
 
-	/* Force vfs namespacing so the bind mounts don't leak out into the
+	/*
+	 * Force vfs namespacing so the bind mounts don't leak out into the
 	 * containing vfs namespace.
 	 */
 	minijail_namespace_vfs(j);
@@ -319,7 +333,8 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 	if (!file)
 		pdie("failed to open seccomp filters file");
 
-	/* Format is simple:
+	/*
+	 * Format is simple:
 	 * syscall_name<COLON><FILTER STRING>[\n|EOF]
 	 * #...comment...
 	 * <empty line?
@@ -615,7 +630,8 @@ int remount_readonly(void)
 {
 	const char *kProcPath = "/proc";
 	const unsigned int kSafeFlags = MS_NODEV | MS_NOEXEC | MS_NOSUID;
-	/* Right now, we're holding a reference to our parent's old mount of
+	/*
+	 * Right now, we're holding a reference to our parent's old mount of
 	 * /proc in our namespace, which means using MS_REMOUNT here would
 	 * mutate our parent's mount as well, even though we're in a VFS
 	 * namespace (!). Instead, remove their mount from our namespace
@@ -722,7 +738,8 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.usergroups && !j->user)
 		die("usergroup inheritance without username");
 
-	/* We can't recover from failures if we've dropped privileges partially,
+	/*
+	 * We can't recover from failures if we've dropped privileges partially,
 	 * so we don't even try. If any of our operations fail, we abort() the
 	 * entire process.
 	 */
@@ -736,7 +753,8 @@ void API minijail_enter(const struct minijail *j)
 		pdie("remount");
 
 	if (j->flags.caps) {
-		/* POSIX capabilities are a bit tricky. If we drop our
+		/*
+		 * POSIX capabilities are a bit tricky. If we drop our
 		 * capability to change uids, our attempt to use setuid()
 		 * below will fail. Hang on to root caps across setuid(), then
 		 * lock securebits.
@@ -767,7 +785,8 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.caps)
 		drop_caps(j);
 
-	/* seccomp has to come last since it cuts off all the other
+	/*
+	 * seccomp has to come last since it cuts off all the other
 	 * privilege-dropping syscalls :)
 	 */
 	if (j->flags.seccomp_filter && prctl(PR_SET_SECCOMP, 13))
@@ -793,7 +812,8 @@ int init(pid_t rootpid)
 	signal(SIGTERM, init_term);
 	/* TODO(wad) self jail with seccomp_filters here. */
 	while ((pid = wait(&status)) > 0) {
-		/* This loop will only end when either there are no processes
+		/*
+		 * This loop will only end when either there are no processes
 		 * left inside our pid namespace or we get a signal.
 		 */
 		if (pid == rootpid)
@@ -906,7 +926,8 @@ int API minijail_run(struct minijail *j, const char *filename,
 	if (setup_preload())
 		return -EFAULT;
 
-	/* Before we fork(2) and execve(2) the child process, we need to open
+	/*
+	 * Before we fork(2) and execve(2) the child process, we need to open
 	 * a pipe(2) to send the minijail configuration over.
 	 */
 	if (setup_pipe(pipe_fds))
@@ -945,7 +966,8 @@ int API minijail_run(struct minijail *j, const char *filename,
 	minijail_enter(j);
 
 	if (pidns) {
-		/* pid namespace: this process will become init inside the new
+		/*
+		 * pid namespace: this process will become init inside the new
 		 * namespace, so fork off a child to actually run the program
 		 * (we don't want all programs we might exec to have to know
 		 * how to be init).
@@ -957,7 +979,8 @@ int API minijail_run(struct minijail *j, const char *filename,
 			init(child_pid);	/* never returns */
 	}
 
-	/* If we aren't pid-namespaced:
+	/*
+	 * If we aren't pid-namespaced:
 	 *   calling process
 	 *   -> execve()-ing process
 	 * If we are:
