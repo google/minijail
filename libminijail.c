@@ -1,4 +1,4 @@
-/* Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+/* Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
@@ -187,6 +187,8 @@ void API minijail_namespace_vfs(struct minijail *j)
 
 void API minijail_namespace_pids(struct minijail *j)
 {
+	j->flags.vfs = 1;
+	j->flags.readonly = 1;
 	j->flags.pids = 1;
 }
 

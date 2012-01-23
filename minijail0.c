@@ -1,4 +1,4 @@
-/* Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+/* Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
@@ -80,7 +80,7 @@ static void usage(const char *progn)
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
 	       "  -H:         seccomp filter help message\n"
-	       "  -p:         use pid namespace\n"
+	       "  -p:         use pid namespace (implies -vr)\n"
 	       "  -r:         remount filesystems readonly (implies -v)\n"
 	       "  -s:         use seccomp\n"
 	       "  -S <file>:  set seccomp filters using <file>\n"

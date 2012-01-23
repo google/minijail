@@ -1,4 +1,4 @@
-/* Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+/* Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
@@ -49,6 +49,7 @@ int minijail_add_seccomp_filter(struct minijail *j, int nr,
 				const char *filter);
 void minijail_use_caps(struct minijail *j, uint64_t capmask);
 void minijail_namespace_vfs(struct minijail *j);
+/* Implies namespace_vfs and remount_readonly */
 void minijail_namespace_pids(struct minijail *j);
 void minijail_remount_readonly(struct minijail *j);
 void minijail_inherit_usergroups(struct minijail *j);

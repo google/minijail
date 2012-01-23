@@ -1,4 +1,4 @@
-.TH MINIJAIL0 "1" "July 2011" "Chromium OS" "User Commands"
+.TH MINIJAIL0 "1" "January 2012" "Chromium OS" "User Commands"
 .SH NAME
 minijail0 \- sandbox a process
 .SH SYNOPSIS
@@ -42,7 +42,9 @@ Print a help message detailing supported system call names for seccomp_filter.
 .TP
 \fB-p\fR
 Run inside a new PID namespace. This option will make it impossible for the
-program to see or affect processes that are not its descendants.
+program to see or affect processes that are not its descendants. This implies
+\fB-v\fR and \fB-r\fR, since otherwise the process can see outside its namespace
+by inspecting /proc.
 .TP
 \fB-r\fR
 Remount certain filesystems readonly. Currently this only remounts /proc. This
