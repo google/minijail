@@ -1,4 +1,4 @@
-# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -9,7 +9,7 @@ CFLAGS += -fvisibility=internal
 
 all : minijail0 libminijail.so libminijailpreload.so
 
-tests : libminijail_unittest.wrapper
+tests : libminijail_unittest.wrapper syscall_filter_unittest
 
 minijail0 : libsyscalls.gen.o libminijail.o minijail0.c
 	$(CC) $(CFLAGS) -o $@ $^ -lcap
@@ -36,6 +36,17 @@ libminijail_unittest.o : libminijail_unittest.c test_harness.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 libsyscalls.gen.o : libsyscalls.gen.c libsyscalls.h
+
+syscall_filter_unittest : syscall_filter_unittest.o syscall_filter.o bpf.o \
+		test_harness.h
+	$(CC) $(CFLAGS) -o $@ $^
+
+syscall_filter_unittest.o : syscall_filter_unittest.c test_harness.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+syscall_filter.o : syscall_filter.c
+
+bpf.o : bpf.c
 
 # sed expression which extracts system calls that are
 # defined via asm/unistd.h.  It converts them from:
@@ -85,3 +96,5 @@ clean : test-clean
 	@rm -f libminijail.so
 	@rm -f libminijail_unittest
 	@rm -f libsyscalls.gen.c
+	@rm -f syscall_filter.o bpf.o
+	@rm -f syscall_filter_unittest syscall_filter_unittest.o
