@@ -14,6 +14,10 @@
 
 #include "syscall_filter.h"
 
+#include "libsyscalls.h"
+
+#define MAX_LINE_LENGTH 1024
+
 #define error(_msg, ...) do {	\
 	fprintf(stderr, "minijail: error: " _msg, ## __VA_ARGS__);	\
 	abort();							\
@@ -72,6 +76,19 @@ void append_filter_block(struct filter_block *head,
 	new_last->last = new_last->next = NULL;
 }
 
+void extend_filter_block_list(struct filter_block *list,
+		struct filter_block *another)
+{
+	if (list->last != NULL) {
+		list->last->next = another;
+		list->last = another->last;
+	} else {
+		list->next = another;
+		list->last = another->last;
+	}
+	list->total_len += another->total_len;
+}
+
 void append_ret_kill(struct filter_block *head)
 {
 	struct sock_filter *filter = new_instr_buf(ONE_INSTR);
@@ -108,7 +125,7 @@ unsigned int success_lbl(struct bpf_labels *labels, int nr)
 	return get_label_id(labels, lbl_str);
 }
 
-struct filter_block *compile_section(int syscall_nr, const char *policy_line,
+struct filter_block *compile_section(int nr, const char *policy_line,
 		unsigned int entry_lbl_id, struct bpf_labels *labels)
 {
 	/*
@@ -225,7 +242,7 @@ struct filter_block *compile_section(int syscall_nr, const char *policy_line,
 
 			long int c = strtol(constant_str, NULL, 0);
 			unsigned int id = group_end_lbl(
-					labels, syscall_nr, group_idx);
+					labels, nr, group_idx);
 
 			/*
 			 * Builds a BPF comparison between a syscall argument
@@ -248,14 +265,14 @@ struct filter_block *compile_section(int syscall_nr, const char *policy_line,
 		 * If the AND statement succeeds, we're done,
 		 * so jump to SUCCESS line.
 		 */
-		unsigned int id = success_lbl(labels, syscall_nr);
+		unsigned int id = success_lbl(labels, nr);
 		struct sock_filter *group_end_block = new_instr_buf(TWO_INSTRS);
 		len = set_bpf_jump_lbl(group_end_block, id);
 		/*
 		 * The end of each AND statement falls after the
 		 * jump to SUCCESS.
 		 */
-		id = group_end_lbl(labels, syscall_nr, group_idx++);
+		id = group_end_lbl(labels, nr, group_idx++);
 		len += set_bpf_lbl(group_end_block + len, id);
 		append_filter_block(head, group_end_block, len);
 	}
@@ -295,7 +312,7 @@ struct filter_block *compile_section(int syscall_nr, const char *policy_line,
 	 * Every time the filter succeeds we jump to a predefined SUCCESS
 	 * label. Add that label and BPF RET_ALLOW code now.
 	 */
-	unsigned int id = success_lbl(labels, syscall_nr);
+	unsigned int id = success_lbl(labels, nr);
 	struct sock_filter *success_block = new_instr_buf(TWO_INSTRS);
 	len = set_bpf_lbl(success_block, id);
 	len += set_bpf_ret_allow(success_block + len);
@@ -303,6 +320,168 @@ struct filter_block *compile_section(int syscall_nr, const char *policy_line,
 
 	free(line);
 	return head;
+}
+
+int lookup_syscall(const char *name)
+{
+	const struct syscall_entry *entry = syscall_table;
+	for (; entry->name && entry->nr >= 0; ++entry)
+		if (!strcmp(entry->name, name))
+			return entry->nr;
+	return -1;
+}
+
+char *strip(char *s)
+{
+	char *end;
+	while (*s && isblank(*s))
+		s++;
+	end = s + strlen(s) - 1;
+	while (end >= s && *end && (isblank(*end) || *end == '\n'))
+		end--;
+	*(end + 1) = '\0';
+	return s;
+}
+
+int compile_filter(FILE *policy, struct sock_fprog *prog)
+{
+	char line[MAX_LINE_LENGTH];
+	int line_count = 0;
+
+	struct bpf_labels labels;
+	labels.count = 0;
+
+	struct filter_block *head = calloc(1, sizeof(struct filter_block));
+	if (!head)
+		return -1;
+	head->instrs = NULL;
+	head->last = head->next = NULL;
+	struct filter_block *arg_blocks = NULL;
+
+	/* Start filter by validating arch. */
+	struct sock_filter *valid_arch = new_instr_buf(ARCH_VALIDATION_LEN);
+	size_t len = bpf_validate_arch(valid_arch);
+	append_filter_block(head, valid_arch, len);
+
+	/* Loading syscall number. */
+	struct sock_filter *load_nr = new_instr_buf(ONE_INSTR);
+	len = bpf_load_syscall_nr(load_nr);
+	append_filter_block(head, load_nr, len);
+
+	/*
+	 * Loop through all the lines in the policy file.
+	 * Build a jump table for the syscall number.
+	 * If the policy line has an arg filter, build the arg filter
+	 * as well.
+	 * Chain the filter sections together and dump them into
+	 * the final buffer at the end.
+	 */
+	while (fgets(line, sizeof(line), policy)) {
+		++line_count;
+		char *policy = line;
+		char *syscall_name = strsep(&policy, ":");
+		int nr = -1;
+
+		syscall_name = strip(syscall_name);
+
+		/* Allow comments and empty lines. */
+		if (*syscall_name == '#' || *syscall_name == '\0')
+			continue;
+
+		if (!policy)
+			return -1;
+
+		nr = lookup_syscall(syscall_name);
+		if (nr < 0)
+			return -1;
+
+		policy = strip(policy);
+
+		/*
+		 * For each syscall, add either a simple ALLOW,
+		 * or an arg filter block.
+		 */
+		if (strcmp(policy, "1") == 0) {
+			/* Add simple ALLOW. */
+			struct sock_filter *nr_comp =
+					new_instr_buf(ALLOW_SYSCALL_LEN);
+			bpf_allow_syscall(nr_comp, nr);
+			append_filter_block(head, nr_comp, ALLOW_SYSCALL_LEN);
+		} else {
+			/*
+			 * Create and jump to the label that will hold
+			 * the arg filter block.
+			 */
+			unsigned int id = bpf_label_id(&labels, syscall_name);
+			struct sock_filter *nr_comp =
+					new_instr_buf(ALLOW_SYSCALL_LEN);
+			bpf_allow_syscall_args(nr_comp, nr, id);
+			append_filter_block(head, nr_comp, ALLOW_SYSCALL_LEN);
+
+			/* Build the arg filter block. */
+			struct filter_block *block =
+				compile_section(nr, policy, id, &labels);
+
+			if (!block)
+				return -1;
+
+			if (arg_blocks) {
+				extend_filter_block_list(arg_blocks, block);
+			} else {
+				arg_blocks = block;
+			}
+		}
+	}
+
+	/* If none of the syscalls match, fall back to KILL. */
+	struct sock_filter *kill_filter = new_instr_buf(ONE_INSTR);
+	set_bpf_ret_kill(kill_filter);
+	append_filter_block(head, kill_filter, ONE_INSTR);
+
+	/* Allocate the final buffer, now that we know its size. */
+	size_t final_filter_len = head->total_len +
+		(arg_blocks? arg_blocks->total_len : 0);
+	if (final_filter_len > BPF_MAXINSNS)
+		return -1;
+
+	struct sock_filter *final_filter =
+			calloc(final_filter_len, sizeof(struct sock_filter));
+
+	if (flatten_block_list(head, final_filter, 0, final_filter_len) < 0)
+		return -1;
+
+	if (flatten_block_list(arg_blocks, final_filter,
+			head->total_len, final_filter_len) < 0)
+		return -1;
+
+	free_block_list(head);
+	free_block_list(arg_blocks);
+
+	bpf_resolve_jumps(&labels, final_filter, final_filter_len);
+
+	free_label_strings(&labels);
+
+	prog->filter = final_filter;
+	prog->len = final_filter_len;
+	return 0;
+}
+
+int flatten_block_list(struct filter_block *head, struct sock_filter *filter,
+		size_t index, size_t cap)
+{
+	size_t _index = index;
+
+	struct filter_block *curr;
+	size_t i;
+
+	for (curr = head; curr; curr = curr->next) {
+		for (i = 0; i < curr->len; i++) {
+			if (_index >= cap)
+				return -1;
+			filter[_index++] = curr->instrs[i];
+		}
+	}
+	return 0;
 }
 
 void free_block_list(struct filter_block *head)

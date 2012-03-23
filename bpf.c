@@ -10,11 +10,7 @@
 
 #include "bpf.h"
 
-/* Common jump targets. */
-#define NEXT 0
-#define SKIP 1
-#define SKIPN(_n) (_n)
-
+/* Basic BPF instruction setter. */
 inline size_t set_bpf_instr(struct sock_filter *instr,
 		unsigned short code, unsigned int k,
 		unsigned char jt, unsigned char jf)
@@ -24,6 +20,35 @@ inline size_t set_bpf_instr(struct sock_filter *instr,
 	instr->jt = jt;
 	instr->jf = jf;
 	return 1U;
+}
+
+/* Architecture validation. */
+size_t bpf_validate_arch(struct sock_filter *filter)
+{
+	struct sock_filter *curr_block = filter;
+	set_bpf_stmt(curr_block++, BPF_LD+BPF_W+BPF_ABS, arch_nr);
+	set_bpf_jump(curr_block++,
+			BPF_JMP+BPF_JEQ+BPF_K, ARCH_NR, SKIP, NEXT);
+	set_bpf_ret_kill(curr_block++);
+	return curr_block - filter;
+}
+
+/* Syscall number eval functions. */
+size_t bpf_allow_syscall(struct sock_filter *filter, int nr)
+{
+	struct sock_filter *curr_block = filter;
+	set_bpf_jump(curr_block++, BPF_JMP+BPF_JEQ+BPF_K, nr, NEXT, SKIP);
+	set_bpf_stmt(curr_block++, BPF_RET+BPF_K, SECCOMP_RET_ALLOW);
+	return curr_block - filter;
+}
+
+size_t bpf_allow_syscall_args(struct sock_filter *filter,
+		int nr, unsigned int id)
+{
+	struct sock_filter *curr_block = filter;
+	set_bpf_jump(curr_block++, BPF_JMP+BPF_JEQ+BPF_K, nr, NEXT, SKIP);
+	set_bpf_jump_lbl(curr_block++, id);
+	return curr_block - filter;
 }
 
 /* Size-aware arg loaders. */
@@ -72,7 +97,6 @@ size_t bpf_comp_jeq64(struct sock_filter *filter, uint64_t c,
 
 #if defined(BITS32)
 #define bpf_comp_jeq bpf_comp_jeq32
-
 #elif defined(BITS64)
 #define bpf_comp_jeq bpf_comp_jeq64
 #endif
@@ -207,6 +231,9 @@ int bpf_label_id(struct bpf_labels *labels, const char *label)
 /* Free label strings. */
 void free_label_strings(struct bpf_labels *labels)
 {
+	if (labels->count == 0)
+		return;
+
 	struct __bpf_label *begin = labels->labels, *end;
 
 	end = begin + labels->count;

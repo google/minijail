@@ -6,6 +6,7 @@
  * Test syscall filtering.
  */
 
+#include <asm/unistd.h>
 #include <errno.h>
 
 #include "test_harness.h"
@@ -66,6 +67,31 @@ do {	\
 	EXPECT_EQ_STMT(&(_block)->instrs[1],			\
 			BPF_RET+BPF_K, SECCOMP_RET_ALLOW);	\
 } while (0)
+
+#define EXPECT_ARCH_VALIDATION(_filter) \
+do {	\
+	EXPECT_EQ_STMT(&(_filter)[0], BPF_LD+BPF_W+BPF_ABS, arch_nr);	\
+	EXPECT_EQ_BLOCK(&(_filter)[1],					\
+			BPF_JMP+BPF_JEQ+BPF_K, ARCH_NR, SKIP, NEXT);	\
+	EXPECT_EQ_STMT(&(_filter)[2], BPF_RET+BPF_K, SECCOMP_RET_KILL);	\
+} while (0)
+
+#define EXPECT_ALLOW_SYSCALL(_filter, _nr) \
+do {	\
+	EXPECT_EQ_BLOCK(&(_filter)[0],					\
+			BPF_JMP+BPF_JEQ+BPF_K, (_nr), NEXT, SKIP);	\
+	EXPECT_EQ_STMT(&(_filter)[1],					\
+			BPF_RET+BPF_K, SECCOMP_RET_ALLOW);		\
+} while (0)
+
+#define EXPECT_ALLOW_SYSCALL_ARGS(_filter, _nr, _id, _jt, _jf) \
+do {	\
+	EXPECT_EQ_BLOCK(&(_filter)[0],					\
+			BPF_JMP+BPF_JEQ+BPF_K, (_nr), NEXT, SKIP);	\
+	EXPECT_EQ_BLOCK(&(_filter)[1],					\
+			BPF_JMP+BPF_JA, (_id), (_jt), (_jf));		\
+} while (0)
+
 
 FIXTURE(bpf) {};
 
@@ -156,6 +182,36 @@ TEST_F(bpf, bpf_arg_comp) {
 	EXPECT_JUMP_LBL(&arg_comp[7]);
 #endif
 	free(arg_comp);
+}
+
+TEST_F(bpf, bpf_validate_arch) {
+	struct sock_filter validate_arch[ARCH_VALIDATION_LEN];
+
+	size_t len = bpf_validate_arch(validate_arch);
+
+	EXPECT_EQ(len, ARCH_VALIDATION_LEN);
+	EXPECT_ARCH_VALIDATION(validate_arch);
+}
+
+TEST_F(bpf, bpf_allow_syscall) {
+	struct sock_filter allow_syscall[ALLOW_SYSCALL_LEN];
+	int nr = 1;
+
+	size_t len = bpf_allow_syscall(allow_syscall, nr);
+
+	EXPECT_EQ(len, ALLOW_SYSCALL_LEN);
+	EXPECT_ALLOW_SYSCALL(allow_syscall, nr);
+}
+
+TEST_F(bpf, bpf_allow_syscall_args) {
+	struct sock_filter allow_syscall[ALLOW_SYSCALL_LEN];
+	int nr = 1;
+	unsigned int id = 1024;
+
+	size_t len = bpf_allow_syscall_args(allow_syscall, nr, id);
+
+	EXPECT_EQ(len, ALLOW_SYSCALL_LEN);
+	EXPECT_ALLOW_SYSCALL_ARGS(allow_syscall, nr, id, JUMP_JT, JUMP_JF);
 }
 
 FIXTURE(arg_filter) {
@@ -333,6 +389,84 @@ TEST_F(arg_filter, invalid) {
 	fragment = "arg0 == 0 && arg1 == 1; return errno";
 	block = compile_section(nr, fragment, id, &self->labels);
 	ASSERT_EQ(block, NULL);
+}
+
+FIXTURE(filter) {};
+
+FIXTURE_SETUP(filter) {}
+FIXTURE_TEARDOWN(filter) {}
+
+TEST_F(filter, seccomp_mode1) {
+	struct sock_fprog actual;
+	FILE *policy = fopen("test/seccomp.policy", "r");
+	int res = compile_filter(policy, &actual);
+
+	/*
+	 * Checks return value, filter length, and that the filter
+	 * validates arch, loads syscall number, and
+	 * only allows expected syscalls.
+	 */
+	ASSERT_EQ(res, 0);
+	EXPECT_EQ(actual.len, 13);
+	EXPECT_ARCH_VALIDATION(actual.filter);
+	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
+			BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 1,
+			__NR_read);
+	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 3,
+			__NR_write);
+	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 5,
+			__NR_rt_sigreturn);
+	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
+			__NR_exit);
+
+	free(actual.filter);
+	fclose(policy);
+}
+
+TEST_F(filter, seccomp_read_write) {
+	struct sock_fprog actual;
+	FILE *policy = fopen("test/stdin_stdout.policy", "r");
+	int res = compile_filter(policy, &actual);
+
+	/*
+	 * Checks return value, filter length, and that the filter
+	 * validates arch, loads syscall number, and
+	 * only allows expected syscalls, jumping to correct arg filter
+	 * offsets.
+	 */
+	ASSERT_EQ(res, 0);
+	size_t exp_total_len = 27 + 3 * (BPF_ARG_COMP_LEN + 1);
+	EXPECT_EQ(actual.len, exp_total_len);
+
+	EXPECT_ARCH_VALIDATION(actual.filter);
+	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
+			BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+	EXPECT_ALLOW_SYSCALL_ARGS(actual.filter + ARCH_VALIDATION_LEN + 1,
+			__NR_read, 7, 0, 0);
+	EXPECT_ALLOW_SYSCALL_ARGS(actual.filter + ARCH_VALIDATION_LEN + 3,
+			__NR_write, 12 + BPF_ARG_COMP_LEN, 0, 0);
+	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 5,
+			__NR_rt_sigreturn);
+	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
+			__NR_exit);
+
+	free(actual.filter);
+	fclose(policy);
+}
+
+TEST_F(filter, invalid) {
+	struct sock_fprog actual;
+
+	FILE *policy = fopen("test/invalid_syscall_name.policy", "r");
+	int res = compile_filter(policy, &actual);
+	ASSERT_NE(res, 0);
+	fclose(policy);
+
+	policy = fopen("test/invalid_arg_filter.policy", "r");
+	res = compile_filter(policy, &actual);
+	ASSERT_NE(res, 0);
+	fclose(policy);
 }
 
 TEST_HARNESS_MAIN

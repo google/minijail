@@ -38,7 +38,7 @@ libminijail_unittest.o : libminijail_unittest.c test_harness.h
 libsyscalls.gen.o : libsyscalls.gen.c libsyscalls.h
 
 syscall_filter_unittest : syscall_filter_unittest.o syscall_filter.o bpf.o \
-		test_harness.h
+		libsyscalls.gen.o test_harness.h
 	$(CC) $(CFLAGS) -o $@ $^
 
 syscall_filter_unittest.o : syscall_filter_unittest.c test_harness.h

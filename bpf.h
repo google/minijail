@@ -10,6 +10,7 @@
 #define BPF_H
 
 #include <asm/bitsperlong.h>   /* for __BITS_PER_LONG */
+#include <linux/audit.h>
 #include <linux/filter.h>
 #include <stddef.h>
 #include <sys/user.h>
@@ -48,6 +49,26 @@ struct seccomp_data {
 	__u64 instruction_pointer;
 	__u64 args[6];
 };
+
+#define syscall_nr (offsetof(struct seccomp_data, nr))
+#define arch_nr (offsetof(struct seccomp_data, arch))
+
+#if defined(__i386__)
+#define ARCH_NR	AUDIT_ARCH_I386
+#elif defined(__x86_64__)
+#define ARCH_NR	AUDIT_ARCH_X86_64
+#elif defined(__arm__)
+/*
+ * <linux/audit.h> includes <linux/elf-em.h>, which does not include EM_ARM.
+ * <linux/elf.h> only includes <asm/elf.h> if we're in the kernel.
+ */
+# ifndef EM_ARM
+# define EM_ARM 40
+# endif
+#define ARCH_NR	AUDIT_ARCH_ARM
+#else
+#error "AUDIT_ARCH value unavailable"
+#endif
 
 /* Size-dependent defines. */
 #if defined(BITS32)
@@ -133,6 +154,9 @@ inline size_t set_bpf_instr(struct sock_filter *instr,
 #define set_bpf_ret_allow(_block) \
 	set_bpf_stmt((_block), BPF_RET+BPF_K, SECCOMP_RET_ALLOW)
 
+#define bpf_load_syscall_nr(_filter) \
+	set_bpf_stmt((_filter), BPF_LD+BPF_W+BPF_ABS, syscall_nr)
+
 /* BPF label functions. */
 int bpf_resolve_jumps(struct bpf_labels *labels,
 		struct sock_filter *filter, size_t count);
@@ -145,8 +169,15 @@ size_t bpf_comp_jeq(struct sock_filter *filter, unsigned long c,
 		unsigned char jt, unsigned char jf);
 
 /* Functions called by syscall_filter.c */
+#define ARCH_VALIDATION_LEN 3U
+#define ALLOW_SYSCALL_LEN 2U
+
 size_t bpf_arg_comp(struct sock_filter **pfilter,
 		int op, int argidx, unsigned long c, unsigned int label_id);
+size_t bpf_validate_arch(struct sock_filter *filter);
+size_t bpf_allow_syscall(struct sock_filter *filter, int nr);
+size_t bpf_allow_syscall_args(struct sock_filter *filter,
+		int nr, unsigned int id);
 
 /* Debug */
 void dump_bpf_prog(struct sock_fprog *fprog);

@@ -1,0 +1,4 @@
+read: arg0 == 0
+write: arg0 == 1 || arg0 == 2
+rt_sigreturn: 1
+exit: 1
