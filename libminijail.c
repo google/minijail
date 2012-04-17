@@ -910,6 +910,12 @@ int setup_pipe(int fds[2])
 int API minijail_run(struct minijail *j, const char *filename,
 		     char *const argv[])
 {
+	return minijail_run_pid(j, filename, argv, NULL);
+}
+
+int API minijail_run_pid(struct minijail *j, const char *filename,
+			 char *const argv[], pid_t *pchild_pid)
+{
 	unsigned int pidns = j->flags.pids ? CLONE_NEWPID : 0;
 	char *oldenv, *oldenv_copy = NULL;
 	pid_t child_pid;
@@ -956,6 +962,8 @@ int API minijail_run(struct minijail *j, const char *filename,
 			kill(j->initpid, SIGKILL);
 			die("failed to send marshalled minijail");
 		}
+		if (pchild_pid)
+			*pchild_pid = child_pid;
 		return 0;
 	}
 	free(oldenv_copy);
