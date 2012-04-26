@@ -44,6 +44,7 @@ int minijail_change_user(struct minijail *j, const char *user);
 int minijail_change_group(struct minijail *j, const char *group);
 void minijail_use_seccomp(struct minijail *j);
 void minijail_use_seccomp_filter(struct minijail *j);
+void minijail_force_seccomp_filter(struct minijail *j);
 void minijail_parse_seccomp_filters(struct minijail *j, const char *path);
 int minijail_add_seccomp_filter(struct minijail *j, int nr,
 				const char *filter);

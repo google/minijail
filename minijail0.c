@@ -86,7 +86,9 @@ static void usage(const char *progn)
 	       "  -S <file>:  set seccomp filters using <file>\n"
 	       "              E.g., -S /usr/share/filters/<prog>.$(uname -m)\n"
 	       "  -u <user>:  change uid to <user>\n"
-	       "  -v:         use vfs namespace\n", progn);
+	       "  -v:         use vfs namespace\n"
+	       "  -F:         no dry run, force setting seccomp filters\n",
+	       progn);
 }
 
 static void seccomp_filter_usage(const char *progn)
@@ -104,7 +106,9 @@ int main(int argc, char *argv[])
 	struct minijail *j = minijail_new();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHp")) != -1) {
+	int use_seccomp_filter = 0;
+	int dry_run = 1;
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHpF")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -118,6 +122,10 @@ int main(int argc, char *argv[])
 		case 'S':
 			minijail_parse_seccomp_filters(j, optarg);
 			minijail_use_seccomp_filter(j);
+			use_seccomp_filter = 1;
+			break;
+		case 'F':
+			dry_run = 0;
 			break;
 		case 'b':
 			add_binding(j, optarg);
@@ -148,6 +156,10 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 	}
+
+	/* TODO(jorgelo): remove this when the seccomp BPF merge is done. */
+	if (use_seccomp_filter && !dry_run)
+		minijail_force_seccomp_filter(j);
 
 	if (argc == optind) {
 		usage(argv[0]);
