@@ -90,10 +90,15 @@ TEST_F(bpf, bpf_load_arg) {
 	size_t len = bpf_load_arg(load_arg, argidx);
 
 	EXPECT_EQ(len, BPF_LOAD_ARG_LEN);
+
+#if defined(BITS32)
+	EXPECT_EQ_STMT(&load_arg[0], BPF_LD+BPF_W+BPF_ABS, LO_ARG(argidx));
+#elif defined(BITS64)
 	EXPECT_EQ_STMT(&load_arg[0], BPF_LD+BPF_W+BPF_ABS, LO_ARG(argidx));
 	EXPECT_EQ_STMT(&load_arg[1], BPF_ST, 0);
 	EXPECT_EQ_STMT(&load_arg[2], BPF_LD+BPF_W+BPF_ABS, HI_ARG(argidx));
 	EXPECT_EQ_STMT(&load_arg[3], BPF_ST, 1);
+#endif
 }
 
 TEST_F(bpf, bpf_comp_jeq) {
@@ -102,14 +107,20 @@ TEST_F(bpf, bpf_comp_jeq) {
 	unsigned char jt = 1;
 	unsigned char jf = 2;
 
-	size_t len = bpf_comp_jeq64(comp_jeq, c, jt, jf);
+	size_t len = bpf_comp_jeq(comp_jeq, c, jt, jf);
 
 	EXPECT_EQ(len, BPF_COMP_LEN);
+
+#if defined(BITS32)
+EXPECT_EQ_BLOCK(&comp_jeq[0],
+			BPF_JMP+BPF_JEQ+BPF_K, c, jt, jf);
+#elif defined(BITS64)
 	EXPECT_EQ_BLOCK(&comp_jeq[0],
 			BPF_JMP+BPF_JEQ+BPF_K, 0, 0, jf + 2);
 	EXPECT_EQ_STMT(&comp_jeq[1], BPF_LD+BPF_MEM, 0);
 	EXPECT_EQ_BLOCK(&comp_jeq[2],
 			BPF_JMP+BPF_JEQ+BPF_K, c, jt, jf);
+#endif
 }
 
 TEST_F(bpf, bpf_arg_comp) {
@@ -122,6 +133,14 @@ TEST_F(bpf, bpf_arg_comp) {
 	size_t len = bpf_arg_comp(&arg_comp, op, argidx, c, label_id);
 
 	EXPECT_EQ(len, BPF_ARG_COMP_LEN + 1);
+
+#if defined(BITS32)
+	EXPECT_EQ_STMT(&arg_comp[0],
+			BPF_LD+BPF_W+BPF_ABS, LO_ARG(argidx));
+	EXPECT_EQ_BLOCK(&arg_comp[1],
+			BPF_JMP+BPF_JEQ+BPF_K, c, 1, 0);
+	EXPECT_JUMP_LBL(&arg_comp[2]);
+#elif defined(BITS64)
 	EXPECT_EQ_STMT(&arg_comp[0],
 			BPF_LD+BPF_W+BPF_ABS, LO_ARG(argidx));
 	EXPECT_EQ_STMT(&arg_comp[1], BPF_ST, 0);
@@ -135,7 +154,7 @@ TEST_F(bpf, bpf_arg_comp) {
 	EXPECT_EQ_BLOCK(&arg_comp[6],
 			BPF_JMP+BPF_JEQ+BPF_K, c, 1, 0);
 	EXPECT_JUMP_LBL(&arg_comp[7]);
-
+#endif
 	free(arg_comp);
 }
 
@@ -154,7 +173,8 @@ TEST_F(arg_filter, arg0_equals) {
 		compile_section(nr, fragment, id, &self->labels);
 
 	ASSERT_NE(block, NULL);
-	EXPECT_EQ(block->total_len, 14U);
+	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+	EXPECT_EQ(block->total_len, exp_total_len);
 
 	/* First block is a label. */
 	struct filter_block *curr_block = block;
@@ -195,7 +215,8 @@ TEST_F(arg_filter, and_or) {
 	struct filter_block *block =
 		compile_section(nr, fragment, id, &self->labels);
 	ASSERT_NE(block, NULL);
-	EXPECT_EQ(block->total_len, 32U);
+	size_t exp_total_len = 1 + 3 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
+	EXPECT_EQ(block->total_len, exp_total_len);
 
 	/* First block is a label. */
 	struct filter_block *curr_block = block;
@@ -252,7 +273,8 @@ TEST_F(arg_filter, ret_errno) {
 	struct filter_block *block =
 		compile_section(nr, fragment, id, &self->labels);
 	ASSERT_NE(block, NULL);
-	EXPECT_EQ(block->total_len, 24U);
+	size_t exp_total_len = 1 + 2 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
+	EXPECT_EQ(block->total_len, exp_total_len);
 
 	/* First block is a label. */
 	struct filter_block *curr_block = block;

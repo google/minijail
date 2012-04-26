@@ -46,10 +46,11 @@ size_t bpf_load_arg(struct sock_filter *filter, int argidx)
 #endif
 
 /* Size-aware comparisons. */
-size_t bpf_comp_jeq32(struct sock_filter *filter, unsigned int c,
+size_t bpf_comp_jeq32(struct sock_filter *filter, unsigned long c,
 		unsigned char jt, unsigned char jf)
 {
-	set_bpf_jump(filter, BPF_JMP+BPF_JEQ+BPF_K, c, jt, jf);
+	unsigned int lo = (unsigned int)(c & 0xFFFFFFFF);
+	set_bpf_jump(filter, BPF_JMP+BPF_JEQ+BPF_K, lo, jt, jf);
 	return 1U;
 }
 
