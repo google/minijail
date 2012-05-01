@@ -194,13 +194,6 @@ void API minijail_no_new_privs(struct minijail *j)
 
 void API minijail_use_seccomp_filter(struct minijail *j)
 {
-	/* TODO(jorgelo): re-enable this when the seccomp BPF merge is done. */
-	j->flags.seccomp_filter = 0;
-}
-
-/* TODO(jorgelo): remove this when the seccomp BPF merge is done. */
-void API minijail_force_seccomp_filter(struct minijail *j)
-{
 	j->flags.seccomp_filter = 1;
 }
 
