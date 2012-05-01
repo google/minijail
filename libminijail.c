@@ -6,6 +6,7 @@
 
 #define _BSD_SOURCE
 #define _GNU_SOURCE
+
 #include <asm/unistd.h>
 #include <ctype.h>
 #include <errno.h>
@@ -40,7 +41,7 @@
 
 /* Until these are reliably available in linux/prctl.h */
 #ifndef PR_SET_SECCOMP
-# define PR_SET_SECCOMP	22
+# define PR_SET_SECCOMP 22
 #endif
 
 /* For seccomp_filter using BPF. */
@@ -80,6 +81,7 @@ struct minijail {
 		int readonly:1;
 		int usergroups:1;
 		int ptrace:1;
+		int no_new_privs:1;
 		int seccomp_filter:1;
 		int chroot:1;
 	} flags;
@@ -183,6 +185,11 @@ int API minijail_change_group(struct minijail *j, const char *group)
 void API minijail_use_seccomp(struct minijail *j)
 {
 	j->flags.seccomp = 1;
+}
+
+void API minijail_no_new_privs(struct minijail *j)
+{
+	j->flags.no_new_privs = 1;
 }
 
 void API minijail_use_seccomp_filter(struct minijail *j)
@@ -641,6 +648,26 @@ void API minijail_enter(const struct minijail *j)
 			pdie("prctl(PR_SET_SECUREBITS)");
 	}
 
+	/*
+	 * Set no_new_privs before installing seccomp filter.
+	 * TODO(jorgelo): document call to PR_SET_NO_NEW_PRIVS.
+	 */
+	if (j->flags.no_new_privs) {
+		if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
+			pdie("prctl(PR_SET_NO_NEW_PRIVS)");
+	}
+
+	/*
+	 * Install seccomp filter before dropping root and caps.
+	 * WARNING: this means that filter policies *must* allow
+	 * setgroups()/setresgid()/setresuid() for dropping root and
+	 * capget()/capset()/prctl() for dropping caps.
+	 */
+	if (j->flags.seccomp_filter) {
+		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, j->filter_prog))
+			pdie("prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER)");
+	}
+
 	if (j->flags.usergroups) {
 		if (initgroups(j->user, j->usergid))
 			pdie("initgroups");
@@ -664,16 +691,6 @@ void API minijail_enter(const struct minijail *j)
 	 * seccomp has to come last since it cuts off all the other
 	 * privilege-dropping syscalls :)
 	 */
-	if (j->flags.seccomp_filter) {
-		/* TODO(jorgelo): document call to PR_SET_NO_NEW_PRIVS. */
-		if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
-			pdie("prctl(PR_SET_NO_NEW_PRIVS)");
-		}
-		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, j->filter_prog)) {
-			pdie("prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER)");
-		}
-	}
-
 	if (j->flags.seccomp && prctl(PR_SET_SECCOMP, 1))
 		pdie("prctl(PR_SET_SECCOMP)");
 }
@@ -896,8 +913,11 @@ int API minijail_wait(struct minijail *j)
 	int st;
 	if (waitpid(j->initpid, &st, 0) < 0)
 		return -errno;
-	if (!WIFEXITED(st))
+	if (!WIFEXITED(st)) {
+		if (WIFSIGNALED(st))
+			warn("child process received signal %d", WTERMSIG(st));
 		return MINIJAIL_ERR_JAIL;
+	}
 	return WEXITSTATUS(st);
 }
 

@@ -43,13 +43,10 @@ int minijail_change_user(struct minijail *j, const char *user);
 /* Does not take ownership of |group|. */
 int minijail_change_group(struct minijail *j, const char *group);
 void minijail_use_seccomp(struct minijail *j);
+void minijail_no_new_privs(struct minijail *j);
 void minijail_use_seccomp_filter(struct minijail *j);
 void minijail_force_seccomp_filter(struct minijail *j);
 void minijail_parse_seccomp_filters(struct minijail *j, const char *path);
-int minijail_add_seccomp_filter(struct minijail *j, int nr,
-				const char *filter);
-void minijail_use_seccomp_bpf(struct minijail *j);
-void minijail_parse_seccomp_bpf(struct minijail *j, const char *path);
 void minijail_use_caps(struct minijail *j, uint64_t capmask);
 void minijail_namespace_vfs(struct minijail *j);
 /* Implies namespace_vfs and remount_readonly */

@@ -69,9 +69,9 @@ static void add_binding(struct minijail *j, char *arg) {
 
 static void usage(const char *progn)
 {
-	printf("Usage: %s [-Ghprsv] [-b <src>,<dest>[,<writeable>]] [-c <caps>] "
-	       "[-C <dir>] [-g <group>] [-S <file>] [-u <user>] <program> "
-	       "[args...]\n"
+	printf("Usage: %s [-Ghnprsv] [-b <src>,<dest>[,<writeable>]] "
+	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
+	       "<program> [args...]\n"
 	       "  -b:         binds <src> to <dest> in chroot. Multiple "
 	       "instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
@@ -80,6 +80,7 @@ static void usage(const char *progn)
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
 	       "  -H:         seccomp filter help message\n"
+	       "  -n:         set no_new_privs\n"
 	       "  -p:         use pid namespace (implies -vr)\n"
 	       "  -r:         remount /proc readonly (implies -v)\n"
 	       "  -s:         use seccomp\n"
@@ -108,7 +109,7 @@ int main(int argc, char *argv[])
 	int opt;
 	int use_seccomp_filter = 0;
 	int dry_run = 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHpF")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnpF")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -116,6 +117,8 @@ int main(int argc, char *argv[])
 		case 'g':
 			set_group(j, optarg);
 			break;
+		case 'n':
+			minijail_no_new_privs(j);
 		case 's':
 			minijail_use_seccomp(j);
 			break;
