@@ -808,7 +808,6 @@ int API minijail_run(struct minijail *j, const char *filename,
 int API minijail_run_pid(struct minijail *j, const char *filename,
 			 char *const argv[], pid_t *pchild_pid)
 {
-	unsigned int pidns = j->flags.pids ? CLONE_NEWPID : 0;
 	char *oldenv, *oldenv_copy = NULL;
 	pid_t child_pid;
 	int pipe_fds[2];
@@ -831,7 +830,51 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 	if (setup_pipe(pipe_fds))
 		return -EFAULT;
 
-	child_pid = syscall(SYS_clone, pidns | SIGCHLD, NULL);
+	/* Use sys_clone() if and only if we're creating a pid namespace.
+	 *
+	 * tl;dr: WARNING: do not mix pid namespaces and multithreading.
+	 *
+	 * In multithreaded programs, there are a bunch of locks inside libc,
+	 * some of which may be held by other threads at the time that we call
+	 * minijail_run_pid(). If we call fork(), glibc does its level best to
+	 * ensure that we hold all of these locks before it calls clone()
+	 * internally and drop them after clone() returns, but when we call
+	 * sys_clone(2) directly, all that gets bypassed and we end up with a
+	 * child address space where some of libc's important locks are held by
+	 * other threads (which did not get cloned, and hence will never release
+	 * those locks). This is okay so long as we call exec() immediately
+	 * after, but a bunch of seemingly-innocent libc functions like setenv()
+	 * take locks.
+	 *
+	 * Hence, only call sys_clone() if we need to, in order to get at pid
+	 * namespacing. If we follow this path, the child's address space might
+	 * have broken locks; you may only call functions that do not acquire
+	 * any locks.
+	 *
+	 * Unfortunately, fork() acquires every lock it can get its hands on, as
+	 * previously detailed, so this function is highly likely to deadlock
+	 * later on (see "deadlock here") if we're multithreaded.
+	 *
+	 * We might hack around this by having the clone()d child (init of the
+	 * pid namespace) return directly, rather than leaving the clone()d
+	 * process hanging around to be init for the new namespace (and having
+	 * its fork()ed child return in turn), but that process would be crippled
+	 * with its libc locks potentially broken. We might try fork()ing in the
+	 * parent before we clone() to ensure that we own all the locks, but
+	 * then we have to have the forked child hanging around consuming
+	 * resources (and possibly having file descriptors / shared memory
+	 * regions / etc attached). We'd need to keep the child around to avoid
+	 * having its children get reparented to init.
+	 *
+	 * TODO(ellyjones): figure out if the "forked child hanging around"
+	 * problem is fixable or not. It would be nice if we worked in this
+	 * case.
+	 */
+	if (j->flags.pids)
+		child_pid = syscall(SYS_clone, CLONE_NEWPID | SIGCHLD, NULL);
+	else
+		child_pid = fork();
+
 	if (child_pid < 0) {
 		free(oldenv_copy);
 		return child_pid;
@@ -865,12 +908,15 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 	/* Jail this process and its descendants... */
 	minijail_enter(j);
 
-	if (pidns) {
+	if (j->flags.pids) {
 		/*
 		 * pid namespace: this process will become init inside the new
 		 * namespace, so fork off a child to actually run the program
 		 * (we don't want all programs we might exec to have to know
 		 * how to be init).
+		 *
+		 * If we're multithreaded, we'll probably deadlock here. See
+		 * WARNING above.
 		 */
 		child_pid = fork();
 		if (child_pid < 0)
