@@ -812,6 +812,8 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 	pid_t child_pid;
 	int pipe_fds[2];
 	int ret;
+	/* We need to remember this across the minijail_preexec() call. */
+	int pid_namespace = j->flags.pids;
 
 	oldenv = getenv(kLdPreloadEnvVar);
 	if (oldenv) {
@@ -870,7 +872,7 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 	 * problem is fixable or not. It would be nice if we worked in this
 	 * case.
 	 */
-	if (j->flags.pids)
+	if (pid_namespace)
 		child_pid = syscall(SYS_clone, CLONE_NEWPID | SIGCHLD, NULL);
 	else
 		child_pid = fork();
@@ -908,7 +910,7 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 	/* Jail this process and its descendants... */
 	minijail_enter(j);
 
-	if (j->flags.pids) {
+	if (pid_namespace) {
 		/*
 		 * pid namespace: this process will become init inside the new
 		 * namespace, so fork off a child to actually run the program
