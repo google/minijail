@@ -434,9 +434,7 @@ int compile_filter(FILE *policy, struct sock_fprog *prog)
 	}
 
 	/* If none of the syscalls match, fall back to KILL. */
-	struct sock_filter *kill_filter = new_instr_buf(ONE_INSTR);
-	set_bpf_ret_kill(kill_filter);
-	append_filter_block(head, kill_filter, ONE_INSTR);
+	append_ret_kill(head);
 
 	/* Allocate the final buffer, now that we know its size. */
 	size_t final_filter_len = head->total_len +
