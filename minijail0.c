@@ -115,6 +115,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'n':
 			minijail_no_new_privs(j);
+			break;
 		case 's':
 			minijail_use_seccomp(j);
 			break;
