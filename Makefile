@@ -60,8 +60,8 @@ bpf.o : bpf.c bpf.h
 # All other lines will not be emitted.  The sed expression lives in its
 # own macro to allow clean line wrapping.
 define sed-multiline
-	's/#define \(__NR_\)\([a-z0-9_]*\)$$/#ifdef \1\2\n\
-	 { "\2", \1\2 },\n#endif/g p;'
+	's/#define __\(ARM_\)\?\(NR_\)\([a-z0-9_]*\)$$/#ifdef __\1\2\3\n\
+	 { "\1\3", __\1\2\3 },\n#endif/g p;'
 endef
 
 # Generates a header file with a system call table made up of "name",
