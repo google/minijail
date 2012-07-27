@@ -1,5 +1,5 @@
 /* syscall_filter_unittest.c
- * Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+ * Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  *
@@ -467,6 +467,14 @@ TEST_F(filter, invalid) {
 	res = compile_filter(policy, &actual);
 	ASSERT_NE(res, 0);
 	fclose(policy);
+}
+
+TEST_F(filter, nonexistent) {
+	struct sock_fprog actual;
+
+	FILE *policy = fopen("test/nonexistent-file.policy", "r");
+	int res = compile_filter(policy, &actual);
+	ASSERT_NE(res, 0);
 }
 
 TEST_HARNESS_MAIN

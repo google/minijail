@@ -351,6 +351,9 @@ int compile_filter(FILE *policy, struct sock_fprog *prog)
 	struct bpf_labels labels;
 	labels.count = 0;
 
+	if (!policy)
+		return -1;
+
 	struct filter_block *head = calloc(1, sizeof(struct filter_block));
 	if (!head)
 		return -1;
