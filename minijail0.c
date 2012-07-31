@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 	struct minijail *j = minijail_new();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnpF")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnp")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
