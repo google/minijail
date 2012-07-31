@@ -642,8 +642,9 @@ void API minijail_enter(const struct minijail *j)
 	}
 
 	/*
-	 * Set no_new_privs before installing seccomp filter.
-	 * TODO(jorgelo): document call to PR_SET_NO_NEW_PRIVS.
+	 * Set no_new_privs before installing seccomp filter. See
+	 * </kernel/seccomp.c> and </kernel/sys.c> in the kernel source tree for
+	 * an explanation of the parameters.
 	 */
 	if (j->flags.no_new_privs) {
 		if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
