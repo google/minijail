@@ -26,6 +26,9 @@
 #define info(_msg, ...) \
         syslog(LOG_INFO, "libminijail: " _msg, ## __VA_ARGS__)
 
+extern const char *log_syscalls[];
+extern const size_t log_syscalls_len;
+
 int lookup_syscall(const char *name);
 const char *lookup_syscall_name(int nr);
 char *strip(char *s);

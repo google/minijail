@@ -11,6 +11,8 @@
 #include "libminijail.h"
 #include "libsyscalls.h"
 
+#include "util.h"
+
 static void set_user(struct minijail *j, const char *arg)
 {
 	char *end = NULL;
@@ -69,6 +71,8 @@ static void add_binding(struct minijail *j, char *arg) {
 
 static void usage(const char *progn)
 {
+	size_t i;
+
 	printf("Usage: %s [-Ghnprsv] [-b <src>,<dest>[,<writeable>]] "
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
 	       "<program> [args...]\n"
@@ -80,14 +84,21 @@ static void usage(const char *progn)
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
 	       "  -H:         seccomp filter help message\n"
+	       "  -L:         log blocked syscalls when using seccomp filter. "
+	       "Forces the following syscalls to be allowed:\n"
+	       "              ", progn);
+	for (i = 0; i < log_syscalls_len; i++)
+		printf("%s ", log_syscalls[i]);
+
+	printf("\n"
 	       "  -n:         set no_new_privs\n"
 	       "  -p:         use pid namespace (implies -vr)\n"
 	       "  -r:         remount /proc readonly (implies -v)\n"
 	       "  -s:         use seccomp\n"
-	       "  -S <file>:  set seccomp filters using <file>\n"
+	       "  -S <file>:  set seccomp filter using <file>\n"
 	       "              E.g., -S /usr/share/filters/<prog>.$(uname -m)\n"
 	       "  -u <user>:  change uid to <user>\n"
-	       "  -v:         use vfs namespace\n", progn);
+	       "  -v:         use vfs namespace\n");
 }
 
 static void seccomp_filter_usage(const char *progn)
@@ -105,7 +116,7 @@ int main(int argc, char *argv[])
 	struct minijail *j = minijail_new();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnp")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnpL")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -122,6 +133,9 @@ int main(int argc, char *argv[])
 		case 'S':
 			minijail_parse_seccomp_filters(j, optarg);
 			minijail_use_seccomp_filter(j);
+			break;
+		case 'L':
+			minijail_log_seccomp_filter_failures(j);
 			break;
 		case 'b':
 			add_binding(j, optarg);

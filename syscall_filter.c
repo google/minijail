@@ -11,7 +11,9 @@
 
 #include "util.h"
 
-#define MAX_LINE_LENGTH 1024
+#define MAX_LINE_LENGTH		1024
+#define MAX_POLICY_LINE_LENGTH	1024
+
 #define ONE_INSTR	1
 #define TWO_INSTRS	2
 
@@ -85,11 +87,34 @@ void append_ret_kill(struct filter_block *head)
 	append_filter_block(head, filter, ONE_INSTR);
 }
 
+void append_ret_trap(struct filter_block *head)
+{
+	struct sock_filter *filter = new_instr_buf(ONE_INSTR);
+	set_bpf_ret_trap(filter);
+	append_filter_block(head, filter, ONE_INSTR);
+}
+
 void append_ret_errno(struct filter_block *head, int errno_val)
 {
 	struct sock_filter *filter = new_instr_buf(ONE_INSTR);
 	set_bpf_ret_errno(filter, errno_val);
 	append_filter_block(head, filter, ONE_INSTR);
+}
+
+void append_allow_syscall(struct filter_block *head, int nr) {
+	struct sock_filter *filter = new_instr_buf(ALLOW_SYSCALL_LEN);
+	size_t len = bpf_allow_syscall(filter, nr);
+	if (len != ALLOW_SYSCALL_LEN)
+		die("error building syscall number comparison");
+
+	append_filter_block(head, filter, len);
+}
+
+void allow_log_syscalls(struct filter_block *head)
+{
+	unsigned int i;
+	for (i = 0; i < log_syscalls_len; i++)
+		append_allow_syscall(head, lookup_syscall(log_syscalls[i]));
 }
 
 unsigned int get_label_id(struct bpf_labels *labels, const char *label_str)
@@ -147,11 +172,11 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	int group_idx = 0;
 
 	/* Checks for overly long policy lines. */
-	if (strlen(policy_line) >= MAX_POLICY_LINE_LEN)
+	if (strlen(policy_line) >= MAX_POLICY_LINE_LENGTH)
 		return NULL;
 
 	/* strtok() modifies its first argument, so let's make a copy. */
-	char *line = strndup(policy_line, MAX_POLICY_LINE_LEN);
+	char *line = strndup(policy_line, MAX_POLICY_LINE_LENGTH);
 	if (!line)
 		return NULL;
 
@@ -311,7 +336,8 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	return head;
 }
 
-int compile_filter(FILE *policy, struct sock_fprog *prog)
+int compile_filter(FILE *policy, struct sock_fprog *prog,
+		int log_failures)
 {
 	char line[MAX_LINE_LENGTH];
 	int line_count = 0;
@@ -334,10 +360,14 @@ int compile_filter(FILE *policy, struct sock_fprog *prog)
 	size_t len = bpf_validate_arch(valid_arch);
 	append_filter_block(head, valid_arch, len);
 
-	/* Loading syscall number. */
+	/* Load syscall number. */
 	struct sock_filter *load_nr = new_instr_buf(ONE_INSTR);
 	len = bpf_load_syscall_nr(load_nr);
 	append_filter_block(head, load_nr, len);
+
+	/* If we're logging failures, allow the necessary syscalls first. */
+	if (log_failures)
+		allow_log_syscalls(head);
 
 	/*
 	 * Loop through all the lines in the policy file.
@@ -374,10 +404,7 @@ int compile_filter(FILE *policy, struct sock_fprog *prog)
 		 */
 		if (strcmp(policy, "1") == 0) {
 			/* Add simple ALLOW. */
-			struct sock_filter *nr_comp =
-					new_instr_buf(ALLOW_SYSCALL_LEN);
-			bpf_allow_syscall(nr_comp, nr);
-			append_filter_block(head, nr_comp, ALLOW_SYSCALL_LEN);
+			append_allow_syscall(head, nr);
 		} else {
 			/*
 			 * Create and jump to the label that will hold
@@ -404,8 +431,14 @@ int compile_filter(FILE *policy, struct sock_fprog *prog)
 		}
 	}
 
-	/* If none of the syscalls match, fall back to KILL. */
-	append_ret_kill(head);
+	/*
+	 * If none of the syscalls match, either fall back to KILL,
+	 * or return TRAP.
+	 */
+	if (!log_failures)
+		append_ret_kill(head);
+	else
+		append_ret_trap(head);
 
 	/* Allocate the final buffer, now that we know its size. */
 	size_t final_filter_len = head->total_len +

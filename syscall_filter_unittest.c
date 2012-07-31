@@ -14,6 +14,8 @@
 #include "bpf.h"
 #include "syscall_filter.h"
 
+#include "util.h"
+
 /* BPF testing macros. */
 #define EXPECT_EQ_BLOCK(_block, _code, _k, _jt, _jf)	\
 do {	\
@@ -399,7 +401,7 @@ FIXTURE_TEARDOWN(filter) {}
 TEST_F(filter, seccomp_mode1) {
 	struct sock_fprog actual;
 	FILE *policy = fopen("test/seccomp.policy", "r");
-	int res = compile_filter(policy, &actual);
+	int res = compile_filter(policy, &actual, NO_LOGGING);
 
 	/*
 	 * Checks return value, filter length, and that the filter
@@ -427,7 +429,7 @@ TEST_F(filter, seccomp_mode1) {
 TEST_F(filter, seccomp_read_write) {
 	struct sock_fprog actual;
 	FILE *policy = fopen("test/stdin_stdout.policy", "r");
-	int res = compile_filter(policy, &actual);
+	int res = compile_filter(policy, &actual, NO_LOGGING);
 
 	/*
 	 * Checks return value, filter length, and that the filter
@@ -459,12 +461,12 @@ TEST_F(filter, invalid) {
 	struct sock_fprog actual;
 
 	FILE *policy = fopen("test/invalid_syscall_name.policy", "r");
-	int res = compile_filter(policy, &actual);
+	int res = compile_filter(policy, &actual, NO_LOGGING);
 	ASSERT_NE(res, 0);
 	fclose(policy);
 
 	policy = fopen("test/invalid_arg_filter.policy", "r");
-	res = compile_filter(policy, &actual);
+	res = compile_filter(policy, &actual, NO_LOGGING);
 	ASSERT_NE(res, 0);
 	fclose(policy);
 }
@@ -473,8 +475,46 @@ TEST_F(filter, nonexistent) {
 	struct sock_fprog actual;
 
 	FILE *policy = fopen("test/nonexistent-file.policy", "r");
-	int res = compile_filter(policy, &actual);
+	int res = compile_filter(policy, &actual, NO_LOGGING);
 	ASSERT_NE(res, 0);
 }
 
 TEST_HARNESS_MAIN
+
+TEST_F(filter, log) {
+	struct sock_fprog actual;
+
+	FILE *policy = fopen("test/seccomp.policy", "r");
+	int res = compile_filter(policy, &actual, USE_LOGGING);
+
+	size_t i;
+	size_t index = 0;
+	/*
+	 * Checks return value, filter length, and that the filter
+	 * validates arch, loads syscall number, only allows expected syscalls,
+	 * and returns TRAP on failure.
+	 * NOTE(jorgelo): the filter is longer since we add the syscalls needed
+	 * for logging.
+	 */
+	ASSERT_EQ(res, 0);
+	EXPECT_EQ(actual.len, 13 + 2 * log_syscalls_len);
+	EXPECT_ARCH_VALIDATION(actual.filter);
+	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
+			BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+
+	index = ARCH_VALIDATION_LEN + 1;
+	for (i = 0; i < log_syscalls_len; i++)
+		EXPECT_ALLOW_SYSCALL(actual.filter + (index + 2 * i),
+				     lookup_syscall(log_syscalls[i]));
+
+	index += 2 * log_syscalls_len;
+
+	EXPECT_ALLOW_SYSCALL(actual.filter + index, __NR_read);
+	EXPECT_ALLOW_SYSCALL(actual.filter + index + 2, __NR_write);
+	EXPECT_ALLOW_SYSCALL(actual.filter + index + 4, __NR_rt_sigreturn);
+	EXPECT_ALLOW_SYSCALL(actual.filter + index + 6, __NR_exit);
+	EXPECT_EQ_STMT(actual.filter + index + 8, BPF_RET+BPF_K, SECCOMP_RET_TRAP);
+
+	free(actual.filter);
+	fclose(policy);
+}

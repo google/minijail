@@ -11,11 +11,12 @@ all : minijail0 libminijail.so libminijailpreload.so
 
 tests : libminijail_unittest.wrapper syscall_filter_unittest
 
-minijail0 : libsyscalls.gen.o libminijail.o syscall_filter.o bpf.o util.o \
-		minijail0.c
+minijail0 : libsyscalls.gen.o libminijail.o syscall_filter.o \
+		signal.o bpf.o util.o minijail0.c
 	$(CC) $(CFLAGS) -o $@ $^ -lcap
 
-libminijail.so : libminijail.o syscall_filter.o bpf.o util.o libsyscalls.gen.o
+libminijail.so : libminijail.o syscall_filter.o signal.o bpf.o util.o \
+		libsyscalls.gen.o
 	$(CC) $(CFLAGS) -shared -o $@ $^ -lcap
 
 # Allow unittests to access what are normally internal symbols.
@@ -26,11 +27,11 @@ libminijail_unittest.wrapper :
 
 libminijail_unittest : CFLAGS := $(filter-out -fvisibility=%,$(CFLAGS))
 libminijail_unittest : libminijail_unittest.o libminijail.o \
-		syscall_filter.o bpf.o util.o libsyscalls.gen.o
+		syscall_filter.o signal.o bpf.o util.o libsyscalls.gen.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(filter-out $(CFLAGS_FILE),$^) -lcap
 
 libminijailpreload.so : libminijailpreload.c libminijail.o libsyscalls.gen.o \
-		syscall_filter.o bpf.o util.o
+		syscall_filter.o signal.o bpf.o util.o
 	$(CC) $(CFLAGS) -shared -o $@ $^ -ldl -lcap
 
 libminijail.o : libminijail.c libminijail.h
@@ -48,6 +49,8 @@ syscall_filter_unittest.o : syscall_filter_unittest.c test_harness.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 syscall_filter.o : syscall_filter.c syscall_filter.h
+
+signal.o : signal.c signal.h
 
 bpf.o : bpf.c bpf.h
 
@@ -101,5 +104,5 @@ clean : test-clean
 	@rm -f libminijail.so
 	@rm -f libminijail_unittest
 	@rm -f libsyscalls.gen.c
-	@rm -f syscall_filter.o bpf.o util.o
+	@rm -f syscall_filter.o signal.o bpf.o util.o
 	@rm -f syscall_filter_unittest syscall_filter_unittest.o

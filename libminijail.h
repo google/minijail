@@ -46,6 +46,7 @@ void minijail_use_seccomp(struct minijail *j);
 void minijail_no_new_privs(struct minijail *j);
 void minijail_use_seccomp_filter(struct minijail *j);
 void minijail_parse_seccomp_filters(struct minijail *j, const char *path);
+void minijail_log_seccomp_filter_failures(struct minijail *j);
 void minijail_use_caps(struct minijail *j, uint64_t capmask);
 void minijail_namespace_vfs(struct minijail *j);
 /* Implies namespace_vfs and remount_readonly.

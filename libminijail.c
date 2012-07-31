@@ -35,6 +35,7 @@
 #include "libminijail.h"
 #include "libminijail-private.h"
 
+#include "signal.h"
 #include "syscall_filter.h"
 #include "util.h"
 
@@ -71,6 +72,7 @@ struct minijail {
 		int ptrace:1;
 		int no_new_privs:1;
 		int seccomp_filter:1;
+		int log_seccomp_filter:1;
 		int chroot:1;
 	} flags;
 	uid_t uid;
@@ -185,6 +187,11 @@ void API minijail_use_seccomp_filter(struct minijail *j)
 	j->flags.seccomp_filter = 1;
 }
 
+void API minijail_log_seccomp_filter_failures(struct minijail *j)
+{
+	j->flags.log_seccomp_filter = 1;
+}
+
 void API minijail_use_caps(struct minijail *j, uint64_t capmask)
 {
 	j->caps = capmask;
@@ -278,8 +285,9 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 	}
 
 	struct sock_fprog *fprog = malloc(sizeof(struct sock_fprog));
-	if (compile_filter(file, fprog)) {
-		die("failed to compile seccomp filter BPF program in '%s'", path);
+	if (compile_filter(file, fprog, j->flags.log_seccomp_filter)) {
+		die("failed to compile seccomp filter BPF program in '%s'",
+		    path);
 	}
 
 	j->filter_len = fprog->len;
@@ -334,7 +342,8 @@ void minijail_marshal_helper(struct marshal_state *state,
 	for (b = j->bindings_head; b; b = b->next) {
 		marshal_append(state, b->src, strlen(b->src) + 1);
 		marshal_append(state, b->dest, strlen(b->dest) + 1);
-		marshal_append(state, (char *)&b->writeable, sizeof(b->writeable));
+		marshal_append(state, (char *)&b->writeable,
+				sizeof(b->writeable));
 	}
 }
 
@@ -637,6 +646,16 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.no_new_privs) {
 		if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
 			pdie("prctl(PR_SET_NO_NEW_PRIVS)");
+	}
+
+	/*
+	 * If we're logging seccomp filter failures,
+	 * install the SIGSYS handler first.
+	 */
+	if (j->flags.seccomp_filter && j->flags.log_seccomp_filter) {
+		if (install_sigsys_handler())
+			pdie("install SIGSYS handler");
+		warn("logging seccomp filter failures");
 	}
 
 	/*

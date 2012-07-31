@@ -10,6 +10,18 @@
 
 #include "libsyscalls.h"
 
+#if defined(__x86_64__)
+const char *log_syscalls[] = { "connect", "sendto" };
+#elif defined(__i386__)
+const char *log_syscalls[] = { "socketcall", "time" };
+#elif defined(__arm__)
+const char *log_syscalls[] = { "connect", "gettimeofday", "send" };
+#else
+#error "Unsupported platform"
+#endif
+
+const size_t log_syscalls_len = sizeof(log_syscalls)/sizeof(log_syscalls[0]);
+
 int lookup_syscall(const char *name)
 {
 	const struct syscall_entry *entry = syscall_table;

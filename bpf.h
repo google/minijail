@@ -59,7 +59,7 @@ struct seccomp_data {
 #define ARCH_NR	AUDIT_ARCH_X86_64
 #elif defined(__arm__)
 /*
- * <linux/audit.h> includes <linux/elf-em.h>, which does not include EM_ARM.
+ * <linux/audit.h> includes <linux/elf-em.h>, which does not define EM_ARM.
  * <linux/elf.h> only includes <asm/elf.h> if we're in the kernel.
  */
 # ifndef EM_ARM
@@ -146,6 +146,9 @@ inline size_t set_bpf_instr(struct sock_filter *instr,
 
 #define set_bpf_ret_kill(_block) \
 	set_bpf_stmt((_block), BPF_RET+BPF_K, SECCOMP_RET_KILL)
+
+#define set_bpf_ret_trap(_block) \
+	set_bpf_stmt((_block), BPF_RET+BPF_K, SECCOMP_RET_TRAP)
 
 #define set_bpf_ret_errno(_block, _errno) \
 	set_bpf_stmt((_block), BPF_RET+BPF_K, \
