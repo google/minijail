@@ -10,18 +10,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 
 #include "syscall_filter.h"
 
 #include "libsyscalls.h"
+#include "logging.h"
 
 #define MAX_LINE_LENGTH 1024
-
-#define error(_msg, ...) do {	\
-	fprintf(stderr, "minijail: error: " _msg, ## __VA_ARGS__);	\
-	abort();							\
-} while (0)
 
 int str_to_op(const char *op_str)
 {
@@ -41,7 +36,7 @@ struct sock_filter *new_instr_buf(size_t count)
 {
 	struct sock_filter *buf = calloc(count, sizeof(struct sock_filter));
 	if (!buf)
-		error("could not allocate BPF instruction buffer");
+		die("could not allocate BPF instruction buffer");
 
 	return buf;
 }
@@ -60,7 +55,7 @@ void append_filter_block(struct filter_block *head,
 	} else {
 		new_last = calloc(1, sizeof(struct filter_block));
 		if (!new_last)
-			error("could not allocate BPF filter block");
+			die("could not allocate BPF filter block");
 
 		if (head->next != NULL) {
 			head->last->next = new_last;
@@ -107,7 +102,7 @@ unsigned int get_label_id(struct bpf_labels *labels, const char *label_str)
 {
 	int label_id = bpf_label_id(labels, label_str);
 	if (label_id < 0)
-		error("could not allocate BPF label string");
+		die("could not allocate BPF label string");
 	return label_id;
 }
 

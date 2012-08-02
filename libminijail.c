@@ -30,12 +30,12 @@
 #include <sys/prctl.h>
 #include <sys/user.h>
 #include <sys/wait.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "libminijail.h"
 #include "libsyscalls.h"
 #include "libminijail-private.h"
+#include "logging.h"
 
 #include "syscall_filter.h"
 
@@ -51,17 +51,6 @@
 #ifndef SECCOMP_MODE_FILTER
 # define SECCOMP_MODE_FILTER 2 /* uses user-supplied filter. */
 #endif
-
-#define die(_msg, ...) do { \
-	syslog(LOG_ERR, "libminijail: " _msg, ## __VA_ARGS__); \
-	abort(); \
-} while (0)
-
-#define pdie(_msg, ...) \
-	die(_msg ": %s", ## __VA_ARGS__, strerror(errno))
-
-#define warn(_msg, ...) \
-	syslog(LOG_WARNING, "libminijail: " _msg, ## __VA_ARGS__)
 
 struct binding {
 	char *src;
@@ -258,7 +247,7 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 		goto error;
 	b->writeable = writeable;
 
-	syslog(LOG_INFO, "libminijail: bind %s -> %s", src, dest);
+	info("bind %s -> %s", src, dest);
 
 	/*
 	 * Force vfs namespacing so the bind mounts don't leak out into the
@@ -286,12 +275,12 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
 	FILE *file = fopen(path, "r");
 	if (!file) {
-		pdie("failed to open seccomp filters file '%s'", path);
+		pdie("failed to open seccomp filter file '%s'", path);
 	}
 
 	struct sock_fprog *fprog = malloc(sizeof(struct sock_fprog));
 	if (compile_filter(file, fprog)) {
-		die("failed to compile seccomp filters BPF program in '%s'", path);
+		die("failed to compile seccomp filter BPF program in '%s'", path);
 	}
 
 	j->filter_len = fprog->len;

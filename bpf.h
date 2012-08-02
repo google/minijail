@@ -183,4 +183,4 @@ size_t bpf_allow_syscall_args(struct sock_filter *filter,
 void dump_bpf_prog(struct sock_fprog *fprog);
 void dump_bpf_filter(struct sock_filter *filter, unsigned short len);
 
-#endif /* _MINIJAIL_BPF_H_ */
+#endif /* BPF_H */
