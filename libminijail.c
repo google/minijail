@@ -33,11 +33,10 @@
 #include <unistd.h>
 
 #include "libminijail.h"
-#include "libsyscalls.h"
 #include "libminijail-private.h"
-#include "logging.h"
 
 #include "syscall_filter.h"
+#include "util.h"
 
 /* Until these are reliably available in linux/prctl.h */
 #ifndef PR_SET_SECCOMP

@@ -80,13 +80,6 @@ int minijail_enter_chroot(struct minijail *j, const char *dir);
 int minijail_bind(struct minijail *j, const char *src, const char *dest,
                   int writeable);
 
-/* Exposes minijail's name-to-int mapping for system calls for the
- * architecture it was built on.  This is primarily exposed for
- * minijail_add_seccomp_filter() and testing.
- * Returns the system call number on success or -1 on failure.
- */
-int minijail_lookup_syscall(const char *name);
-
 /* Lock this process into the given minijail. Note that this procedure cannot fail,
  * since there is no way to undo privilege-dropping; therefore, if any part of
  * the privilege-drop fails, minijail_enter() will abort the entire process.

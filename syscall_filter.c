@@ -1,22 +1,19 @@
-/* parser.c
- * Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+/* Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
- *
- * Syscall filter syntax parser.
  */
 
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "syscall_filter.h"
 
-#include "libsyscalls.h"
-#include "logging.h"
+#include "util.h"
 
 #define MAX_LINE_LENGTH 1024
+#define ONE_INSTR	1
+#define TWO_INSTRS	2
 
 int str_to_op(const char *op_str)
 {
@@ -28,9 +25,6 @@ int str_to_op(const char *op_str)
 		return 0;
 	}
 }
-
-#define ONE_INSTR	1
-#define TWO_INSTRS	2
 
 struct sock_filter *new_instr_buf(size_t count)
 {
@@ -315,27 +309,6 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 
 	free(line);
 	return head;
-}
-
-int lookup_syscall(const char *name)
-{
-	const struct syscall_entry *entry = syscall_table;
-	for (; entry->name && entry->nr >= 0; ++entry)
-		if (!strcmp(entry->name, name))
-			return entry->nr;
-	return -1;
-}
-
-char *strip(char *s)
-{
-	char *end;
-	while (*s && isblank(*s))
-		s++;
-	end = s + strlen(s) - 1;
-	while (end >= s && *end && (isblank(*end) || *end == '\n'))
-		end--;
-	*(end + 1) = '\0';
-	return s;
 }
 
 int compile_filter(FILE *policy, struct sock_fprog *prog)
