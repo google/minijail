@@ -566,6 +566,25 @@ int remount_readonly(void)
 	return 0;
 }
 
+void drop_ugid(const struct minijail *j)
+{
+	if (j->flags.usergroups) {
+		if (initgroups(j->user, j->usergid))
+			pdie("initgroups");
+	} else {
+		/* Only attempt to clear supplemental groups if we are changing
+		 * users. */
+		if ((j->uid || j->gid) && setgroups(0, NULL))
+			pdie("setgroups");
+	}
+
+	if (j->flags.gid && setresgid(j->gid, j->gid, j->gid))
+		pdie("setresgid");
+
+	if (j->flags.uid && setresuid(j->uid, j->uid, j->uid))
+		pdie("setresuid");
+}
+
 void drop_caps(const struct minijail *j)
 {
 	cap_t caps = cap_get_proc();
@@ -598,6 +617,36 @@ void drop_caps(const struct minijail *j)
 			continue;
 		if (prctl(PR_CAPBSET_DROP, i))
 			pdie("prctl(PR_CAPBSET_DROP)");
+	}
+}
+
+void set_seccomp_filter(const struct minijail *j)
+{
+	/*
+	 * Set no_new_privs. See </kernel/seccomp.c> and </kernel/sys.c>
+	 * in the kernel source tree for an explanation of the parameters.
+	 */
+	if (j->flags.no_new_privs) {
+		if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
+			pdie("prctl(PR_SET_NO_NEW_PRIVS)");
+	}
+
+	/*
+	 * If we're logging seccomp filter failures,
+	 * install the SIGSYS handler first.
+	 */
+	if (j->flags.seccomp_filter && j->flags.log_seccomp_filter) {
+		if (install_sigsys_handler())
+			pdie("install SIGSYS handler");
+		warn("logging seccomp filter failures");
+	}
+
+	/*
+	 * Install the syscall filter.
+	 */
+	if (j->flags.seccomp_filter) {
+		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, j->filter_prog))
+			pdie("prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER)");
 	}
 }
 
@@ -639,54 +688,30 @@ void API minijail_enter(const struct minijail *j)
 	}
 
 	/*
-	 * Set no_new_privs before installing seccomp filter. See
-	 * </kernel/seccomp.c> and </kernel/sys.c> in the kernel source tree for
-	 * an explanation of the parameters.
+	 * If we're setting no_new_privs, we can drop privileges
+	 * before setting seccomp filter. This way filter policies
+	 * don't need to allow privilege-dropping syscalls.
 	 */
 	if (j->flags.no_new_privs) {
-		if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
-			pdie("prctl(PR_SET_NO_NEW_PRIVS)");
-	}
+		drop_ugid(j);
+		if (j->flags.caps)
+			drop_caps(j);
 
-	/*
-	 * If we're logging seccomp filter failures,
-	 * install the SIGSYS handler first.
-	 */
-	if (j->flags.seccomp_filter && j->flags.log_seccomp_filter) {
-		if (install_sigsys_handler())
-			pdie("install SIGSYS handler");
-		warn("logging seccomp filter failures");
-	}
-
-	/*
-	 * Install seccomp filter before dropping root and caps.
-	 * WARNING: this means that filter policies *must* allow
-	 * setgroups()/setresgid()/setresuid() for dropping root and
-	 * capget()/capset()/prctl() for dropping caps.
-	 */
-	if (j->flags.seccomp_filter) {
-		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, j->filter_prog))
-			pdie("prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER)");
-	}
-
-	if (j->flags.usergroups) {
-		if (initgroups(j->user, j->usergid))
-			pdie("initgroups");
+		set_seccomp_filter(j);
 	} else {
-		/* Only attempt to clear supplemental groups if we are changing
-		 * users. */
-		if ((j->uid || j->gid) && setgroups(0, NULL))
-			pdie("setgroups");
+		/*
+		 * If we're not setting no_new_privs,
+		 * we need to set seccomp filter *before* dropping privileges.
+		 * WARNING: this means that filter policies *must* allow
+		 * setgroups()/setresgid()/setresuid() for dropping root and
+		 * capget()/capset()/prctl() for dropping caps.
+		 */
+		set_seccomp_filter(j);
+
+		drop_ugid(j);
+		if (j->flags.caps)
+			drop_caps(j);
 	}
-
-	if (j->flags.gid && setresgid(j->gid, j->gid, j->gid))
-		pdie("setresgid");
-
-	if (j->flags.uid && setresuid(j->uid, j->uid, j->uid))
-		pdie("setresuid");
-
-	if (j->flags.caps)
-		drop_caps(j);
 
 	/*
 	 * seccomp has to come last since it cuts off all the other
