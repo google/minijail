@@ -393,8 +393,11 @@ int compile_filter(FILE *policy, struct sock_fprog *prog,
 			return -1;
 
 		nr = lookup_syscall(syscall_name);
-		if (nr < 0)
+		if (nr < 0) {
+			warn("compile_filter: nonexistent syscall '%s'",
+			     syscall_name);
 			return -1;
+		}
 
 		policy = strip(policy);
 
