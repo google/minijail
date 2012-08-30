@@ -835,15 +835,29 @@ int setup_pipe(int fds[2])
 int API minijail_run(struct minijail *j, const char *filename,
 		     char *const argv[])
 {
-	return minijail_run_pid(j, filename, argv, NULL);
+	return minijail_run_pid_pipe(j, filename, argv, NULL, NULL);
 }
 
 int API minijail_run_pid(struct minijail *j, const char *filename,
 			 char *const argv[], pid_t *pchild_pid)
 {
+	return minijail_run_pid_pipe(j, filename, argv, pchild_pid, NULL);
+}
+
+int API minijail_run_pipe(struct minijail *j, const char *filename,
+			 char *const argv[], int *pstdin_fd)
+{
+	return minijail_run_pid_pipe(j, filename, argv, NULL, pstdin_fd);
+}
+
+int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
+			       char *const argv[], pid_t *pchild_pid,
+			       int *pstdin_fd)
+{
 	char *oldenv, *oldenv_copy = NULL;
 	pid_t child_pid;
 	int pipe_fds[2];
+	int stdin_fds[2];
 	int ret;
 	/* We need to remember this across the minijail_preexec() call. */
 	int pid_namespace = j->flags.pids;
@@ -864,6 +878,15 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 	 */
 	if (setup_pipe(pipe_fds))
 		return -EFAULT;
+
+	/*
+	 * If we want to write to the child process' standard input,
+	 * create the pipe(2) now.
+	 */
+	if (pstdin_fd) {
+		if (pipe(stdin_fds))
+			return -EFAULT;
+	}
 
 	/* Use sys_clone() if and only if we're creating a pid namespace.
 	 *
@@ -924,7 +947,10 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 			unsetenv(kLdPreloadEnvVar);
 		}
 		unsetenv(kFdEnvVar);
+
 		j->initpid = child_pid;
+
+		/* Send marshalled minijail. */
 		close(pipe_fds[0]);	/* read endpoint */
 		ret = minijail_to_fd(j, pipe_fds[1]);
 		close(pipe_fds[1]);	/* write endpoint */
@@ -932,11 +958,33 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 			kill(j->initpid, SIGKILL);
 			die("failed to send marshalled minijail");
 		}
+
 		if (pchild_pid)
 			*pchild_pid = child_pid;
+
+		/*
+		 * If we want to write to the child process' standard input,
+		 * set up the write end of the pipe.
+		 */
+		if (pstdin_fd) {
+			close(stdin_fds[0]);	/* read endpoint */
+			*pstdin_fd = stdin_fds[1];
+		}
+
 		return 0;
 	}
 	free(oldenv_copy);
+
+	/*
+	 * If we want to write to the jailed process' standard input,
+	 * set up the read end of the pipe.
+	 */
+	if (pstdin_fd) {
+		close(stdin_fds[1]);	/* write endpoint */
+		/* dup2(2) the read end of the pipe into stdin. */
+		if (dup2(stdin_fds[0], 0))
+			die("failed to set up stdin pipe");
+	}
 
 	/* Drop everything that cannot be inherited across execve. */
 	minijail_preexec(j);

@@ -8,6 +8,9 @@
 
 #include <errno.h>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include "test_harness.h"
 
 #include "libminijail.h"
@@ -140,9 +143,26 @@ TEST_F(marshal, 0xff) {
   EXPECT_EQ(-EINVAL, minijail_unmarshal(self->j, self->buf, sizeof(self->buf)));
 }
 
-TEST_F(marshal, short) {
-  ASSERT_EQ(0, minijail_marshal(self->m, self->buf, sizeof(self->buf)));
-  EXPECT_NE(0, minijail_unmarshal(self->j, self->buf, self->size / 2));
+TEST(test_minijail_run_pid_pipe) {
+  pid_t pid;
+  int child_stdin;
+  int mj_run_ret;
+  int write_ret;
+  int status;
+
+  struct minijail *j = minijail_new();
+  mj_run_ret = minijail_run_pid_pipe(j, "test/read_stdin",
+                                     NULL, &pid, &child_stdin);
+  EXPECT_EQ(mj_run_ret, 0);
+  write_ret = write(child_stdin, "test\n", strlen("test\n"));
+  EXPECT_GT(write_ret, -1);
+
+  waitpid(pid, &status, 0);
+
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+
+  minijail_destroy(j);
 }
 
 TEST_HARNESS_MAIN

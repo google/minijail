@@ -3,7 +3,8 @@
 # found in the LICENSE file.
 
 LIBDIR = lib
-PRELOADPATH = \"/$(LIBDIR)/libminijailpreload.so\"
+PRELOADNAME = libminijailpreload.so
+PRELOADPATH = \"/$(LIBDIR)/$(PRELOADNAME)\"
 CFLAGS += -fPIC -Wall -Wextra -Werror -DPRELOADPATH="$(PRELOADPATH)"
 CFLAGS += -fvisibility=internal
 
@@ -26,6 +27,8 @@ libminijail_unittest.wrapper :
 	$(MAKE) $(MAKEARGS) test-clean
 
 libminijail_unittest : CFLAGS := $(filter-out -fvisibility=%,$(CFLAGS))
+libminijail_unittest : CFLAGS := $(filter-out -DPRELOADPATH=%,$(CFLAGS))
+libminijail_unittest : CFLAGS := $(CFLAGS) -DPRELOADPATH=\"./$(PRELOADNAME)\"
 libminijail_unittest : libminijail_unittest.o libminijail.o \
 		syscall_filter.o signal.o bpf.o util.o libsyscalls.gen.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(filter-out $(CFLAGS_FILE),$^) -lcap
