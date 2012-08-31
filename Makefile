@@ -97,12 +97,12 @@ libsyscalls.gen.c : Makefile libsyscalls.h
 
 # Only clean up files affected by the CFLAGS change for testing.
 test-clean :
-	@rm -f libminijail.o libminijail_unittest.o libsyscalls.gen.o
+	@rm -f libminijail.o libminijail_unittest.o
 
 clean : test-clean
 	@rm -f libminijail.o libminijailpreload.so minijail0
 	@rm -f libminijail.so
 	@rm -f libminijail_unittest
-	@rm -f libsyscalls.gen.c
+	@rm -f libsyscalls.gen.o libsyscalls.gen.c
 	@rm -f syscall_filter.o signal.o bpf.o util.o
 	@rm -f syscall_filter_unittest syscall_filter_unittest.o
