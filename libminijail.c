@@ -845,14 +845,14 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 }
 
 int API minijail_run_pipe(struct minijail *j, const char *filename,
-			 char *const argv[], int *pstdin_fd)
+			  char *const argv[], int *pstdin_fd)
 {
 	return minijail_run_pid_pipe(j, filename, argv, NULL, pstdin_fd);
 }
 
 int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
-			       char *const argv[], pid_t *pchild_pid,
-			       int *pstdin_fd)
+			      char *const argv[], pid_t *pchild_pid,
+			      int *pstdin_fd)
 {
 	char *oldenv, *oldenv_copy = NULL;
 	pid_t child_pid;
