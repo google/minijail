@@ -14,7 +14,6 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <linux/capability.h>
-#include <linux/securebits.h>
 #include <pwd.h>
 #include <sched.h>
 #include <signal.h>
@@ -38,6 +37,13 @@
 #include "signal.h"
 #include "syscall_filter.h"
 #include "util.h"
+
+#ifdef HAVE_SECUREBITS_H
+#include <linux/securebits.h>
+#else
+#define SECURE_ALL_BITS         0x15
+#define SECURE_ALL_LOCKS        (SECURE_ALL_BITS << 1)
+#endif
 
 /* Until these are reliably available in linux/prctl.h */
 #ifndef PR_SET_SECCOMP
