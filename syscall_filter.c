@@ -23,6 +23,8 @@ int str_to_op(const char *op_str)
 		return EQ;
 	} else if (!strcmp(op_str, "!=")) {
 		return NE;
+	} else if (!strcmp(op_str, "&")) {
+		return SET;
 	} else {
 		return 0;
 	}
@@ -139,6 +141,85 @@ unsigned int success_lbl(struct bpf_labels *labels, int nr)
 	return get_label_id(labels, lbl_str);
 }
 
+int compile_atom(struct filter_block *head, char *atom,
+		struct bpf_labels *labels, int nr, int group_idx)
+{
+	/* Splits the atom. */
+	char *atom_ptr;
+	char *argidx_str = strtok_r(atom, " ", &atom_ptr);
+	char *operator_str = strtok_r(NULL, " ", &atom_ptr);
+	char *constant_str = strtok_r(NULL, " ", &atom_ptr);
+
+	if (argidx_str == NULL || operator_str == NULL || constant_str == NULL)
+		return -1;
+
+	int op = str_to_op(operator_str);
+	if (op < MIN_OPERATOR)
+		return -1;
+
+	if (strncmp(argidx_str, "arg", 3)) {
+		return -1;
+	}
+
+	char *argidx_ptr;
+	long int argidx = strtol(argidx_str + 3, &argidx_ptr, 10);
+	/*
+	 * Checks to see if an actual argument index
+	 * was parsed.
+	 */
+	if (argidx_ptr == argidx_str + 3)
+		return -1;
+
+	long int c = strtol(constant_str, NULL, 0);
+	/*
+	 * Looks up the label for the end of the AND statement
+	 * this atom belongs to.
+	 */
+	unsigned int id = group_end_lbl(labels, nr, group_idx);
+
+	/*
+	 * Builds a BPF comparison between a syscall argument
+	 * and a constant.
+	 * The comparison lives inside an AND statement.
+	 * If the comparison succeeds, we continue
+	 * to the next comparison.
+	 * If this comparison fails, the whole AND statement
+	 * will fail, so we jump to the end of this AND statement.
+	 */
+	struct sock_filter *comp_block;
+	size_t len = bpf_arg_comp(&comp_block, op, argidx, c, id);
+	if (len == 0)
+		return -1;
+
+	append_filter_block(head, comp_block, len);
+	return 0;
+}
+
+int compile_errno(struct filter_block *head, char *ret_errno) {
+	char *errno_ptr;
+
+	/* Splits the 'return' keyword and the actual errno value. */
+	char *ret_str = strtok_r(ret_errno, " ", &errno_ptr);
+	if (strncmp(ret_str, "return", strlen("return")))
+		return -1;
+
+	char *errno_val_str = strtok_r(NULL, " ", &errno_ptr);
+
+	if (errno_val_str) {
+		char *errno_val_ptr;
+		int errno_val = strtol(
+				errno_val_str, &errno_val_ptr, 0);
+		/* Checks to see if we parsed an actual errno. */
+		if (errno_val_ptr == errno_val_str)
+			return -1;
+
+		append_ret_errno(head, errno_val);
+	} else {
+		append_ret_kill(head);
+	}
+	return 0;
+}
+
 struct filter_block *compile_section(int nr, const char *policy_line,
 		unsigned int entry_lbl_id, struct bpf_labels *labels)
 {
@@ -153,8 +234,8 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	 * Atoms are of the form "arg{DNUM} OP NUM"
 	 * where:
 	 *   - DNUM is a decimal number.
-	 *   - OP is a comparison operator (== or != for now).
-	 *   - NUM is a decimal or hexadecimal number.
+	 *   - OP is an operator: ==, !=, or & (flags set).
+	 *   - NUM is an octal, decimal, or hexadecimal number.
 	 *
 	 * When the syscall arguments make the expression true,
 	 * the syscall is allowed. If not, the process is killed.
@@ -181,8 +262,9 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 		return NULL;
 
 	/* Splits the optional "return <errno>" part. */
-	char *arg_filter = strtok(line, ";");
-	char *ret_errno = strtok(NULL, ";");
+	char *line_ptr;
+	char *arg_filter = strtok_r(line, ";", &line_ptr);
+	char *ret_errno = strtok_r(NULL, ";", &line_ptr);
 
 	/*
 	 * We build the argument filter as a collection of smaller
@@ -207,73 +289,15 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	 * Splits the policy line by '||' into conjunctions and each conjunction
 	 * by '&&' into atoms.
 	 */
-	char *arg_filter_str;
-	char *arg_filter_ptr;
-	for (arg_filter_str = arg_filter; ; arg_filter_str = NULL) {
-		char *group = strtok_r(arg_filter_str, "||", &arg_filter_ptr);
-
-		if (group == NULL)
-			break;
-
-		char *group_str;
-		char *group_ptr;
-		for (group_str = group; ; group_str = NULL) {
-			char *comp = strtok_r(group_str, "&&", &group_ptr);
-
-			if (comp == NULL)
-				break;
-
-			/* Splits each atom. */
-			char *comp_ptr;
-			char *argidx_str = strtok_r(comp, " ", &comp_ptr);
-			char *operator_str = strtok_r(NULL, " ", &comp_ptr);
-			char *constant_str = strtok_r(NULL, " ", &comp_ptr);
-
-			if (argidx_str == NULL ||
-			    operator_str == NULL ||
-			    constant_str == NULL)
+	char *arg_filter_str = arg_filter;
+	char *group;
+	while ((group = tokenize(&arg_filter_str, "||")) != NULL) {
+		char *group_str = group;
+		char *comp;
+		while ((comp = tokenize(&group_str, "&&")) != NULL) {
+			/* Compiles each atom into a BPF block. */
+			if (compile_atom(head, comp, labels, nr, group_idx) < 0)
 				return NULL;
-
-			int op = str_to_op(operator_str);
-
-			if (op < MIN_OPERATOR)
-				return NULL;
-
-			if (strncmp(argidx_str, "arg", 3)) {
-				return NULL;
-			}
-
-			char *argidx_ptr;
-			long int argidx = strtol(
-					argidx_str + 3, &argidx_ptr, 10);
-			/*
-			 * Checks to see if an actual argument index
-			 * was parsed.
-			 */
-			if (argidx_ptr == argidx_str + 3) {
-				return NULL;
-			}
-
-			long int c = strtol(constant_str, NULL, 0);
-			unsigned int id = group_end_lbl(
-					labels, nr, group_idx);
-
-			/*
-			 * Builds a BPF comparison between a syscall argument
-			 * and a constant.
-			 * The comparison lives inside an AND statement.
-			 * If the comparison succeeds, we continue
-			 * to the next comparison.
-			 * If this comparison fails, the whole AND statement
-			 * will fail, so we jump to the end of this AND statement.
-			 */
-			struct sock_filter *comp_block;
-			len = bpf_arg_comp(&comp_block,
-					op, argidx, c, id);
-			if (len == 0)
-				return NULL;
-
-			append_filter_block(head, comp_block, len);
 		}
 		/*
 		 * If the AND statement succeeds, we're done,
@@ -298,26 +322,8 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	 * otherwise just kill the task.
 	 */
 	if (ret_errno) {
-		char *errno_ptr;
-
-		char *ret_str = strtok_r(ret_errno, " ", &errno_ptr);
-		if (strncmp(ret_str, "return", strlen("return")))
+		if (compile_errno(head, ret_errno) < 0)
 			return NULL;
-
-		char *errno_val_str = strtok_r(NULL, " ", &errno_ptr);
-
-		if (errno_val_str) {
-			char *errno_val_ptr;
-			int errno_val = strtol(
-					errno_val_str, &errno_val_ptr, 0);
-			/* Checks to see if we parsed an actual errno. */
-			if (errno_val_ptr == errno_val_str)
-				return NULL;
-
-			append_ret_errno(head, errno_val);
-		} else {
-			append_ret_kill(head);
-		}
 	} else {
 		append_ret_kill(head);
 	}

@@ -51,3 +51,52 @@ char *strip(char *s)
 	*(end + 1) = '\0';
 	return s;
 }
+
+char *tokenize(char **stringp, const char *delim) {
+	char *ret = NULL;
+
+	/* If the string is NULL or empty, there are no tokens to be found. */
+	if (stringp == NULL || *stringp == NULL || **stringp == '\0')
+		return NULL;
+
+	/*
+	 * If the delimiter is NULL or empty,
+	 * the full string makes up the only token.
+	 */
+	if (delim == NULL || *delim == '\0') {
+		ret = *stringp;
+		*stringp = NULL;
+		return ret;
+	}
+
+	char *found;
+	while (**stringp != '\0') {
+		found = strstr(*stringp, delim);
+
+		if (!found) {
+			/*
+			 * The delimiter was not found, so the full string
+			 * makes up the only token, and we're done.
+			 */
+			ret = *stringp;
+			*stringp = NULL;
+			break;
+		}
+
+		if (found != *stringp) {
+			/* There's a non-empty token before the delimiter. */
+			*found = '\0';
+			ret = *stringp;
+			*stringp = found + strlen(delim);
+			break;
+		}
+
+		/*
+		 * The delimiter was found at the start of the string,
+		 * skip it and keep looking for a non-empty token.
+		 */
+		*stringp += strlen(delim);
+	}
+
+	return ret;
+}
