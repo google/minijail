@@ -29,7 +29,8 @@ enum operator {
 	LT,
 	LE,
 	GT,
-	GE
+	GE,
+	SET
 };
 
 /*
@@ -72,23 +73,30 @@ struct seccomp_data {
 
 /* Size-dependent defines. */
 #if defined(BITS32)
-/* On 32 bits, comparisons take 2 instructions: 1 load arg, and 1 cmp. */
-#define BPF_LOAD_ARG_LEN 1U
-#define BPF_COMP_LEN 1U
+/*
+ * On 32 bits, comparisons take 2 instructions: 1 for loading the argument,
+ * 1 for the actual comparison.
+ */
+#define BPF_LOAD_ARG_LEN	1U
+#define BPF_COMP_LEN		1U
 #define BPF_ARG_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_COMP_LEN)
 
 #define bpf_comp_jeq bpf_comp_jeq32
+#define bpf_comp_jset bpf_comp_jset32
 
 #define LO_ARG(idx) offsetof(struct seccomp_data, args[(idx)])
 
-#elif __BITS_PER_LONG == 64
-#define BITS64
-/* On 64 bits, comparisons take 7 instructions: 4 load arg, and 3 cmp. */
-#define BPF_LOAD_ARG_LEN 4U
-#define BPF_COMP_LEN 3U
+#elif defined(BITS64)
+/*
+ * On 64 bits, comparisons take 7 instructions: 4 for loading the argument,
+ * and 3 for the actual comparison.
+ */
+#define BPF_LOAD_ARG_LEN	4U
+#define BPF_COMP_LEN		3U
 #define BPF_ARG_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_COMP_LEN)
 
 #define bpf_comp_jeq bpf_comp_jeq64
+#define bpf_comp_jset bpf_comp_jset64
 
 /* Ensure that we load the logically correct offset. */
 #if defined(__LITTLE_ENDIAN)
@@ -100,6 +108,9 @@ struct seccomp_data {
 #else
 #error "Unknown endianness"
 #endif
+
+#else
+#error "Unknown bit width"
 
 #endif
 
@@ -170,6 +181,8 @@ void free_label_strings(struct bpf_labels *labels);
 size_t bpf_load_arg(struct sock_filter *filter, int argidx);
 size_t bpf_comp_jeq(struct sock_filter *filter, unsigned long c,
 		unsigned char jt, unsigned char jf);
+size_t bpf_comp_jset(struct sock_filter *filter, unsigned long mask,
+		unsigned char jt, unsigned char jf);
 
 /* Functions called by syscall_filter.c */
 #define ARCH_VALIDATION_LEN 3U
@@ -182,7 +195,7 @@ size_t bpf_allow_syscall(struct sock_filter *filter, int nr);
 size_t bpf_allow_syscall_args(struct sock_filter *filter,
 		int nr, unsigned int id);
 
-/* Debug */
+/* Debug functions. */
 void dump_bpf_prog(struct sock_fprog *fprog);
 void dump_bpf_filter(struct sock_filter *filter, unsigned short len);
 

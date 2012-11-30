@@ -8,6 +8,7 @@
 
 #include <asm/unistd.h>
 #include <errno.h>
+#include <fcntl.h>	/* For O_WRONLY */
 
 #include "test_harness.h"
 
@@ -100,6 +101,7 @@ FIXTURE(bpf) {};
 FIXTURE_SETUP(bpf) {}
 FIXTURE_TEARDOWN(bpf) {}
 
+/* Test that setting one BPF instruction works. */
 TEST_F(bpf, set_bpf_instr) {
 	struct sock_filter instr;
 	unsigned char code = BPF_LD+BPF_W+BPF_ABS;
@@ -140,7 +142,7 @@ TEST_F(bpf, bpf_comp_jeq) {
 	EXPECT_EQ(len, BPF_COMP_LEN);
 
 #if defined(BITS32)
-EXPECT_EQ_BLOCK(&comp_jeq[0],
+	EXPECT_EQ_BLOCK(&comp_jeq[0],
 			BPF_JMP+BPF_JEQ+BPF_K, c, jt, jf);
 #elif defined(BITS64)
 	EXPECT_EQ_BLOCK(&comp_jeq[0],
@@ -148,6 +150,28 @@ EXPECT_EQ_BLOCK(&comp_jeq[0],
 	EXPECT_EQ_STMT(&comp_jeq[1], BPF_LD+BPF_MEM, 0);
 	EXPECT_EQ_BLOCK(&comp_jeq[2],
 			BPF_JMP+BPF_JEQ+BPF_K, c, jt, jf);
+#endif
+}
+
+TEST_F(bpf, bpf_comp_jset) {
+	struct sock_filter comp_jset[BPF_COMP_LEN];
+	unsigned long mask = O_WRONLY;
+	unsigned char jt = 1;
+	unsigned char jf = 2;
+
+	size_t len = bpf_comp_jset(comp_jset, mask, jt, jf);
+
+	EXPECT_EQ(len, BPF_COMP_LEN);
+
+#if defined(BITS32)
+	EXPECT_EQ_BLOCK(&comp_jset[0],
+			BPF_JMP+BPF_JSET+BPF_K, mask, jt, jf);
+#elif defined(BITS64)
+	EXPECT_EQ_BLOCK(&comp_jset[0],
+			BPF_JMP+BPF_JSET+BPF_K, 0, jt + 2, 0);
+	EXPECT_EQ_STMT(&comp_jset[1], BPF_LD+BPF_MEM, 0);
+	EXPECT_EQ_BLOCK(&comp_jset[2],
+			BPF_JMP+BPF_JSET+BPF_K, mask, jt, jf);
 #endif
 }
 
@@ -479,8 +503,6 @@ TEST_F(filter, nonexistent) {
 	ASSERT_NE(res, 0);
 }
 
-TEST_HARNESS_MAIN
-
 TEST_F(filter, log) {
 	struct sock_fprog actual;
 
@@ -518,3 +540,5 @@ TEST_F(filter, log) {
 	free(actual.filter);
 	fclose(policy);
 }
+
+TEST_HARNESS_MAIN
