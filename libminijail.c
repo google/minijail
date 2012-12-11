@@ -1041,12 +1041,18 @@ int API minijail_wait(struct minijail *j)
 	int st;
 	if (waitpid(j->initpid, &st, 0) < 0)
 		return -errno;
+
 	if (!WIFEXITED(st)) {
 		if (WIFSIGNALED(st))
 			warn("child process received signal %d", WTERMSIG(st));
 		return MINIJAIL_ERR_JAIL;
 	}
-	return WEXITSTATUS(st);
+
+	int exit_status = WEXITSTATUS(st);
+	if (exit_status != 0)
+		info("child process exited with status %d", exit_status);
+
+	return exit_status;
 }
 
 void API minijail_destroy(struct minijail *j)
