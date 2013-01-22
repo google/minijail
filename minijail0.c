@@ -111,11 +111,11 @@ static void seccomp_filter_usage(const char *progn)
 	printf("\nSee minijail0(5) for example policies.\n");
 }
 
-int main(int argc, char *argv[])
+static int parse_args(struct minijail *j, int argc, char *argv[])
 {
-	struct minijail *j = minijail_new();
-
 	int opt;
+	if (argc > 1 && argv[1][0] != '-')
+		return 1;
 	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnpL")) != -1) {
 		switch (opt) {
 		case 'u':
@@ -165,16 +165,23 @@ int main(int argc, char *argv[])
 			usage(argv[0]);
 			exit(1);
 		}
+		if (optind < argc && argv[optind][0] != '-')
+			return optind;
 	}
 
 	if (argc == optind) {
 		usage(argv[0]);
 		exit(1);
 	}
+	return optind;
+}
 
-	argc -= optind;
-	argv += optind;
-
+int main(int argc, char *argv[])
+{
+	struct minijail *j = minijail_new();
+	int consumed = parse_args(j, argc, argv);
+	argc -= consumed;
+	argv += consumed;
 	minijail_run(j, argv[0], argv);
 	return minijail_wait(j);
 }
