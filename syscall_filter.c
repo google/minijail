@@ -342,7 +342,7 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	return head;
 }
 
-int compile_filter(FILE *policy, struct sock_fprog *prog,
+int compile_filter(FILE *policy_file, struct sock_fprog *prog,
 		int log_failures)
 {
 	char line[MAX_LINE_LENGTH];
@@ -351,7 +351,7 @@ int compile_filter(FILE *policy, struct sock_fprog *prog,
 	struct bpf_labels labels;
 	labels.count = 0;
 
-	if (!policy)
+	if (!policy_file)
 		return -1;
 
 	struct filter_block *head = calloc(1, sizeof(struct filter_block));
@@ -383,10 +383,10 @@ int compile_filter(FILE *policy, struct sock_fprog *prog,
 	 * Chain the filter sections together and dump them into
 	 * the final buffer at the end.
 	 */
-	while (fgets(line, sizeof(line), policy)) {
+	while (fgets(line, sizeof(line), policy_file)) {
 		++line_count;
-		char *policy = line;
-		char *syscall_name = strsep(&policy, ":");
+		char *policy_line = line;
+		char *syscall_name = strsep(&policy_line, ":");
 		int nr = -1;
 
 		syscall_name = strip(syscall_name);
@@ -395,7 +395,7 @@ int compile_filter(FILE *policy, struct sock_fprog *prog,
 		if (*syscall_name == '#' || *syscall_name == '\0')
 			continue;
 
-		if (!policy)
+		if (!policy_line)
 			return -1;
 
 		nr = lookup_syscall(syscall_name);
@@ -405,13 +405,13 @@ int compile_filter(FILE *policy, struct sock_fprog *prog,
 			return -1;
 		}
 
-		policy = strip(policy);
+		policy_line = strip(policy_line);
 
 		/*
 		 * For each syscall, add either a simple ALLOW,
 		 * or an arg filter block.
 		 */
-		if (strcmp(policy, "1") == 0) {
+		if (strcmp(policy_line, "1") == 0) {
 			/* Add simple ALLOW. */
 			append_allow_syscall(head, nr);
 		} else {
@@ -427,7 +427,7 @@ int compile_filter(FILE *policy, struct sock_fprog *prog,
 
 			/* Build the arg filter block. */
 			struct filter_block *block =
-				compile_section(nr, policy, id, &labels);
+				compile_section(nr, policy_line, id, &labels);
 
 			if (!block)
 				return -1;
