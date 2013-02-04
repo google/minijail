@@ -15,7 +15,7 @@
 #include <stddef.h>
 #include <sys/user.h>
 
-#if __BITS_PER_LONG == 32
+#if __BITS_PER_LONG == 32 || defined(__ILP32__)
 #define BITS32
 #elif __BITS_PER_LONG == 64
 #define BITS64

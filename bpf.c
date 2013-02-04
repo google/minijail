@@ -83,6 +83,7 @@ size_t bpf_comp_jeq32(struct sock_filter *filter, unsigned long c,
  * On 64 bits, we have to do two 32-bit comparisons.
  * We jump true when *both* comparisons are true.
  */
+#if defined(BITS64)
 size_t bpf_comp_jeq64(struct sock_filter *filter, uint64_t c,
 		unsigned char jt, unsigned char jf)
 {
@@ -98,6 +99,7 @@ size_t bpf_comp_jeq64(struct sock_filter *filter, uint64_t c,
 
 	return curr_block - filter;
 }
+#endif
 
 /* Size-aware bitwise AND. */
 size_t bpf_comp_jset32(struct sock_filter *filter, unsigned long mask,
@@ -112,6 +114,7 @@ size_t bpf_comp_jset32(struct sock_filter *filter, unsigned long mask,
  * On 64 bits, we have to do two 32-bit bitwise ANDs.
  * We jump true when *either* bitwise AND is true (non-zero).
  */
+#if defined(BITS64)
 size_t bpf_comp_jset64(struct sock_filter *filter, uint64_t mask,
 		unsigned char jt, unsigned char jf)
 {
@@ -127,6 +130,7 @@ size_t bpf_comp_jset64(struct sock_filter *filter, uint64_t mask,
 
 	return curr_block - filter;
 }
+#endif
 
 size_t bpf_arg_comp(struct sock_filter **pfilter,
 		int op, int argidx, unsigned long c, unsigned int label_id)
