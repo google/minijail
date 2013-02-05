@@ -594,7 +594,7 @@ void drop_ugid(const struct minijail *j)
 void drop_caps(const struct minijail *j)
 {
 	cap_t caps = cap_get_proc();
-	cap_value_t raise_flag[1];
+	cap_value_t flag[1];
 	unsigned int i;
 	if (!caps)
 		die("can't get process caps");
@@ -605,25 +605,48 @@ void drop_caps(const struct minijail *j)
 	if (cap_clear_flag(caps, CAP_PERMITTED))
 		die("can't clear permitted caps");
 	for (i = 0; i < sizeof(j->caps) * 8 && cap_valid((int)i); ++i) {
-		if (i != CAP_SETPCAP && !(j->caps & (1 << i)))
+		/* Keep CAP_SETPCAP for dropping bounding set bits. */
+		if (i != CAP_SETPCAP && !(j->caps & (1UL << i)))
 			continue;
-		raise_flag[0] = i;
-		if (cap_set_flag(caps, CAP_EFFECTIVE, 1, raise_flag, CAP_SET))
+		flag[0] = i;
+		if (cap_set_flag(caps, CAP_EFFECTIVE, 1, flag, CAP_SET))
 			die("can't add effective cap");
-		if (cap_set_flag(caps, CAP_PERMITTED, 1, raise_flag, CAP_SET))
+		if (cap_set_flag(caps, CAP_PERMITTED, 1, flag, CAP_SET))
 			die("can't add permitted cap");
-		if (cap_set_flag(caps, CAP_INHERITABLE, 1, raise_flag, CAP_SET))
+		if (cap_set_flag(caps, CAP_INHERITABLE, 1, flag, CAP_SET))
 			die("can't add inheritable cap");
 	}
 	if (cap_set_proc(caps))
-		die("can't apply cleaned capset");
-	cap_free(caps);
+		die("can't apply initial cleaned capset");
+
+	/*
+	 * Instead of dropping bounding set first, do it here in case
+	 * the caller had a more permissive bounding set which could
+	 * have been used above to raise a capability that wasn't already
+	 * present. This requires CAP_SETPCAP, so we raised/kept it above.
+	 */
 	for (i = 0; i < sizeof(j->caps) * 8 && cap_valid((int)i); ++i) {
-		if (j->caps & (1 << i))
+		if (j->caps & (1UL << i))
 			continue;
 		if (prctl(PR_CAPBSET_DROP, i))
 			pdie("prctl(PR_CAPBSET_DROP)");
 	}
+
+	/* If CAP_SETPCAP wasn't specifically requested, now we remove it. */
+	if ((j->caps & (1UL << CAP_SETPCAP)) == 0) {
+		flag[0] = CAP_SETPCAP;
+		if (cap_set_flag(caps, CAP_EFFECTIVE, 1, flag, CAP_CLEAR))
+			die("can't clear effective cap");
+		if (cap_set_flag(caps, CAP_PERMITTED, 1, flag, CAP_CLEAR))
+			die("can't clear permitted cap");
+		if (cap_set_flag(caps, CAP_INHERITABLE, 1, flag, CAP_CLEAR))
+			die("can't clear inheritable cap");
+	}
+
+	if (cap_set_proc(caps))
+		die("can't apply final cleaned capset");
+
+	cap_free(caps);
 }
 
 void set_seccomp_filter(const struct minijail *j)
