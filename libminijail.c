@@ -595,6 +595,7 @@ void drop_caps(const struct minijail *j)
 {
 	cap_t caps = cap_get_proc();
 	cap_value_t flag[1];
+	const uint64_t one = 1;
 	unsigned int i;
 	if (!caps)
 		die("can't get process caps");
@@ -606,7 +607,7 @@ void drop_caps(const struct minijail *j)
 		die("can't clear permitted caps");
 	for (i = 0; i < sizeof(j->caps) * 8 && cap_valid((int)i); ++i) {
 		/* Keep CAP_SETPCAP for dropping bounding set bits. */
-		if (i != CAP_SETPCAP && !(j->caps & (1UL << i)))
+		if (i != CAP_SETPCAP && !(j->caps & (one << i)))
 			continue;
 		flag[0] = i;
 		if (cap_set_flag(caps, CAP_EFFECTIVE, 1, flag, CAP_SET))
@@ -626,14 +627,14 @@ void drop_caps(const struct minijail *j)
 	 * present. This requires CAP_SETPCAP, so we raised/kept it above.
 	 */
 	for (i = 0; i < sizeof(j->caps) * 8 && cap_valid((int)i); ++i) {
-		if (j->caps & (1UL << i))
+		if (j->caps & (one << i))
 			continue;
 		if (prctl(PR_CAPBSET_DROP, i))
 			pdie("prctl(PR_CAPBSET_DROP)");
 	}
 
 	/* If CAP_SETPCAP wasn't specifically requested, now we remove it. */
-	if ((j->caps & (1UL << CAP_SETPCAP)) == 0) {
+	if ((j->caps & (one << CAP_SETPCAP)) == 0) {
 		flag[0] = CAP_SETPCAP;
 		if (cap_set_flag(caps, CAP_EFFECTIVE, 1, flag, CAP_CLEAR))
 			die("can't clear effective cap");
