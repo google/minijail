@@ -147,18 +147,72 @@ TEST(test_minijail_run_pid_pipe) {
   pid_t pid;
   int child_stdin;
   int mj_run_ret;
-  int write_ret;
+  ssize_t write_ret;
   int status;
+  char filename[] = "test/read_stdin";
+  char *argv[2];
+  argv[0] = filename;
+  argv[1] = NULL;
 
   struct minijail *j = minijail_new();
-  mj_run_ret = minijail_run_pid_pipe(j, "test/read_stdin",
-                                     NULL, &pid, &child_stdin);
+  mj_run_ret = minijail_run_pid_pipe(j, argv[0], argv, &pid, &child_stdin);
   EXPECT_EQ(mj_run_ret, 0);
   write_ret = write(child_stdin, "test\n", strlen("test\n"));
   EXPECT_GT(write_ret, -1);
 
   waitpid(pid, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
 
+  minijail_destroy(j);
+}
+
+TEST(test_minijail_run_pid_pipes) {
+  pid_t pid;
+  int child_stdin, child_stdout, child_stderr;
+  int mj_run_ret;
+  ssize_t write_ret, read_ret;
+  const size_t buf_len = 128;
+  char buf[buf_len];
+  int status;
+  char filename[] = "/bin/cat";
+  char teststr[] = "test\n";
+  size_t teststr_len = strlen(teststr);
+  char *argv[4];
+
+  struct minijail *j = minijail_new();
+
+  argv[0] = filename;
+  argv[1] = NULL;
+  mj_run_ret = minijail_run_pid_pipes(j, argv[0], argv,
+                                      &pid, &child_stdin, &child_stdout, NULL);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  write_ret = write(child_stdin, teststr, teststr_len);
+  EXPECT_EQ(write_ret, (int)teststr_len);
+
+  read_ret = read(child_stdout, buf, 8);
+  EXPECT_EQ(read_ret, (int)teststr_len);
+  buf[teststr_len] = 0;
+  EXPECT_EQ(strcmp(buf, teststr), 0);
+
+  EXPECT_EQ(kill(pid, SIGTERM), 0);
+  waitpid(pid, &status, 0);
+  ASSERT_TRUE(WIFSIGNALED(status));
+  EXPECT_EQ(WTERMSIG(status), SIGTERM);
+
+  argv[0] = "/bin/sh";
+  argv[1] = "-c";
+  argv[2] = "echo test >&2";
+  argv[3] = NULL;
+  mj_run_ret = minijail_run_pid_pipes(j, argv[0], argv, &pid, &child_stdin,
+                                      &child_stdout, &child_stderr);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  read_ret = read(child_stderr, buf, buf_len);
+  EXPECT_GE(read_ret, (int)teststr_len);
+
+  waitpid(pid, &status, 0);
   ASSERT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 0);
 

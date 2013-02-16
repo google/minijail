@@ -118,6 +118,19 @@ int minijail_run_pid_pipe(struct minijail *j, const char *filename,
 			  char *const argv[], pid_t *pchild_pid,
 			  int *pstdin_fd);
 
+/* Run the specified command in the given minijail, execve(3)-style.
+ * Update |*pchild_pid| with the pid of the child.
+ * Update |*pstdin_fd| with a fd that allows writing to the child's
+ * standard input.
+ * Update |*pstdout_fd| with a fd that allows reading from the child's
+ * standard output.
+ * Update |*pstderr_fd| with a fd that allows reading from the child's
+ * standard error.
+ */
+int minijail_run_pid_pipes(struct minijail *j, const char *filename,
+			   char *const argv[], pid_t *pchild_pid,
+			   int *pstdin_fd, int *pstdout_fd, int *pstderr_fd);
+
 /* Kill the specified minijail. The minijail must have been created with pid
  * namespacing; if it was, all processes inside it are atomically killed.
  */

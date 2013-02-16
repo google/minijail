@@ -862,32 +862,64 @@ int setup_pipe(int fds[2])
 	return 0;
 }
 
+int setup_pipe_end(int fds[2], size_t index)
+{
+	if (index > 1)
+		return -1;
+
+	close(fds[1 - index]);
+	return fds[index];
+}
+
+int setup_and_dupe_pipe_end(int fds[2], size_t index, int fd)
+{
+	if (index > 1)
+		return -1;
+
+	close(fds[1 - index]);
+	/* dup2(2) the corresponding end of the pipe into |fd|. */
+	return dup2(fds[index], fd);
+}
+
 int API minijail_run(struct minijail *j, const char *filename,
 		     char *const argv[])
 {
-	return minijail_run_pid_pipe(j, filename, argv, NULL, NULL);
+	return minijail_run_pid_pipes(j, filename, argv,
+				      NULL, NULL, NULL, NULL);
 }
 
 int API minijail_run_pid(struct minijail *j, const char *filename,
 			 char *const argv[], pid_t *pchild_pid)
 {
-	return minijail_run_pid_pipe(j, filename, argv, pchild_pid, NULL);
+	return minijail_run_pid_pipes(j, filename, argv, pchild_pid,
+				      NULL, NULL, NULL);
 }
 
 int API minijail_run_pipe(struct minijail *j, const char *filename,
 			  char *const argv[], int *pstdin_fd)
 {
-	return minijail_run_pid_pipe(j, filename, argv, NULL, pstdin_fd);
+	return minijail_run_pid_pipes(j, filename, argv, NULL, pstdin_fd,
+				      NULL, NULL);
 }
 
 int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
 			      char *const argv[], pid_t *pchild_pid,
 			      int *pstdin_fd)
 {
+	return minijail_run_pid_pipes(j, filename, argv, pchild_pid, pstdin_fd,
+				      NULL, NULL);
+}
+
+int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
+			      char *const argv[], pid_t *pchild_pid,
+			      int *pstdin_fd, int *pstdout_fd, int *pstderr_fd)
+{
 	char *oldenv, *oldenv_copy = NULL;
 	pid_t child_pid;
 	int pipe_fds[2];
 	int stdin_fds[2];
+	int stdout_fds[2];
+	int stderr_fds[2];
 	int ret;
 	/* We need to remember this across the minijail_preexec() call. */
 	int pid_namespace = j->flags.pids;
@@ -915,6 +947,24 @@ int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
 	 */
 	if (pstdin_fd) {
 		if (pipe(stdin_fds))
+			return -EFAULT;
+	}
+
+	/*
+	 * If we want to read from the child process' standard output,
+	 * create the pipe(2) now.
+	 */
+	if (pstdout_fd) {
+		if (pipe(stdout_fds))
+			return -EFAULT;
+	}
+
+	/*
+	 * If we want to read from the child process' standard error,
+	 * create the pipe(2) now.
+	 */
+	if (pstderr_fd) {
+		if (pipe(stderr_fds))
 			return -EFAULT;
 	}
 
@@ -996,10 +1046,25 @@ int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
 		 * If we want to write to the child process' standard input,
 		 * set up the write end of the pipe.
 		 */
-		if (pstdin_fd) {
-			close(stdin_fds[0]);	/* read endpoint */
-			*pstdin_fd = stdin_fds[1];
-		}
+		if (pstdin_fd)
+			*pstdin_fd = setup_pipe_end(stdin_fds,
+						    1	/* write end */);
+
+		/*
+		 * If we want to read from the child process' standard output,
+		 * set up the read end of the pipe.
+		 */
+		if (pstdout_fd)
+			*pstdout_fd = setup_pipe_end(stdout_fds,
+						     0	/* read end */);
+
+		/*
+		 * If we want to read from the child process' standard error,
+		 * set up the read end of the pipe.
+		 */
+		if (pstderr_fd)
+			*pstderr_fd = setup_pipe_end(stderr_fds,
+						     0	/* read end */);
 
 		return 0;
 	}
@@ -1010,10 +1075,29 @@ int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
 	 * set up the read end of the pipe.
 	 */
 	if (pstdin_fd) {
-		close(stdin_fds[1]);	/* write endpoint */
-		/* dup2(2) the read end of the pipe into stdin. */
-		if (dup2(stdin_fds[0], 0))
+		if (setup_and_dupe_pipe_end(stdin_fds, 0 /* read end */,
+					    STDIN_FILENO) < 0)
 			die("failed to set up stdin pipe");
+	}
+
+	/*
+	 * If we want to read from the jailed process' standard output,
+	 * set up the write end of the pipe.
+	 */
+	if (pstdout_fd) {
+		if (setup_and_dupe_pipe_end(stdout_fds, 1 /* write end */,
+					    STDOUT_FILENO) < 0)
+			die("failed to set up stdout pipe");
+	}
+
+	/*
+	 * If we want to read from the jailed process' standard error,
+	 * set up the write end of the pipe.
+	 */
+	if (pstderr_fd) {
+		if (setup_and_dupe_pipe_end(stderr_fds, 1 /* write end */,
+					    STDERR_FILENO) < 0)
+			die("failed to set up stderr pipe");
 	}
 
 	/* Drop everything that cannot be inherited across execve. */
