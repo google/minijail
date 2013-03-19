@@ -182,6 +182,11 @@ int main(int argc, char *argv[])
 	int consumed = parse_args(j, argc, argv);
 	argc -= consumed;
 	argv += consumed;
+	if (access(argv[0], X_OK)) {
+		fprintf(stderr, "Target program '%s' not accessible\n",
+		        argv[0]);
+		return 1;
+	}
 	minijail_run(j, argv[0], argv);
 	return minijail_wait(j);
 }
