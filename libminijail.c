@@ -72,6 +72,7 @@ struct minijail {
 		int caps:1;
 		int vfs:1;
 		int pids:1;
+		int net:1;
 		int seccomp:1;
 		int readonly:1;
 		int usergroups:1;
@@ -214,6 +215,11 @@ void API minijail_namespace_pids(struct minijail *j)
 	j->flags.vfs = 1;
 	j->flags.readonly = 1;
 	j->flags.pids = 1;
+}
+
+void API minijail_namespace_net(struct minijail *j)
+{
+	j->flags.net = 1;
 }
 
 void API minijail_remount_readonly(struct minijail *j)
@@ -695,7 +701,10 @@ void API minijail_enter(const struct minijail *j)
 	 * entire process.
 	 */
 	if (j->flags.vfs && unshare(CLONE_NEWNS))
-		pdie("unshare");
+		pdie("unshare(vfs)");
+
+	if (j->flags.net && unshare(CLONE_NEWNET))
+		pdie("unshare(net)");
 
 	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");

@@ -49,6 +49,7 @@ void minijail_parse_seccomp_filters(struct minijail *j, const char *path);
 void minijail_log_seccomp_filter_failures(struct minijail *j);
 void minijail_use_caps(struct minijail *j, uint64_t capmask);
 void minijail_namespace_vfs(struct minijail *j);
+void minijail_namespace_net(struct minijail *j);
 /* Implies namespace_vfs and remount_readonly.
  * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
  */

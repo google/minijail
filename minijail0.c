@@ -80,6 +80,7 @@ static void usage(const char *progn)
 	       "instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
+               "  -e          enter a network namespace\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
@@ -116,7 +117,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[])
 	int opt;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnpL")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnpLe")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -157,6 +158,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[])
 			break;
 		case 'p':
 			minijail_namespace_pids(j);
+			break;
+		case 'e':
+			minijail_namespace_net(j);
 			break;
 		case 'H':
 			seccomp_filter_usage(argv[0]);
