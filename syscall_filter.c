@@ -39,6 +39,18 @@ struct sock_filter *new_instr_buf(size_t count)
 	return buf;
 }
 
+struct filter_block *new_filter_block()
+{
+	struct filter_block *block = calloc(1, sizeof(struct filter_block));
+	if (!block)
+		die("could not allocate BPF filter block");
+
+	block->instrs = NULL;
+	block->last = block->next = NULL;
+
+	return block;
+}
+
 void append_filter_block(struct filter_block *head,
 		struct sock_filter *instrs, size_t len)
 {
@@ -51,10 +63,7 @@ void append_filter_block(struct filter_block *head,
 	if (head->instrs == NULL) {
 		new_last = head;
 	} else {
-		new_last = calloc(1, sizeof(struct filter_block));
-		if (!new_last)
-			die("could not allocate BPF filter block");
-
+		new_last = new_filter_block();
 		if (head->next != NULL) {
 			head->last->next = new_last;
 			head->last = new_last;
@@ -231,7 +240,7 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	 * a disjunction ('||') of one or more conjunctions ('&&')
 	 * of one or more atoms.
 	 *
-	 * Atoms are of the form "arg{DNUM} OP NUM"
+	 * Atoms are of the form "arg{DNUM} {OP} {NUM}"
 	 * where:
 	 *   - DNUM is a decimal number.
 	 *   - OP is an operator: ==, !=, or & (flags set).
@@ -240,13 +249,19 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	 * When the syscall arguments make the expression true,
 	 * the syscall is allowed. If not, the process is killed.
 	 *
-	 * To avoid killing the process, a policy line can include an
-	 * optional "return <errno>" clause:
+	 * To block a syscall without killing the process,
+	 * |policy_line| can be of the form:
+	 * "return <errno>"
 	 *
+	 * This "return {NUM}" policy line will block the syscall,
+	 * make it return -1 and set |errno| to NUM.
+	 *
+	 * A regular policy line can also include a "return <errno>" clause,
+	 * separated by a semicolon (';'):
 	 * "arg0 == 3 && arg1 == 5 || arg0 == 0x8; return {NUM}"
 	 *
-	 * In this case, the syscall will return -1 and |errno| will
-	 * be set to NUM.
+	 * If the syscall arguments don't make the expression true,
+	 * the syscall will be blocked as above instead of killing the process.
 	 */
 
 	size_t len = 0;
@@ -256,34 +271,37 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	if (strlen(policy_line) >= MAX_POLICY_LINE_LENGTH)
 		return NULL;
 
-	/* strtok() modifies its first argument, so let's make a copy. */
+	/* We will modify |policy_line|, so let's make a copy. */
 	char *line = strndup(policy_line, MAX_POLICY_LINE_LENGTH);
 	if (!line)
 		return NULL;
 
-	/* Splits the optional "return <errno>" part. */
-	char *line_ptr;
-	char *arg_filter = strtok_r(line, ";", &line_ptr);
-	char *ret_errno = strtok_r(NULL, ";", &line_ptr);
-
 	/*
-	 * We build the argument filter as a collection of smaller
+	 * We build the filter section as a collection of smaller
 	 * "filter blocks" linked together in a singly-linked list.
 	 */
-	struct filter_block *head = calloc(1, sizeof(struct filter_block));
-	if (!head)
-		return NULL;
-
-	head->instrs = NULL;
-	head->last = head->next = NULL;
+	struct filter_block *head = new_filter_block();
 
 	/*
-	 * Argument filters begin with a label where the main filter
+	 * Filter sections begin with a label where the main filter
 	 * will jump after checking the syscall number.
 	 */
 	struct sock_filter *entry_label = new_instr_buf(ONE_INSTR);
 	set_bpf_lbl(entry_label, entry_lbl_id);
 	append_filter_block(head, entry_label, ONE_INSTR);
+
+	/* Checks whether we're unconditionally blocking this syscall. */
+	if (strncmp(line, "return", strlen("return")) == 0) {
+		if (compile_errno(head, line) < 0)
+			return NULL;
+		free(line);
+		return head;
+	}
+
+	/* Splits the optional "return <errno>" part. */
+	char *line_ptr;
+	char *arg_filter = strtok_r(line, ";", &line_ptr);
+	char *ret_errno = strtok_r(NULL, ";", &line_ptr);
 
 	/*
 	 * Splits the policy line by '||' into conjunctions and each conjunction
@@ -354,11 +372,7 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog,
 	if (!policy_file)
 		return -1;
 
-	struct filter_block *head = calloc(1, sizeof(struct filter_block));
-	if (!head)
-		return -1;
-	head->instrs = NULL;
-	head->last = head->next = NULL;
+	struct filter_block *head = new_filter_block();
 	struct filter_block *arg_blocks = NULL;
 
 	/* Start filter by validating arch. */

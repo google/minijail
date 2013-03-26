@@ -445,6 +445,37 @@ TEST_F(arg_filter, ret_errno) {
 	free_label_strings(&self->labels);
 }
 
+TEST_F(arg_filter, unconditional_errno) {
+	const char *fragment = "return 1";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+		compile_section(nr, fragment, id, &self->labels);
+	ASSERT_NE(block, NULL);
+	size_t exp_total_len = 2;
+	EXPECT_EQ(block->total_len, exp_total_len);
+
+	/* First block is a label. */
+	struct filter_block *curr_block = block;
+	ASSERT_NE(curr_block, NULL);
+	EXPECT_EQ(block->len, 1U);
+	EXPECT_LBL(curr_block->instrs);
+
+	/* Second block is SECCOMP_RET_ERRNO */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_EQ(curr_block->len, 1U);
+	EXPECT_EQ_STMT(curr_block->instrs,
+			BPF_RET+BPF_K,
+			SECCOMP_RET_ERRNO | (1 & SECCOMP_RET_DATA));
+
+	EXPECT_EQ(curr_block->next, NULL);
+
+	free_block_list(block);
+	free_label_strings(&self->labels);
+}
+
 TEST_F(arg_filter, invalid) {
 	const char *fragment = "argnn == 0";
 	int nr = 1;
