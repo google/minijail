@@ -597,6 +597,28 @@ void drop_ugid(const struct minijail *j)
 		pdie("setresuid");
 }
 
+/*
+ * We specifically do not use cap_valid() as that only tells us the last
+ * valid cap we were *compiled* against (i.e. what the version of kernel
+ * headers says).  If we run on a different kernel version, then it's not
+ * uncommon for that to be less (if an older kernel) or more (if a newer
+ * kernel).  So suck up the answer via /proc.
+ */
+static int run_cap_valid(unsigned int cap)
+{
+	static unsigned int last_cap;
+
+	if (!last_cap) {
+		const char cap_file[] = "/proc/sys/kernel/cap_last_cap";
+		FILE *fp = fopen(cap_file, "re");
+		if (fscanf(fp, "%u", &last_cap) != 1)
+			pdie("fscanf(%s)", cap_file);
+		fclose(fp);
+	}
+
+	return cap <= last_cap;
+}
+
 void drop_caps(const struct minijail *j)
 {
 	cap_t caps = cap_get_proc();
@@ -611,7 +633,7 @@ void drop_caps(const struct minijail *j)
 		die("can't clear effective caps");
 	if (cap_clear_flag(caps, CAP_PERMITTED))
 		die("can't clear permitted caps");
-	for (i = 0; i < sizeof(j->caps) * 8 && cap_valid((int)i); ++i) {
+	for (i = 0; i < sizeof(j->caps) * 8 && run_cap_valid(i); ++i) {
 		/* Keep CAP_SETPCAP for dropping bounding set bits. */
 		if (i != CAP_SETPCAP && !(j->caps & (one << i)))
 			continue;
@@ -632,7 +654,7 @@ void drop_caps(const struct minijail *j)
 	 * have been used above to raise a capability that wasn't already
 	 * present. This requires CAP_SETPCAP, so we raised/kept it above.
 	 */
-	for (i = 0; i < sizeof(j->caps) * 8 && cap_valid((int)i); ++i) {
+	for (i = 0; i < sizeof(j->caps) * 8 && run_cap_valid(i); ++i) {
 		if (j->caps & (one << i))
 			continue;
 		if (prctl(PR_CAPBSET_DROP, i))
