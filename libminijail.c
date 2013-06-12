@@ -1183,13 +1183,15 @@ int API minijail_wait(struct minijail *j)
 
 	if (!WIFEXITED(st)) {
 		if (WIFSIGNALED(st))
-			warn("child process received signal %d", WTERMSIG(st));
+			warn("child process %d received signal %d",
+			     j->initpid, WTERMSIG(st));
 		return MINIJAIL_ERR_JAIL;
 	}
 
 	int exit_status = WEXITSTATUS(st);
 	if (exit_status != 0)
-		info("child process exited with status %d", exit_status);
+		info("child process %d exited with status %d",
+		     j->initpid, exit_status);
 
 	return exit_status;
 }
