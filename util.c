@@ -4,10 +4,12 @@
  */
 
 #include <ctype.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "util.h"
 
+#include "libconstants.h"
 #include "libsyscalls.h"
 
 /*
@@ -54,6 +56,21 @@ const char *lookup_syscall_name(int nr)
 		if (entry->nr == nr)
 			return entry->name;
 	return NULL;
+}
+
+long int parse_constant(char *constant_str, char **endptr)
+{
+	const struct constant_entry *entry = constant_table;
+	for (; entry->name; ++entry) {
+		if (!strcmp(entry->name, constant_str)) {
+			if (endptr)
+				*endptr = constant_str + strlen(constant_str);
+
+			return entry->value;
+		}
+	}
+
+	return strtol(constant_str, endptr, 0);
 }
 
 char *strip(char *s)

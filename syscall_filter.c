@@ -182,7 +182,11 @@ int compile_atom(struct filter_block *head, char *atom,
 	if (argidx_ptr == argidx_str + 3)
 		return -1;
 
-	long int c = strtol(constant_str, NULL, 0);
+	char *constant_str_ptr;
+	long int c = parse_constant(constant_str, &constant_str_ptr);
+	if (constant_str_ptr == constant_str)
+		return -1;
+
 	/*
 	 * Looks up the label for the end of the AND statement
 	 * this atom belongs to.
@@ -220,10 +224,9 @@ int compile_errno(struct filter_block *head, char *ret_errno)
 
 	if (errno_val_str) {
 		char *errno_val_ptr;
-		int errno_val = strtol(
-				errno_val_str, &errno_val_ptr, 0);
+		int errno_val = parse_constant(errno_val_str, &errno_val_ptr);
 		/* Checks to see if we parsed an actual errno. */
-		if (errno_val_ptr == errno_val_str)
+		if (errno_val_ptr == errno_val_str || errno_val == -1)
 			return -1;
 
 		append_ret_errno(head, errno_val);

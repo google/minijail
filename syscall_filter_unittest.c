@@ -290,7 +290,7 @@ TEST_F(arg_filter, arg0_equals) {
 }
 
 TEST_F(arg_filter, arg0_mask) {
-	const char *fragment = "arg1 & 02";	/* O_RDWR */
+	const char *fragment = "arg1 & O_RDWR";
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
