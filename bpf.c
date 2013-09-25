@@ -10,18 +10,6 @@
 
 #include "bpf.h"
 
-/* Basic BPF instruction setter. */
-inline size_t set_bpf_instr(struct sock_filter *instr,
-		unsigned short code, unsigned int k,
-		unsigned char jt, unsigned char jf)
-{
-	instr->code = code;
-	instr->k = k;
-	instr->jt = jt;
-	instr->jf = jf;
-	return 1U;
-}
-
 /* Architecture validation. */
 size_t bpf_validate_arch(struct sock_filter *filter)
 {

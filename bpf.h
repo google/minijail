@@ -137,9 +137,16 @@ struct bpf_labels {
 };
 
 /* BPF instruction manipulation functions and macros. */
-inline size_t set_bpf_instr(struct sock_filter *instr,
-		unsigned short code, unsigned int k,
-		unsigned char jt, unsigned char jf);
+static inline size_t set_bpf_instr(struct sock_filter *instr,
+	unsigned short code, unsigned int k,
+	unsigned char jt, unsigned char jf)
+{
+	instr->code = code;
+	instr->k = k;
+	instr->jt = jt;
+	instr->jf = jf;
+	return 1U;
+}
 
 #define set_bpf_stmt(_block, _code, _k) \
 	set_bpf_instr((_block), (_code), (_k), 0, 0)
