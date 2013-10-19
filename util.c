@@ -10,12 +10,28 @@
 
 #include "libsyscalls.h"
 
+/*
+ * These are syscalls used by the syslog() C library call.  You can find them
+ * by running a simple test program.  See below for x86_64 behavior:
+ * $ cat test.c
+ * main() { syslog(0, "foo"); }
+ * $ gcc test.c -static
+ * $ strace ./a.out
+ * ...
+ * socket(PF_FILE, SOCK_DGRAM|SOCK_CLOEXEC, 0) = 3 <- look for socket connection
+ * connect(...)                                    <- important
+ * sendto(...)                                     <- important
+ * exit_group(0)                                   <- finish!
+ */
 #if defined(__x86_64__)
 const char *log_syscalls[] = { "connect", "sendto" };
 #elif defined(__i386__)
 const char *log_syscalls[] = { "socketcall", "time" };
 #elif defined(__arm__)
 const char *log_syscalls[] = { "connect", "gettimeofday", "send" };
+#elif defined(__powerpc__) || defined(__ia64__) || defined(__hppa__) || \
+      defined(__sparc__)
+const char *log_syscalls[] = { "connect", "send" };
 #else
 #error "Unsupported platform"
 #endif
