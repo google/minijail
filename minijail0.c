@@ -73,18 +73,20 @@ static void usage(const char *progn)
 {
 	size_t i;
 
-	printf("Usage: %s [-Ghnprsv] [-b <src>,<dest>[,<writeable>]] "
+	printf("Usage: %s [-Ghinprsv] [-b <src>,<dest>[,<writeable>]] "
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
 	       "<program> [args...]\n"
 	       "  -b:         binds <src> to <dest> in chroot. Multiple "
 	       "instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
-               "  -e          enter a network namespace\n"
+	       "  -e          enter a network namespace\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
 	       "  -H:         seccomp filter help message\n"
+	       "  -i:         exit immediately after fork (do not act as init)\n"
+	       "              Not compatible with -p\n"
 	       "  -L:         log blocked syscalls when using seccomp filter. "
 	       "Forces the following syscalls to be allowed:\n"
 	       "              ", progn);
@@ -112,12 +114,14 @@ static void seccomp_filter_usage(const char *progn)
 	printf("\nSee minijail0(5) for example policies.\n");
 }
 
-static int parse_args(struct minijail *j, int argc, char *argv[])
+static int parse_args(struct minijail *j, int argc, char *argv[],
+		      int *exit_immediately)
 {
 	int opt;
+	int use_pid_ns = 0;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHnpLe")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHinpLe")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -157,10 +161,26 @@ static int parse_args(struct minijail *j, int argc, char *argv[])
 			minijail_inherit_usergroups(j);
 			break;
 		case 'p':
+			if (*exit_immediately) {
+				fprintf(stderr,
+					"Could not enter pid namespace because "
+					"'-i' was specified.");
+				exit(1);
+			}
+			use_pid_ns = 1;
 			minijail_namespace_pids(j);
 			break;
 		case 'e':
 			minijail_namespace_net(j);
+			break;
+		case 'i':
+			if (use_pid_ns) {
+				fprintf(stderr,
+					"Could not disable init loop because "
+					"'-p' was specified.");
+				exit(1);
+			}
+			*exit_immediately = 1;
 			break;
 		case 'H':
 			seccomp_filter_usage(argv[0]);
@@ -183,7 +203,8 @@ static int parse_args(struct minijail *j, int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	struct minijail *j = minijail_new();
-	int consumed = parse_args(j, argc, argv);
+	int exit_immediately = 0;
+	int consumed = parse_args(j, argc, argv, &exit_immediately);
 	argc -= consumed;
 	argv += consumed;
 	if (access(argv[0], X_OK)) {
@@ -192,5 +213,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	minijail_run(j, argv[0], argv);
+	if (exit_immediately) {
+		info("not running init loop, exiting immediately");
+		return 0;
+	}
 	return minijail_wait(j);
 }
