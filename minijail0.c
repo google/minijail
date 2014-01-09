@@ -3,6 +3,7 @@
  * found in the LICENSE file.
  */
 
+#include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -203,13 +204,21 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 int main(int argc, char *argv[])
 {
 	struct minijail *j = minijail_new();
+	char *dl_mesg = NULL;
 	int exit_immediately = 0;
 	int consumed = parse_args(j, argc, argv, &exit_immediately);
 	argc -= consumed;
 	argv += consumed;
+	/* Check that we can access the target program. */
 	if (access(argv[0], X_OK)) {
 		fprintf(stderr, "Target program '%s' not accessible\n",
 		        argv[0]);
+		return 1;
+	}
+	/* Check that we can dlopen() libminijailpreload.so. */
+	if (!dlopen(PRELOADPATH, RTLD_LAZY | RTLD_LOCAL)) {
+		dl_mesg = dlerror();
+		fprintf(stderr, "dlopen(): %s\n", dl_mesg);
 		return 1;
 	}
 	minijail_run(j, argv[0], argv);

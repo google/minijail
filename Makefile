@@ -18,7 +18,7 @@ tests : libminijail_unittest.wrapper syscall_filter_unittest
 
 minijail0 : libsyscalls.gen.o libminijail.o syscall_filter.o \
 		signal.o bpf.o util.o minijail0.c
-	$(CC) $(CFLAGS) -o $@ $^ -lcap
+	$(CC) $(CFLAGS) -o $@ $^ -lcap -ldl
 
 libminijail.so : libminijail.o syscall_filter.o signal.o bpf.o util.o \
 		libsyscalls.gen.o
