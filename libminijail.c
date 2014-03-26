@@ -140,8 +140,9 @@ int API minijail_change_user(struct minijail *j, const char *user)
 	 * dangling but it's safe. ppw points at pw if getpwnam_r succeeded.
 	 */
 	free(buf);
+	/* getpwnam_r(3) does *not* set errno when |ppw| is NULL. */
 	if (!ppw)
-		return -errno;
+		return -1;
 	minijail_change_uid(j, ppw->pw_uid);
 	j->user = strdup(user);
 	if (!j->user)
@@ -173,8 +174,9 @@ int API minijail_change_group(struct minijail *j, const char *group)
 	 * dangling but it's safe. pgr points at gr if getgrnam_r succeeded.
 	 */
 	free(buf);
+	/* getgrnam_r(3) does *not* set errno when |pgr| is NULL. */
 	if (!pgr)
-		return -errno;
+		return -1;
 	minijail_change_gid(j, pgr->gr_gid);
 	return 0;
 }
