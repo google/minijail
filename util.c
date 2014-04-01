@@ -30,7 +30,7 @@ const char *log_syscalls[] = { "socketcall", "time" };
 #elif defined(__arm__)
 const char *log_syscalls[] = { "connect", "gettimeofday", "send" };
 #elif defined(__powerpc__) || defined(__ia64__) || defined(__hppa__) || \
-      defined(__sparc__)
+      defined(__sparc__) || defined(__mips__)
 const char *log_syscalls[] = { "connect", "send" };
 #else
 #error "Unsupported platform"

@@ -3,15 +3,18 @@
  * found in the LICENSE file.
  */
 
+/* These header files need to be included before asm/siginfo.h such that
+ * pid_t, timer_t, and clock_t are defined. */
+#include <stdlib.h>
+#include <unistd.h>
+
 #include <asm/siginfo.h>
 #define __have_siginfo_t 1
 #define __have_sigval_t 1
 #define __have_sigevent_t 1
 
 #include <signal.h>
-#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "signal.h"
 
