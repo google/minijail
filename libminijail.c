@@ -66,6 +66,10 @@ struct binding {
 };
 
 struct minijail {
+	/*
+	 * WARNING: if you add a flag here you need to make sure it's accounted for
+	 * in minijail_pre{enter|exec}() below.
+	 */
 	struct {
 		int uid:1;
 		int gid:1;
@@ -95,6 +99,38 @@ struct minijail {
 	struct binding *bindings_head;
 	struct binding *bindings_tail;
 };
+
+/*
+ * Strip out flags meant for the parent.
+ * We keep things that are not inherited across execve(2) (e.g. capabilities),
+ * or are easier to set after execve(2) (e.g. seccomp filters).
+ */
+void minijail_preenter(struct minijail *j)
+{
+	j->flags.vfs = 0;
+	j->flags.readonly = 0;
+	j->flags.pids = 0;
+}
+
+/*
+ * Strip out flags meant for the child.
+ * We keep things that are inherited across execve(2).
+ */
+void minijail_preexec(struct minijail *j)
+{
+	int vfs = j->flags.vfs;
+	int readonly = j->flags.readonly;
+	if (j->user)
+		free(j->user);
+	j->user = NULL;
+	memset(&j->flags, 0, sizeof(j->flags));
+	/* Now restore anything we meant to keep. */
+	j->flags.vfs = vfs;
+	j->flags.readonly = readonly;
+	/* Note, |pids| will already have been used before this call. */
+}
+
+/* Minijail API. */
 
 struct minijail API *minijail_new(void)
 {
@@ -495,28 +531,6 @@ clear_pointers:
 	j->chrootdir = NULL;
 out:
 	return ret;
-}
-
-void minijail_preenter(struct minijail *j)
-{
-	/* Strip out options which are minijail_run() only. */
-	j->flags.vfs = 0;
-	j->flags.readonly = 0;
-	j->flags.pids = 0;
-}
-
-void minijail_preexec(struct minijail *j)
-{
-	int vfs = j->flags.vfs;
-	int readonly = j->flags.readonly;
-	if (j->user)
-		free(j->user);
-	j->user = NULL;
-	memset(&j->flags, 0, sizeof(j->flags));
-	/* Now restore anything we meant to keep. */
-	j->flags.vfs = vfs;
-	j->flags.readonly = readonly;
-	/* Note, pidns will already have been used before this call. */
 }
 
 /* bind_one: Applies bindings from @b for @j, recursing as needed.
@@ -944,8 +958,8 @@ int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
 }
 
 int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
-			      char *const argv[], pid_t *pchild_pid,
-			      int *pstdin_fd, int *pstdout_fd, int *pstderr_fd)
+			       char *const argv[], pid_t *pchild_pid,
+			       int *pstdin_fd, int *pstdout_fd, int *pstderr_fd)
 {
 	char *oldenv, *oldenv_copy = NULL;
 	pid_t child_pid;
@@ -1133,7 +1147,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 			die("failed to set up stderr pipe");
 	}
 
-	/* Drop everything that cannot be inherited across execve. */
+	/* Strip out flags that cannot be inherited across execve. */
 	minijail_preexec(j);
 	/* Jail this process and its descendants... */
 	minijail_enter(j);
