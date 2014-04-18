@@ -518,6 +518,8 @@ TEST_F(filter, seccomp_mode1) {
 			__NR_rt_sigreturn);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
 			__NR_exit);
+	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET+BPF_K,
+			SECCOMP_RET_KILL);
 
 	free(actual.filter);
 	fclose(policy);
@@ -549,6 +551,8 @@ TEST_F(filter, seccomp_read_write) {
 			__NR_rt_sigreturn);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
 			__NR_exit);
+	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET+BPF_K,
+			SECCOMP_RET_KILL);
 
 	free(actual.filter);
 	fclose(policy);

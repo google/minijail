@@ -1198,10 +1198,25 @@ int API minijail_wait(struct minijail *j)
 		return -errno;
 
 	if (!WIFEXITED(st)) {
-		if (WIFSIGNALED(st))
+		int error_status = st;
+		if (WIFSIGNALED(st)) {
+			int signum = WTERMSIG(st);
 			warn("child process %d received signal %d",
-			     j->initpid, WTERMSIG(st));
-		return MINIJAIL_ERR_JAIL;
+			     j->initpid, signum);
+			/*
+			 * We return MINIJAIL_ERR_JAIL if the process received
+			 * SIGSYS, which happens when a syscall is blocked by
+			 * seccomp filters.
+			 * If not, we do what bash(1) does:
+			 * $? = 128 + signum
+			 */
+			if (signum == SIGSYS) {
+				error_status = MINIJAIL_ERR_JAIL;
+			} else {
+				error_status = 128 + signum;
+			}
+		}
+		return error_status;
 	}
 
 	int exit_status = WEXITSTATUS(st);
