@@ -85,6 +85,7 @@ struct minijail {
 		int seccomp_filter:1;
 		int log_seccomp_filter:1;
 		int chroot:1;
+		int mount_tmp:1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -284,6 +285,11 @@ int API minijail_enter_chroot(struct minijail *j, const char *dir) {
 		return -ENOMEM;
 	j->flags.chroot = 1;
 	return 0;
+}
+
+void API minijail_mount_tmp(struct minijail *j)
+{
+	j->flags.mount_tmp = 1;
 }
 
 int API minijail_bind(struct minijail *j, const char *src, const char *dest,
@@ -576,6 +582,11 @@ int enter_chroot(const struct minijail *j) {
 	return 0;
 }
 
+int mount_tmp(void)
+{
+	return mount("none", "/tmp", "tmpfs", 0, "size=128M,mode=777");
+}
+
 int remount_readonly(void)
 {
 	const char *kProcPath = "/proc";
@@ -746,6 +757,9 @@ void API minijail_enter(const struct minijail *j)
 
 	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");
+
+	if (j->flags.chroot && j->flags.mount_tmp && mount_tmp())
+		pdie("mount_tmp");
 
 	if (j->flags.readonly && remount_readonly())
 		pdie("remount");

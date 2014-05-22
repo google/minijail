@@ -74,14 +74,15 @@ static void usage(const char *progn)
 {
 	size_t i;
 
-	printf("Usage: %s [-Ghinprsv] [-b <src>,<dest>[,<writeable>]] "
+	printf("Usage: %s [-Ghinprsvt] [-b <src>,<dest>[,<writeable>]] "
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
 	       "<program> [args...]\n"
 	       "  -b:         binds <src> to <dest> in chroot. Multiple "
 	       "instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
-	       "  -e          enter a network namespace\n"
+	       "  -t:         mount tmpfs at /tmp inside chroot\n"
+	       "  -e:         enter a network namespace\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
@@ -120,9 +121,11 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 {
 	int opt;
 	int use_pid_ns = 0;
+	int chroot = 0;
+	int mount_tmp = 0;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHinpLe")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHinpLet")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -150,7 +153,13 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			use_caps(j, optarg);
 			break;
 		case 'C':
-			minijail_enter_chroot(j, optarg);
+			if (0 != minijail_enter_chroot(j, optarg))
+				exit(1);
+			chroot = 1;
+			break;
+		case 't':
+			minijail_mount_tmp(j);
+			mount_tmp = 1;
 			break;
 		case 'v':
 			minijail_namespace_vfs(j);
@@ -165,7 +174,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			if (*exit_immediately) {
 				fprintf(stderr,
 					"Could not enter pid namespace because "
-					"'-i' was specified.");
+					"'-i' was specified.\n");
 				exit(1);
 			}
 			use_pid_ns = 1;
@@ -178,7 +187,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			if (use_pid_ns) {
 				fprintf(stderr,
 					"Could not disable init loop because "
-					"'-p' was specified.");
+					"'-p' was specified.\n");
 				exit(1);
 			}
 			*exit_immediately = 1;
@@ -191,13 +200,21 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			exit(1);
 		}
 		if (optind < argc && argv[optind][0] != '-')
-			return optind;
+			break;
 	}
 
 	if (argc == optind) {
 		usage(argv[0]);
 		exit(1);
 	}
+
+	if (mount_tmp && !chroot) {
+		fprintf(stderr,
+		        "Could not mount tmpfs at /tmp "
+		        "because '-C' was not specified.\n");
+		exit(1);
+	}
+
 	return optind;
 }
 
