@@ -1076,7 +1076,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 
 	if (child_pid < 0) {
 		free(oldenv_copy);
-		return child_pid;
+		die("failed to fork child");
 	}
 
 	if (child_pid) {
@@ -1192,6 +1192,56 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	 *   -> init()-ing process
 	 *      -> execve()-ing process
 	 */
+	_exit(execve(filename, argv, environ));
+}
+
+int API minijail_run_static(struct minijail *j, const char *filename,
+			    char *const argv[])
+{
+	pid_t child_pid;
+	int pid_namespace = j->flags.pids;
+
+	if (j->flags.caps)
+		die("caps not supported with static targets");
+
+	if (pid_namespace)
+		child_pid = syscall(SYS_clone, CLONE_NEWPID | SIGCHLD, NULL);
+	else
+		child_pid = fork();
+
+	if (child_pid < 0) {
+		die("failed to fork child");
+	}
+	if (child_pid > 0 ) {
+		j->initpid = child_pid;
+		return 0;
+	}
+
+	/*
+	 * We can now drop this child into the sandbox
+	 * then execve the target.
+	 */
+
+	j->flags.pids = 0;
+	minijail_enter(j);
+
+	if (pid_namespace) {
+		/*
+		 * pid namespace: this process will become init inside the new
+		 * namespace, so fork off a child to actually run the program
+		 * (we don't want all programs we might exec to have to know
+		 * how to be init).
+		 *
+		 * If we're multithreaded, we'll probably deadlock here. See
+		 * WARNING above.
+		 */
+		child_pid = fork();
+		if (child_pid < 0)
+			_exit(child_pid);
+		else if (child_pid > 0)
+			init(child_pid);	/* never returns */
+	}
+
 	_exit(execve(filename, argv, environ));
 }
 

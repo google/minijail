@@ -17,7 +17,7 @@ all : minijail0 libminijail.so libminijailpreload.so
 tests : libminijail_unittest.wrapper syscall_filter_unittest
 
 minijail0 : libsyscalls.gen.o libminijail.o syscall_filter.o \
-		signal.o bpf.o util.o minijail0.c
+		signal.o bpf.o util.o elfparse.o minijail0.c
 	$(CC) $(CFLAGS) -o $@ $^ -lcap -ldl
 
 libminijail.so : libminijail.o syscall_filter.o signal.o bpf.o util.o \
@@ -62,6 +62,8 @@ signal.o : signal.c signal.h
 bpf.o : bpf.c bpf.h
 
 util.o : util.c util.h
+
+elfparse.o : elfparse.c elfparse.h
 
 # Only regenerate libsyscalls.gen.c if the Makefile or header changes.
 # NOTE! This will not detect if the file is not appropriate for the target.

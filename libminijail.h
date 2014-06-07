@@ -103,6 +103,12 @@ int minijail_run(struct minijail *j, const char *filename,
 		 char *const argv[]);
 
 /* Run the specified command in the given minijail, execve(3)-style.
+ * Used with static binaries.
+ */
+int minijail_run_static(struct minijail *j, const char *filename,
+			char *const argv[]);
+
+/* Run the specified command in the given minijail, execve(3)-style.
  * Update |*pchild_pid| with the pid of the child.
  */
 int minijail_run_pid(struct minijail *j, const char *filename,

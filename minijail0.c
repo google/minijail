@@ -12,6 +12,7 @@
 #include "libminijail.h"
 #include "libsyscalls.h"
 
+#include "elfparse.h"
 #include "util.h"
 
 static void set_user(struct minijail *j, const char *arg)
@@ -224,6 +225,7 @@ int main(int argc, char *argv[])
 	char *dl_mesg = NULL;
 	int exit_immediately = 0;
 	int consumed = parse_args(j, argc, argv, &exit_immediately);
+	ElfType elftype = ELFERROR;
 	argc -= consumed;
 	argv += consumed;
 	/* Check that we can access the target program. */
@@ -232,13 +234,30 @@ int main(int argc, char *argv[])
 		        argv[0]);
 		return 1;
 	}
-	/* Check that we can dlopen() libminijailpreload.so. */
-	if (!dlopen(PRELOADPATH, RTLD_LAZY | RTLD_LOCAL)) {
-		dl_mesg = dlerror();
-		fprintf(stderr, "dlopen(): %s\n", dl_mesg);
+	/* Check if target is statically or dynamically linked. */
+	elftype = get_elf_linkage(argv[0]);
+	if (elftype == ELFSTATIC) {
+		/* Target binary is static. */
+		minijail_run_static(j, argv[0], argv);
+	} else if (elftype == ELFDYNAMIC) {
+		/*
+		 * Target binary is dynamically linked so we can
+		 * inject libminijailpreload.so into it.
+		 */
+
+		/* Check that we can dlopen() libminijailpreload.so. */
+		if (!dlopen(PRELOADPATH, RTLD_LAZY | RTLD_LOCAL)) {
+			    dl_mesg = dlerror();
+			    fprintf(stderr, "dlopen(): %s\n", dl_mesg);
+			    return 1;
+		}
+		minijail_run(j, argv[0], argv);
+	} else {
+		fprintf(stderr, "Target program '%s' is not an ELF executable.\n",
+		        argv[0]);
 		return 1;
 	}
-	minijail_run(j, argv[0], argv);
+
 	if (exit_immediately) {
 		info("not running init loop, exiting immediately");
 		return 0;
