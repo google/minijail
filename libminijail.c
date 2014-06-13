@@ -67,8 +67,8 @@ struct binding {
 
 struct minijail {
 	/*
-	 * WARNING: if you add a flag here you need to make sure it's accounted for
-	 * in minijail_pre{enter|exec}() below.
+	 * WARNING: if you add a flag here you need to make sure it's
+	 * accounted for in minijail_pre{enter|exec}() below.
 	 */
 	struct {
 		int uid:1;
@@ -277,7 +277,8 @@ void API minijail_disable_ptrace(struct minijail *j)
 	j->flags.ptrace = 1;
 }
 
-int API minijail_enter_chroot(struct minijail *j, const char *dir) {
+int API minijail_enter_chroot(struct minijail *j, const char *dir)
+{
 	if (j->chrootdir)
 		return -EINVAL;
 	j->chrootdir = strdup(dir);
@@ -293,7 +294,8 @@ void API minijail_mount_tmp(struct minijail *j)
 }
 
 int API minijail_bind(struct minijail *j, const char *src, const char *dest,
-                      int writeable) {
+		      int writeable)
+{
 	struct binding *b;
 
 	if (*dest != '/')
@@ -426,7 +428,8 @@ int minijail_marshal(const struct minijail *j, char *buf, size_t available)
  *
  * Returns a pointer to the base of the bytes, or NULL for errors.
  */
-void *consumebytes(size_t length, char **buf, size_t *buflength) {
+void *consumebytes(size_t length, char **buf, size_t *buflength)
+{
 	char *p = *buf;
 	if (length > *buflength)
 		return NULL;
@@ -441,7 +444,8 @@ void *consumebytes(size_t length, char **buf, size_t *buflength) {
  *
  * Returns a pointer to the base of the string, or NULL for errors.
  */
-char *consumestr(char **buf, size_t *buflength) {
+char *consumestr(char **buf, size_t *buflength)
+{
 	size_t len = strnlen(*buf, *buflength);
 	if (len == *buflength)
 		/* There's no null-terminator */
@@ -545,7 +549,8 @@ out:
  *
  * Returns 0 for success.
  */
-int bind_one(const struct minijail *j, struct binding *b) {
+int bind_one(const struct minijail *j, struct binding *b)
+{
 	int ret = 0;
 	char *dest = NULL;
 	if (ret)
@@ -568,7 +573,8 @@ int bind_one(const struct minijail *j, struct binding *b) {
 	return ret;
 }
 
-int enter_chroot(const struct minijail *j) {
+int enter_chroot(const struct minijail *j)
+{
 	int ret;
 	if (j->bindings_head && (ret = bind_one(j, j->bindings_head)))
 		return ret;

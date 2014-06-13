@@ -57,7 +57,8 @@ static void use_caps(struct minijail *j, const char *arg)
 	minijail_use_caps(j, caps);
 }
 
-static void add_binding(struct minijail *j, char *arg) {
+static void add_binding(struct minijail *j, char *arg)
+{
 	char *src = strtok(arg, ",");
 	char *dest = strtok(NULL, ",");
 	char *flags = strtok(NULL, ",");
@@ -82,7 +83,6 @@ static void usage(const char *progn)
 	       "instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
-	       "  -t:         mount tmpfs at /tmp inside chroot\n"
 	       "  -e:         enter a network namespace\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
@@ -103,6 +103,7 @@ static void usage(const char *progn)
 	       "  -s:         use seccomp\n"
 	       "  -S <file>:  set seccomp filter using <file>\n"
 	       "              E.g., -S /usr/share/filters/<prog>.$(uname -m)\n"
+	       "  -t:         mount tmpfs at /tmp inside chroot\n"
 	       "  -u <user>:  change uid to <user>\n"
 	       "  -v:         use vfs namespace\n");
 }
@@ -231,7 +232,7 @@ int main(int argc, char *argv[])
 	/* Check that we can access the target program. */
 	if (access(argv[0], X_OK)) {
 		fprintf(stderr, "Target program '%s' not accessible\n",
-		        argv[0]);
+			argv[0]);
 		return 1;
 	}
 	/* Check if target is statically or dynamically linked. */

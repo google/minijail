@@ -68,7 +68,8 @@ char *strip(char *s)
 	return s;
 }
 
-char *tokenize(char **stringp, const char *delim) {
+char *tokenize(char **stringp, const char *delim)
+{
 	char *ret = NULL;
 
 	/* If the string is NULL or empty, there are no tokens to be found. */

@@ -112,7 +112,8 @@ void append_ret_errno(struct filter_block *head, int errno_val)
 	append_filter_block(head, filter, ONE_INSTR);
 }
 
-void append_allow_syscall(struct filter_block *head, int nr) {
+void append_allow_syscall(struct filter_block *head, int nr)
+{
 	struct sock_filter *filter = new_instr_buf(ALLOW_SYSCALL_LEN);
 	size_t len = bpf_allow_syscall(filter, nr);
 	if (len != ALLOW_SYSCALL_LEN)
@@ -204,7 +205,8 @@ int compile_atom(struct filter_block *head, char *atom,
 	return 0;
 }
 
-int compile_errno(struct filter_block *head, char *ret_errno) {
+int compile_errno(struct filter_block *head, char *ret_errno)
+{
 	char *errno_ptr;
 
 	/* Splits the 'return' keyword and the actual errno value. */
