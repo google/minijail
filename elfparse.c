@@ -99,6 +99,11 @@ ElfType get_elf_linkage(const char *path)
 				ret = ELFDYNAMIC;
 			}
 		} else {
+			/*
+			 * The file is smaller than |HEADERSIZE| bytes.
+			 * We assume it's a short script. See above for
+			 * reasoning on scripts.
+			 */
 			ret = ELFDYNAMIC;
 		}
 		fclose(elf_file);

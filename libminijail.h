@@ -85,7 +85,7 @@ void minijail_mount_tmp(struct minijail *j);
  * of minijail_bind() calls.
  */
 int minijail_bind(struct minijail *j, const char *src, const char *dest,
-                  int writeable);
+		  int writeable);
 
 /* Lock this process into the given minijail. Note that this procedure cannot fail,
  * since there is no way to undo privilege-dropping; therefore, if any part of

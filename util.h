@@ -13,18 +13,18 @@
 #include <syslog.h>
 
 #define die(_msg, ...) do { \
-        syslog(LOG_ERR, "libminijail: " _msg, ## __VA_ARGS__); \
-        abort(); \
+	syslog(LOG_ERR, "libminijail: " _msg, ## __VA_ARGS__); \
+	abort(); \
 } while (0)
 
 #define pdie(_msg, ...) \
-        die(_msg ": %s", ## __VA_ARGS__, strerror(errno))
+	die(_msg ": %s", ## __VA_ARGS__, strerror(errno))
 
 #define warn(_msg, ...) \
-        syslog(LOG_WARNING, "libminijail: " _msg, ## __VA_ARGS__)
+	syslog(LOG_WARNING, "libminijail: " _msg, ## __VA_ARGS__)
 
 #define info(_msg, ...) \
-        syslog(LOG_INFO, "libminijail: " _msg, ## __VA_ARGS__)
+	syslog(LOG_INFO, "libminijail: " _msg, ## __VA_ARGS__)
 
 extern const char *log_syscalls[];
 extern const size_t log_syscalls_len;

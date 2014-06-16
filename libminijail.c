@@ -563,7 +563,7 @@ int bind_one(const struct minijail *j, struct binding *b)
 		pdie("bind: %s -> %s", b->src, dest);
 	if (!b->writeable) {
 		ret = mount(b->src, dest, NULL,
-		            MS_BIND | MS_REMOUNT | MS_RDONLY, NULL);
+			    MS_BIND | MS_REMOUNT | MS_RDONLY, NULL);
 		if (ret)
 			pdie("bind ro: %s -> %s", b->src, dest);
 	}

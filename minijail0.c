@@ -67,7 +67,7 @@ static void add_binding(struct minijail *j, char *arg)
 		exit(1);
 	}
 	if (minijail_bind(j, src, dest, flags ? atoi(flags) : 0)) {
-		fprintf(stderr, "Bind failure\n");
+		fprintf(stderr, "Bind failure.\n");
 		exit(1);
 	}
 }
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
 	argv += consumed;
 	/* Check that we can access the target program. */
 	if (access(argv[0], X_OK)) {
-		fprintf(stderr, "Target program '%s' not accessible\n",
+		fprintf(stderr, "Target program '%s' is not accessible.\n",
 			argv[0]);
 		return 1;
 	}
@@ -254,8 +254,9 @@ int main(int argc, char *argv[])
 		}
 		minijail_run(j, argv[0], argv);
 	} else {
-		fprintf(stderr, "Target program '%s' is not an ELF executable.\n",
-		        argv[0]);
+		fprintf(stderr,
+			"Target program '%s' is not a valid ELF file.\n",
+			argv[0]);
 		return 1;
 	}
 
