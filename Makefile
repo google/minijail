@@ -81,5 +81,5 @@ clean : test-clean
 	@rm -f libminijail.so
 	@rm -f libminijail_unittest
 	@rm -f libsyscalls.gen.o libsyscalls.gen.c
-	@rm -f syscall_filter.o signal.o bpf.o util.o
+	@rm -f syscall_filter.o signal.o bpf.o util.o elfparse.o
 	@rm -f syscall_filter_unittest syscall_filter_unittest.o

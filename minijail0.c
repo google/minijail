@@ -83,7 +83,7 @@ static void usage(const char *progn)
 	       "instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
-	       "  -e:         enter a network namespace\n"
+	       "  -e:         enter new network namespace\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
@@ -98,14 +98,15 @@ static void usage(const char *progn)
 
 	printf("\n"
 	       "  -n:         set no_new_privs\n"
-	       "  -p:         use pid namespace (implies -vr)\n"
-	       "  -r:         remount /proc readonly (implies -v)\n"
+	       "  -p:         enter new pid namespace (implies -vr)\n"
+	       "  -r:         remount /proc read-only (implies -v)\n"
 	       "  -s:         use seccomp\n"
 	       "  -S <file>:  set seccomp filter using <file>\n"
 	       "              E.g., -S /usr/share/filters/<prog>.$(uname -m)\n"
 	       "  -t:         mount tmpfs at /tmp inside chroot\n"
 	       "  -u <user>:  change uid to <user>\n"
-	       "  -v:         use vfs namespace\n");
+	       "  -v:         enter new mount namespace\n"
+	       "  -V <file>:  enter specified mount namespace\n");
 }
 
 static void seccomp_filter_usage(const char *progn)
@@ -127,7 +128,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int mount_tmp = 0;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:vrGhHinpLet")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:vrGhHinpLet")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -155,8 +156,10 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			use_caps(j, optarg);
 			break;
 		case 'C':
-			if (0 != minijail_enter_chroot(j, optarg))
+			if (0 != minijail_enter_chroot(j, optarg)) {
+				fprintf(stderr, "Could not set chroot.\n");
 				exit(1);
+			}
 			chroot = 1;
 			break;
 		case 't':
@@ -165,6 +168,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		case 'v':
 			minijail_namespace_vfs(j);
+			break;
+		case 'V':
+			minijail_namespace_enter_vfs(j, optarg);
 			break;
 		case 'r':
 			minijail_remount_readonly(j);

@@ -10,6 +10,7 @@
 #include <asm/unistd.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <grp.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -27,6 +28,8 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/prctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/user.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -75,6 +78,7 @@ struct minijail {
 		int gid:1;
 		int caps:1;
 		int vfs:1;
+		int enter_vfs:1;
 		int pids:1;
 		int net:1;
 		int seccomp:1;
@@ -93,6 +97,7 @@ struct minijail {
 	char *user;
 	uint64_t caps;
 	pid_t initpid;
+	int mountns_fd;
 	int filter_len;
 	int binding_count;
 	char *chrootdir;
@@ -109,6 +114,7 @@ struct minijail {
 void minijail_preenter(struct minijail *j)
 {
 	j->flags.vfs = 0;
+	j->flags.enter_vfs = 0;
 	j->flags.readonly = 0;
 	j->flags.pids = 0;
 }
@@ -120,6 +126,7 @@ void minijail_preenter(struct minijail *j)
 void minijail_preexec(struct minijail *j)
 {
 	int vfs = j->flags.vfs;
+	int enter_vfs = j->flags.enter_vfs;
 	int readonly = j->flags.readonly;
 	if (j->user)
 		free(j->user);
@@ -127,6 +134,7 @@ void minijail_preexec(struct minijail *j)
 	memset(&j->flags, 0, sizeof(j->flags));
 	/* Now restore anything we meant to keep. */
 	j->flags.vfs = vfs;
+	j->flags.enter_vfs = enter_vfs;
 	j->flags.readonly = readonly;
 	/* Note, |pids| will already have been used before this call. */
 }
@@ -247,6 +255,16 @@ void API minijail_use_caps(struct minijail *j, uint64_t capmask)
 void API minijail_namespace_vfs(struct minijail *j)
 {
 	j->flags.vfs = 1;
+}
+
+void API minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path)
+{
+	int ns_fd = open(ns_path, O_RDONLY);
+	if (ns_fd < 0) {
+		pdie("failed to open namespace '%s'", ns_path);
+	}
+	j->mountns_fd = ns_fd;
+	j->flags.enter_vfs = 1;
 }
 
 void API minijail_namespace_pids(struct minijail *j)
@@ -745,7 +763,7 @@ void API minijail_enter(const struct minijail *j)
 {
 	if (j->flags.pids)
 		die("tried to enter a pid-namespaced jail;"
-		    "try minijail_run()?");
+		    " try minijail_run()?");
 
 	if (j->flags.usergroups && !j->user)
 		die("usergroup inheritance without username");
@@ -755,6 +773,9 @@ void API minijail_enter(const struct minijail *j)
 	 * so we don't even try. If any of our operations fail, we abort() the
 	 * entire process.
 	 */
+	if (j->flags.enter_vfs && setns(j->mountns_fd, CLONE_NEWNS))
+		pdie("setns(CLONE_NEWNS)");
+
 	if (j->flags.vfs && unshare(CLONE_NEWNS))
 		pdie("unshare(vfs)");
 
