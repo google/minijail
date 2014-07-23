@@ -123,9 +123,12 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		      int *exit_immediately)
 {
 	int opt;
-	int use_pid_ns = 0;
 	int chroot = 0;
 	int mount_tmp = 0;
+	int use_pid_ns = 0;
+	int use_seccomp_filter = 0;
+	const size_t path_max = 4096;
+	const char *filter_path;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
 	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:vrGhHinpLet")) != -1) {
@@ -143,8 +146,19 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_use_seccomp(j);
 			break;
 		case 'S':
-			minijail_parse_seccomp_filters(j, optarg);
 			minijail_use_seccomp_filter(j);
+			if (strlen(optarg) >= path_max) {
+				fprintf(stderr,
+					"Filter path is too long.\n");
+				exit(1);
+			}
+			filter_path = strndup(optarg, path_max);
+			if (!filter_path) {
+				fprintf(stderr,
+					"Could not strndup(3) filter path.\n");
+				exit(1);
+			}
+			use_seccomp_filter = 1;
 			break;
 		case 'L':
 			minijail_log_seccomp_filter_failures(j);
@@ -211,6 +225,15 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 	}
 
+	/*
+	 * We parse seccomp filters here to make sure we've collected all
+	 * cmdline options.
+	 */
+	if (use_seccomp_filter) {
+		minijail_parse_seccomp_filters(j, filter_path);
+		free((void*)filter_path);
+	}
+
 	if (argc == optind) {
 		usage(argv[0]);
 		exit(1);
@@ -235,12 +258,14 @@ int main(int argc, char *argv[])
 	ElfType elftype = ELFERROR;
 	argc -= consumed;
 	argv += consumed;
+
 	/* Check that we can access the target program. */
 	if (access(argv[0], X_OK)) {
 		fprintf(stderr, "Target program '%s' is not accessible.\n",
 			argv[0]);
 		return 1;
 	}
+
 	/* Check if target is statically or dynamically linked. */
 	elftype = get_elf_linkage(argv[0]);
 	if (elftype == ELFSTATIC) {
