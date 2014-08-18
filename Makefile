@@ -11,6 +11,9 @@ CFLAGS += -fvisibility=internal
 ifneq ($(HAVE_SECUREBITS_H),no)
 CFLAGS += -DHAVE_SECUREBITS_H
 endif
+ifneq ($(USE_seccomp),yes)
+CFLAGS += -DUSE_SECCOMP_SOFTFAIL
+endif
 
 all : minijail0 libminijail.so libminijailpreload.so
 

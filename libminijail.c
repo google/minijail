@@ -61,6 +61,12 @@
 # define SECCOMP_MODE_FILTER 2 /* uses user-supplied filter. */
 #endif
 
+#ifdef USE_SECCOMP_SOFTFAIL
+# define SECCOMP_SOFTFAIL 1
+#else
+# define SECCOMP_SOFTFAIL 0
+#endif
+
 struct binding {
 	char *src;
 	char *dest;
@@ -355,6 +361,12 @@ error:
 
 void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
+	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL)) {
+		if ((errno == ENOSYS) && SECCOMP_SOFTFAIL) {
+			warn("not loading seccomp filter, seccomp not supported");
+			return;
+		}
+	}
 	FILE *file = fopen(path, "r");
 	if (!file) {
 		pdie("failed to open seccomp filter file '%s'", path);
@@ -754,8 +766,13 @@ void set_seccomp_filter(const struct minijail *j)
 	 * Install the syscall filter.
 	 */
 	if (j->flags.seccomp_filter) {
-		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, j->filter_prog))
+		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, j->filter_prog)) {
+			if ((errno == ENOSYS) && SECCOMP_SOFTFAIL) {
+				warn("seccomp not supported");
+				return;
+			}
 			pdie("prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER)");
+		}
 	}
 }
 
@@ -835,8 +852,13 @@ void API minijail_enter(const struct minijail *j)
 	 * seccomp has to come last since it cuts off all the other
 	 * privilege-dropping syscalls :)
 	 */
-	if (j->flags.seccomp && prctl(PR_SET_SECCOMP, 1))
+	if (j->flags.seccomp && prctl(PR_SET_SECCOMP, 1)) {
+		if ((errno == ENOSYS) && SECCOMP_SOFTFAIL) {
+			warn("seccomp not supported");
+			return;
+		}
 		pdie("prctl(PR_SET_SECCOMP)");
+	}
 }
 
 /* TODO(wad) will visibility affect this variable? */
