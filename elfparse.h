@@ -89,21 +89,15 @@ typedef struct
 #pragma pack(pop)
 /* End of definitions from elf.h */
 
-
-#define ELFERROR    0
-#define ELFSTATIC   1
-#define ELFDYNAMIC  2
+enum ElfTypeEnum { ELFERROR=0, ELFSTATIC=1, ELFDYNAMIC=2 };
+typedef enum ElfTypeEnum ElfType;
 
 /*
- * This is the inital amout of the elf we try and read.
+ * This is the initial amount of the ELF file we try and read.
  * It is the same value that the kernel uses (BINPRM_BUF_SIZE).
  */
 #define HEADERSIZE  128
 
-typedef int ElfType;
-
 ElfType get_elf_linkage(const char *path);
-
-
 
 #endif /* _ELFPARSE_H_ */
