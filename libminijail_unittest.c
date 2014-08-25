@@ -143,6 +143,8 @@ TEST_F(marshal, 0xff) {
   EXPECT_EQ(-EINVAL, minijail_unmarshal(self->j, self->buf, sizeof(self->buf)));
 }
 
+/*
+ * TODO(jorgelo): rewrite these tests to not depend on libminijailpreload.so.
 TEST(test_minijail_run_pid_pipe) {
   pid_t pid;
   int child_stdin;
@@ -218,5 +220,6 @@ TEST(test_minijail_run_pid_pipes) {
 
   minijail_destroy(j);
 }
+*/
 
 TEST_HARNESS_MAIN

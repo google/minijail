@@ -2,87 +2,61 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+include common.mk
+
 LIBDIR = lib
 PRELOADNAME = libminijailpreload.so
 PRELOADPATH = \"/$(LIBDIR)/$(PRELOADNAME)\"
-CFLAGS += -fPIC -Wall -Wextra -Werror -DPRELOADPATH="$(PRELOADPATH)"
-CFLAGS += -fvisibility=internal
+CPPFLAGS += -DPRELOADPATH="$(PRELOADPATH)"
 
 ifneq ($(HAVE_SECUREBITS_H),no)
-CFLAGS += -DHAVE_SECUREBITS_H
+CPPFLAGS += -DHAVE_SECUREBITS_H
 endif
 ifneq ($(USE_seccomp),yes)
-CFLAGS += -DUSE_SECCOMP_SOFTFAIL
+CPPFLAGS += -DUSE_SECCOMP_SOFTFAIL
 endif
 
-all : minijail0 libminijail.so libminijailpreload.so
+all: CC_BINARY(minijail0) CC_LIBRARY(libminijail.so) \
+		CC_LIBRARY(libminijailpreload.so)
 
-tests : libminijail_unittest.wrapper syscall_filter_unittest
+# TODO(jorgelo): convert to TEST().
+tests: CC_BINARY(libminijail_unittest) CC_BINARY(syscall_filter_unittest)
 
-minijail0 : libsyscalls.gen.o libminijail.o syscall_filter.o \
-		signal.o bpf.o util.o elfparse.o minijail0.c
-	$(CC) $(CFLAGS) -o $@ $^ -lcap -ldl
+CC_BINARY(minijail0): LDLIBS += -lcap -ldl
+CC_BINARY(minijail0): libsyscalls.gen.o libminijail.o syscall_filter.o \
+		signal.o bpf.o util.o elfparse.o minijail0.o
+clean: CLEAN(minijail0)
 
-libminijail.so : libminijail.o syscall_filter.o signal.o bpf.o util.o \
-		libsyscalls.gen.o
-	$(CC) $(CFLAGS) -shared -o $@ $^ -lcap
+CC_LIBRARY(libminijail.so): LDLIBS += -lcap
+CC_LIBRARY(libminijail.so): libminijail.o syscall_filter.o signal.o bpf.o \
+		util.o libsyscalls.gen.o
+clean: CLEAN(libminijail.so)
 
-# Allow unittests to access what are normally internal symbols.
-libminijail_unittest.wrapper :
-	$(MAKE) $(MAKEARGS) test-clean
-	$(MAKE) $(MAKEARGS) libminijail_unittest
-	$(MAKE) $(MAKEARGS) test-clean
-
-libminijail_unittest : CFLAGS := $(filter-out -fvisibility=%,$(CFLAGS))
-libminijail_unittest : CFLAGS := $(filter-out -DPRELOADPATH=%,$(CFLAGS))
-libminijail_unittest : CFLAGS := $(CFLAGS) -DPRELOADPATH=\"./$(PRELOADNAME)\"
-libminijail_unittest : libminijail_unittest.o libminijail.o \
+CC_BINARY(libminijail_unittest): LDLIBS += -lcap
+CC_BINARY(libminijail_unittest): libminijail_unittest.o libminijail.o \
 		syscall_filter.o signal.o bpf.o util.o libsyscalls.gen.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(filter-out $(CFLAGS_FILE),$^) -lcap
+clean: CLEAN(libminijail_unittest)
 
-libminijailpreload.so : libminijailpreload.c libminijail.o libsyscalls.gen.o \
-		syscall_filter.o signal.o bpf.o util.o
-	$(CC) $(CFLAGS) -shared -o $@ $^ -ldl -lcap
+CC_LIBRARY(libminijailpreload.so): LDLIBS += -lcap -ldl
+CC_LIBRARY(libminijailpreload.so): libminijailpreload.o libminijail.o \
+		libsyscalls.gen.o syscall_filter.o signal.o bpf.o util.o
+clean: CLEAN(libminijailpreload.so)
 
-libminijail.o : libminijail.c libminijail.h
-
-libminijail_unittest.o : libminijail_unittest.c test_harness.h
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-libsyscalls.gen.o : libsyscalls.gen.c libsyscalls.h
-
-syscall_filter_unittest : syscall_filter_unittest.o syscall_filter.o \
+CC_BINARY(syscall_filter_unittest): syscall_filter_unittest.o syscall_filter.o \
 		bpf.o util.o libsyscalls.gen.o
-	$(CC) $(CFLAGS) -o $@ $^
+clean: CLEAN(syscall_filter_unittest)
 
-syscall_filter_unittest.o : syscall_filter_unittest.c test_harness.h
-	$(CC) $(CFLAGS) -c -o $@ $<
+libsyscalls.gen.o: CPPFLAGS += -I$(SRC)
 
-syscall_filter.o : syscall_filter.c syscall_filter.h
-
-signal.o : signal.c signal.h
-
-bpf.o : bpf.c bpf.h
-
-util.o : util.c util.h
-
-elfparse.o : elfparse.c elfparse.h
+libsyscalls.gen.o.depends: libsyscalls.gen.c
 
 # Only regenerate libsyscalls.gen.c if the Makefile or header changes.
 # NOTE! This will not detect if the file is not appropriate for the target.
-libsyscalls.gen.c : Makefile libsyscalls.h
-	@printf "Generating target-arch specific $@ . . . "
-	@./gen_syscalls.sh $@
+# TODO(jorgelo): fix generation when 'CC' env variable is not set.
+libsyscalls.gen.c: $(SRC)/Makefile $(SRC)/libsyscalls.h
+	@printf "Generating target-arch specific $@... "
+	$(QUIET)$(SRC)/gen_syscalls.sh $@
 	@printf "done.\n"
+clean: CLEAN(libsyscalls.gen.c)
 
-# Only clean up files affected by the CFLAGS change for testing.
-test-clean :
-	@rm -f libminijail.o libminijail_unittest.o
-
-clean : test-clean
-	@rm -f libminijail.o libminijailpreload.so minijail0
-	@rm -f libminijail.so
-	@rm -f libminijail_unittest
-	@rm -f libsyscalls.gen.o libsyscalls.gen.c
-	@rm -f syscall_filter.o signal.o bpf.o util.o elfparse.o
-	@rm -f syscall_filter_unittest syscall_filter_unittest.o
+$(eval $(call add_object_rules,libsyscalls.gen.o,CC,c,CFLAGS))
