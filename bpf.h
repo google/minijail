@@ -72,10 +72,18 @@ struct seccomp_data {
 #elif defined(__ia64__)
 #define ARCH_NR AUDIT_ARCH_IA64
 #elif defined(__mips__)
-# if defined(__MIPSEB__)
+# if defined(__mips64)
+#  if defined(__MIPSEB__)
 #define ARCH_NR AUDIT_ARCH_MIPS64
-# else
+#  else
 #define ARCH_NR AUDIT_ARCH_MIPSEL64
+#  endif
+# else
+#  if defined(__MIPSEB__)
+#define ARCH_NR AUDIT_ARCH_MIPS
+#  else
+#define ARCH_NR AUDIT_ARCH_MIPSEL
+#  endif
 # endif
 #elif defined(__powerpc64__)
 #define ARCH_NR AUDIT_ARCH_PPC64
