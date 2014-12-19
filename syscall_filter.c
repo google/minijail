@@ -125,8 +125,10 @@ void append_allow_syscall(struct filter_block *head, int nr)
 void allow_log_syscalls(struct filter_block *head)
 {
 	unsigned int i;
-	for (i = 0; i < log_syscalls_len; i++)
+	for (i = 0; i < log_syscalls_len; i++) {
+		warn("allowing syscall: %s", log_syscalls[i]);
 		append_allow_syscall(head, lookup_syscall(log_syscalls[i]));
+	}
 }
 
 unsigned int get_label_id(struct bpf_labels *labels, const char *label_str)

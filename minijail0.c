@@ -90,9 +90,9 @@ static void usage(const char *progn)
 	       "  -H:         seccomp filter help message\n"
 	       "  -i:         exit immediately after fork (do not act as init)\n"
 	       "              Not compatible with -p\n"
-	       "  -L:         log blocked syscalls when using seccomp filter. "
-	       "Forces the following syscalls to be allowed:\n"
-	       "              ", progn);
+	       "  -L:         report blocked syscalls to syslog when using seccomp filter.\n"
+	       "              Forces the following syscalls to be allowed:\n"
+	       "                  ", progn);
 	for (i = 0; i < log_syscalls_len; i++)
 		printf("%s ", log_syscalls[i]);
 
@@ -103,6 +103,7 @@ static void usage(const char *progn)
 	       "  -s:         use seccomp\n"
 	       "  -S <file>:  set seccomp filter using <file>\n"
 	       "              E.g., -S /usr/share/filters/<prog>.$(uname -m)\n"
+	       "              Requires -n when not running as root\n"
 	       "  -t:         mount tmpfs at /tmp inside chroot\n"
 	       "  -u <user>:  change uid to <user>\n"
 	       "  -v:         enter new mount namespace\n"
