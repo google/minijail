@@ -18,7 +18,7 @@
 } while (0)
 
 #define pdie(_msg, ...) \
-	die(_msg ": %s", ## __VA_ARGS__, strerror(errno))
+	die(_msg ": %m", ## __VA_ARGS__)
 
 #define warn(_msg, ...) \
 	syslog(LOG_WARNING, "libminijail: " _msg, ## __VA_ARGS__)
