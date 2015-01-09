@@ -126,7 +126,6 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int opt;
 	int chroot = 0;
 	int mount_tmp = 0;
-	int use_pid_ns = 0;
 	int use_seccomp_filter = 0;
 	const size_t path_max = 4096;
 	const char *filter_path;
@@ -194,25 +193,12 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_inherit_usergroups(j);
 			break;
 		case 'p':
-			if (*exit_immediately) {
-				fprintf(stderr,
-					"Could not enter pid namespace because "
-					"'-i' was specified.\n");
-				exit(1);
-			}
-			use_pid_ns = 1;
 			minijail_namespace_pids(j);
 			break;
 		case 'e':
 			minijail_namespace_net(j);
 			break;
 		case 'i':
-			if (use_pid_ns) {
-				fprintf(stderr,
-					"Could not disable init loop because "
-					"'-p' was specified.\n");
-				exit(1);
-			}
 			*exit_immediately = 1;
 			break;
 		case 'H':
