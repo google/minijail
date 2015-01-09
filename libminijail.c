@@ -1216,8 +1216,6 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	minijail_enter(j);
 
 	if (pid_namespace) {
-		if (setsid() < 0)
-			pdie("failed to make init the session leader");
 		/*
 		 * pid namespace: this process will become init inside the new
 		 * namespace, so fork off a child to actually run the program
