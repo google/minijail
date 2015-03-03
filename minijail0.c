@@ -124,8 +124,6 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		      int *exit_immediately)
 {
 	int opt;
-	int chroot = 0;
-	int mount_tmp = 0;
 	int use_seccomp_filter = 0;
 	const size_t path_max = 4096;
 	const char *filter_path;
@@ -174,11 +172,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 				fprintf(stderr, "Could not set chroot.\n");
 				exit(1);
 			}
-			chroot = 1;
 			break;
 		case 't':
 			minijail_mount_tmp(j);
-			mount_tmp = 1;
 			break;
 		case 'v':
 			minijail_namespace_vfs(j);
@@ -223,13 +219,6 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 
 	if (argc == optind) {
 		usage(argv[0]);
-		exit(1);
-	}
-
-	if (mount_tmp && !chroot) {
-		fprintf(stderr,
-		        "Could not mount tmpfs at /tmp "
-		        "because '-C' was not specified.\n");
 		exit(1);
 	}
 

@@ -620,7 +620,7 @@ int enter_chroot(const struct minijail *j)
 
 int mount_tmp(void)
 {
-	return mount("none", "/tmp", "tmpfs", 0, "size=128M,mode=777");
+	return mount("none", "/tmp", "tmpfs", 0, "size=64M,mode=777");
 }
 
 int remount_readonly(void)
@@ -802,7 +802,7 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");
 
-	if (j->flags.chroot && j->flags.mount_tmp && mount_tmp())
+	if (j->flags.mount_tmp && mount_tmp())
 		pdie("mount_tmp");
 
 	if (j->flags.readonly && remount_readonly())
