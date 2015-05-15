@@ -1044,6 +1044,19 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		return -EFAULT;
 
 	/*
+	 * Make the process group ID of this process equal to its PID, so that
+	 * both the Minijail process and the jailed process can be killed
+	 * together.
+	 * Don't fail on EPERM, since setpgid(0, 0) can only EPERM when
+	 * the process is already a process group leader.
+	 */
+	if (setpgid(0 /* use calling PID */, 0 /* make PGID = PID */)) {
+		if (errno != EPERM) {
+			pdie("setpgid(0, 0)");
+		}
+	}
+
+	/*
 	 * Before we fork(2) and execve(2) the child process, we need to open
 	 * a pipe(2) to send the minijail configuration over.
 	 */
