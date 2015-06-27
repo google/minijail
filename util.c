@@ -40,6 +40,8 @@ const char *log_syscalls[] = { "connect", "send" };
 
 const size_t log_syscalls_len = sizeof(log_syscalls)/sizeof(log_syscalls[0]);
 
+long int parse_single_constant(char *constant_str, char **endptr);
+
 int lookup_syscall(const char *name)
 {
 	const struct syscall_entry *entry = syscall_table;
@@ -59,6 +61,36 @@ const char *lookup_syscall_name(int nr)
 }
 
 long int parse_constant(char *constant_str, char **endptr)
+{
+	long int value = 0;
+	char *group, *lastpos = constant_str;
+	char *original_constant_str = constant_str;
+
+	/*
+	 * Try to parse constants separated by pipes.  Note that since
+	 * |constant_str| is an atom, there can be no spaces between the
+	 * constant and the pipe.  Constants can be either a named constant
+	 * defined in libconstants.gen.c or a number parsed with strtol.
+	 *
+	 * If there is an error parsing any of the constants, the whole process
+	 * fails.
+	 */
+	while ((group = tokenize(&constant_str, "|")) != NULL) {
+		char *end = group;
+		value |= parse_single_constant(group, &end);
+		if (end == group) {
+			lastpos = original_constant_str;
+			value = 0;
+			break;
+		}
+		lastpos = end;
+	}
+	if (endptr)
+		*endptr = lastpos;
+	return value;
+}
+
+long int parse_single_constant(char *constant_str, char **endptr)
 {
 	const struct constant_entry *entry = constant_table;
 	for (; entry->name; ++entry) {

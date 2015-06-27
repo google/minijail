@@ -331,6 +331,50 @@ TEST_F(arg_filter, arg0_mask) {
 	free_label_strings(&self->labels);
 }
 
+TEST_F(arg_filter, arg0_eq_mask) {
+	const char *fragment = "arg1 == O_WRONLY|O_CREAT";
+	int nr = 1;
+	unsigned int id = 0;
+	struct filter_block *block =
+		compile_section(nr, fragment, id, &self->labels);
+
+	ASSERT_NE(block, NULL);
+	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+	EXPECT_EQ(block->total_len, exp_total_len);
+
+	/* First block is a label. */
+	struct filter_block *curr_block = block;
+	ASSERT_NE(curr_block, NULL);
+	EXPECT_EQ(block->len, 1U);
+	EXPECT_LBL(curr_block->instrs);
+
+	/* Second block is a comparison. */
+	curr_block = block->next;
+	EXPECT_COMP(curr_block);
+	EXPECT_EQ(curr_block->instrs[BPF_ARG_COMP_LEN  - 1].k,
+		(unsigned int)(O_WRONLY | O_CREAT));
+
+	/* Third block is a jump and a label (end of AND group). */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_GROUP_END(curr_block);
+
+	/* Fourth block is SECCOMP_RET_KILL */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_KILL(curr_block);
+
+	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_ALLOW(curr_block);
+
+	EXPECT_EQ(curr_block->next, NULL);
+
+	free_block_list(block);
+	free_label_strings(&self->labels);
+}
+
 TEST_F(arg_filter, and_or) {
 	const char *fragment = "arg0 == 0 && arg1 == 0 || arg0 == 1";
 	int nr = 1;
