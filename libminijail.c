@@ -36,7 +36,7 @@
 #include "libminijail.h"
 #include "libminijail-private.h"
 
-#include "signal.h"
+#include "signal_handler.h"
 #include "syscall_filter.h"
 #include "util.h"
 
@@ -203,9 +203,14 @@ int API minijail_change_user(struct minijail *j, const char *user)
 
 int API minijail_change_group(struct minijail *j, const char *group)
 {
-	char *buf = NULL;
-	struct group gr;
 	struct group *pgr = NULL;
+
+#if defined(__BRILLO__)
+	/* Android does not implement getgrnam_r(). */
+	pgr = getgrnam(group);
+#else
+	struct group gr;
+	char *buf = NULL;
 	ssize_t sz = sysconf(_SC_GETGR_R_SIZE_MAX);
 	if (sz == -1)
 		sz = 65536;	/* and mine is as good as yours, really */
@@ -225,6 +230,7 @@ int API minijail_change_group(struct minijail *j, const char *group)
 	 */
 	free(buf);
 	/* getgrnam_r(3) does *not* set errno when |pgr| is NULL. */
+#endif
 	if (!pgr)
 		return -1;
 	minijail_change_gid(j, pgr->gr_gid);
@@ -683,6 +689,13 @@ static int run_cap_valid(unsigned int cap)
 
 void drop_caps(const struct minijail *j)
 {
+#if defined(__BRILLO__)
+	/*
+	 * Temporarily disable capabilities support until Minijail can use
+	 * libcap-ng.
+	 */
+	(void) j;
+#else
 	cap_t caps = cap_get_proc();
 	cap_value_t flag[1];
 	const uint64_t one = 1;
@@ -738,6 +751,7 @@ void drop_caps(const struct minijail *j)
 		die("can't apply final cleaned capset");
 
 	cap_free(caps);
+#endif
 }
 
 void set_seccomp_filter(const struct minijail *j)
@@ -943,6 +957,10 @@ int API minijail_to_fd(struct minijail *j, int fd)
 
 int setup_preload(void)
 {
+#if defined(__BRILLO__)
+	/* Don't use LDPRELOAD on Brillo. */
+	return 0;
+#else
 	char *oldenv = getenv(kLdPreloadEnvVar) ? : "";
 	char *newenv = malloc(strlen(oldenv) + 2 + strlen(PRELOADPATH));
 	if (!newenv)
@@ -956,6 +974,7 @@ int setup_preload(void)
 	setenv(kLdPreloadEnvVar, newenv, 1);
 	free(newenv);
 	return 0;
+#endif
 }
 
 int setup_pipe(int fds[2])

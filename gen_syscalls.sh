@@ -12,18 +12,13 @@
 
 set -e
 
-if [ $# -ne 1 ] && [ $# -ne 3 ]; then
-  echo "Usage: $(basename "$0") OUTFILE"
-  echo "Usage: $(basename "$0") CC CFLAGS OUTFILE"
+if [ $# -ne 2 ]; then
+  echo "Usage: $(basename "$0") CC OUTFILE"
   exit 1
 fi
 
-if [ $# -eq 3 ]; then
-  CC="$1"
-  shift
-  CFLAGS="$1"
-  shift
-fi
+CC="$1"
+shift
 OUTFILE="$1"
 
 # sed expression which extracts system calls that are
@@ -43,7 +38,7 @@ cat <<-EOF > "${OUTFILE}"
 #include "libsyscalls.h"
 const struct syscall_entry syscall_table[] = {
 $(echo '#include <asm/unistd.h>' | \
-  ${CC} ${CFLAGS} -dD - -E | sed -rne "${SED_MULTILINE}")
+  ${CC} -dD - -E | sed -rne "${SED_MULTILINE}")
   { NULL, -1 },
 };
 EOF

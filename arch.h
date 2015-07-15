@@ -24,6 +24,8 @@
 #    define EM_ARM 40
 #  endif
 #  define ARCH_NR AUDIT_ARCH_ARM
+#elif defined(__aarch64__)
+#  define ARCH_NR AUDIT_ARCH_AARCH64
 #elif defined(__hppa__)
 #  define ARCH_NR AUDIT_ARCH_PARISC
 #elif defined(__ia64__)
