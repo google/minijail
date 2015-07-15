@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+read line
+
+if [ "$line" == "test" ]; then
+	exit 0
+else
+	exit 1
+fi

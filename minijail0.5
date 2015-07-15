@@ -1,0 +1,85 @@
+.TH MINIJAIL0 "1" "July 2011" "Chromium OS" "User Commands"
+.SH NAME
+minijail0 \- sandbox a process
+.SH DESCRIPTION
+.PP
+Runs PROGRAM inside a sandbox. See minijail(1) for details.
+.SH EXAMPLES
+
+Safely switch from root to nobody while dropping all capabilities and
+inheriting any groups from nobody:
+
+  # minijail0 -c 0 -G -u nobody /usr/bin/whoami
+  nobody
+
+Run in a PID and VFS namespace without superuser capabilities (but still
+as root) and with a private view of /proc:
+
+  # minijail0 -p -v -r -c 0 /bin/ps
+    PID TTY           TIME CMD
+      1 pts/0     00:00:00 minijail0
+      2 pts/0     00:00:00 ps
+
+Running a process with a seccomp filter policy at reduced privileges:
+
+  # minijail0 -S /usr/share/minijail0/$(uname -m)/cat.policy -- \\
+              /bin/cat /proc/self/seccomp_filter
+  ...
+
+.SH SECCOMP_FILTER POLICY
+The policy file supplied to the \fB-S\fR argument supports the following syntax:
+
+  \fB<syscall_name>\fR:\fB<ftrace filter policy>\fR
+  \fB<syscall_number>\fR:\fB<ftrace filter policy>\fR
+  \fB<empty line>\fR
+  \fB# any single line comment\fR
+
+A policy that emulates seccomp(2) in mode 1 may look like:
+  read: 1
+  write: 1
+  sig_return: 1
+  exit: 1
+
+The "1" acts as a wildcard and allows any use of the mentioned system
+call.  More advanced filtering is possible if your kernel supports
+CONFIG_FTRACE_SYSCALLS.  For example, we can allow a process to open any
+file read only and mmap PROT_READ only:
+
+  # open with O_LARGEFILE|O_RDONLY|O_NONBLOCK or some combination
+  open: flags == 32768 || flags == 0 || flags == 34816 || flags == 2048
+  mmap2: prot == 0x0
+  munmap: 1
+  close: 1
+
+The supported arguments may be found by reviewing the system call
+prototypes in the Linux kernel source code.  Be aware that any
+non-numeric comparison may be subject to time-of-check-time-of-use
+attacks and cannot be considered safe.
+
+\fBexecve\fR may only be used when invoking with CAP_SYS_ADMIN privileges.
+
+.SH SECCOMP_FILTER POLICY WRITING
+
+Determining policy for seccomp_filter can be time consuming.  System
+calls are often named in arch-specific, or legacy tainted, ways.  E.g.,
+geteuid versus geteuid32.  On process death due to a seccomp filter
+rule, the offending system call number will be supplied with a best
+guess of the ABI defined name.  This information may be used to produce
+working baseline policies.  However, if the process being contained has
+a fairly tight working domain, using \fBstrace -e raw=all <program>\fR
+can generate the list of system calls that are needed. Note that when
+using libminijail or minijail with preloading, supporting initial
+process setup calls will not be required.  Be conservative.
+
+It's also possible to analyze the binary checking for all non-dead
+functions and determining if any of them issue system calls.  There is
+no active implementation for this, but something like
+code.google.com/p/seccompsandbox is one possible runtime variant.
+
+.SH AUTHOR
+The Chromium OS Authors <chromiumos-dev@chromium.org>
+.SH COPYRIGHT
+Copyright \(co 2011 The Chromium OS Authors
+License BSD-like.
+.SH "SEE ALSO"
+\fBminijail\fR(1)
