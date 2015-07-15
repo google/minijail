@@ -16,7 +16,7 @@
 #include <signal.h>
 #include <string.h>
 
-#include "signal.h"
+#include "signal_handler.h"
 
 #include "util.h"
 
