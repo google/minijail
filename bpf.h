@@ -84,10 +84,10 @@ struct seccomp_data {
 #define bpf_comp_jset bpf_comp_jset64
 
 /* Ensure that we load the logically correct offset. */
-#if defined(__LITTLE_ENDIAN)
+#if defined(__LITTLE_ENDIAN__)
 #define LO_ARG(idx) offsetof(struct seccomp_data, args[(idx)])
 #define HI_ARG(idx) offsetof(struct seccomp_data, args[(idx)]) + sizeof(__u32)
-#elif defined(__BIG_ENDIAN)
+#elif defined(__BIG_ENDIAN__)
 #define LO_ARG(idx) offsetof(struct seccomp_data, args[(idx)]) + sizeof(__u32)
 #define HI_ARG(idx) offsetof(struct seccomp_data, args[(idx)])
 #else
