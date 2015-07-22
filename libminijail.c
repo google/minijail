@@ -203,14 +203,9 @@ int API minijail_change_user(struct minijail *j, const char *user)
 
 int API minijail_change_group(struct minijail *j, const char *group)
 {
-	struct group *pgr = NULL;
-
-#if defined(__BRILLO__)
-	/* Android does not implement getgrnam_r(). */
-	pgr = getgrnam(group);
-#else
-	struct group gr;
 	char *buf = NULL;
+	struct group gr;
+	struct group *pgr = NULL;
 	ssize_t sz = sysconf(_SC_GETGR_R_SIZE_MAX);
 	if (sz == -1)
 		sz = 65536;	/* and mine is as good as yours, really */
@@ -230,7 +225,6 @@ int API minijail_change_group(struct minijail *j, const char *group)
 	 */
 	free(buf);
 	/* getgrnam_r(3) does *not* set errno when |pgr| is NULL. */
-#endif
 	if (!pgr)
 		return -1;
 	minijail_change_gid(j, pgr->gr_gid);
