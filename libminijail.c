@@ -95,6 +95,7 @@ struct minijail {
 		int log_seccomp_filter:1;
 		int chroot:1;
 		int mount_tmp:1;
+		int do_init:1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -122,6 +123,7 @@ void minijail_preenter(struct minijail *j)
 	j->flags.enter_vfs = 0;
 	j->flags.readonly = 0;
 	j->flags.pids = 0;
+	j->flags.do_init = 0;
 }
 
 /*
@@ -277,6 +279,7 @@ void API minijail_namespace_pids(struct minijail *j)
 	j->flags.vfs = 1;
 	j->flags.readonly = 1;
 	j->flags.pids = 1;
+	j->flags.do_init = 1;
 }
 
 void API minijail_namespace_net(struct minijail *j)
@@ -298,6 +301,15 @@ void API minijail_inherit_usergroups(struct minijail *j)
 void API minijail_disable_ptrace(struct minijail *j)
 {
 	j->flags.ptrace = 1;
+}
+
+void API minijail_run_as_init(struct minijail *j)
+{
+	/*
+	 * Since the jailed program will become 'init' in the new PID namespace,
+	 * Minijail does not need to fork an 'init' process.
+	 */
+	j->flags.do_init = 0;
 }
 
 int API minijail_enter_chroot(struct minijail *j, const char *dir)
@@ -1037,6 +1049,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	int ret;
 	/* We need to remember this across the minijail_preexec() call. */
 	int pid_namespace = j->flags.pids;
+	int do_init = j->flags.do_init;
 
 	oldenv = getenv(kLdPreloadEnvVar);
 	if (oldenv) {
@@ -1232,12 +1245,13 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	/* Jail this process and its descendants... */
 	minijail_enter(j);
 
-	if (pid_namespace) {
+	if (pid_namespace && do_init) {
 		/*
 		 * pid namespace: this process will become init inside the new
-		 * namespace, so fork off a child to actually run the program
-		 * (we don't want all programs we might exec to have to know
-		 * how to be init).
+		 * namespace. We don't want all programs we might exec to have
+		 * to know how to be init. Normally |do_init == 1| we fork off
+		 * a child to actually run the program. If |do_init == 0|, we
+		 * let the program keep pid 1 and be init.
 		 *
 		 * If we're multithreaded, we'll probably deadlock here. See
 		 * WARNING above.
@@ -1250,7 +1264,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	}
 
 	/*
-	 * If we aren't pid-namespaced:
+	 * If we aren't pid-namespaced, or jailed program asked to be init:
 	 *   calling process
 	 *   -> execve()-ing process
 	 * If we are:
@@ -1266,6 +1280,7 @@ int API minijail_run_static(struct minijail *j, const char *filename,
 {
 	pid_t child_pid;
 	int pid_namespace = j->flags.pids;
+	int do_init = j->flags.do_init;
 
 	if (j->flags.caps)
 		die("caps not supported with static targets");
@@ -1291,12 +1306,13 @@ int API minijail_run_static(struct minijail *j, const char *filename,
 	j->flags.pids = 0;
 	minijail_enter(j);
 
-	if (pid_namespace) {
+	if (pid_namespace && do_init) {
 		/*
 		 * pid namespace: this process will become init inside the new
-		 * namespace, so fork off a child to actually run the program
-		 * (we don't want all programs we might exec to have to know
-		 * how to be init).
+		 * namespace. We don't want all programs we might exec to have
+		 * to know how to be init. Normally |do_init == 1| we fork off
+		 * a child to actually run the program. If |do_init == 0|, we
+		 * let the program keep pid 1 and be init.
 		 *
 		 * If we're multithreaded, we'll probably deadlock here. See
 		 * WARNING above.

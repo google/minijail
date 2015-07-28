@@ -56,6 +56,7 @@ void minijail_namespace_net(struct minijail *j);
  */
 void minijail_namespace_pids(struct minijail *j);
 void minijail_remount_readonly(struct minijail *j);
+void minijail_run_as_init(struct minijail *j);
 void minijail_inherit_usergroups(struct minijail *j);
 void minijail_disable_ptrace(struct minijail *j);
 

@@ -90,6 +90,7 @@ static void usage(const char *progn)
 	       "  -H:         seccomp filter help message\n"
 	       "  -i:         exit immediately after fork (do not act as init)\n"
 	       "              Not compatible with -p\n"
+	       "  -I:         run <program> as init (pid 1) inside a new pid namespace (implies -p)\n"
 	       "  -L:         report blocked syscalls to syslog when using seccomp filter.\n"
 	       "              Forces the following syscalls to be allowed:\n"
 	       "                  ", progn);
@@ -129,7 +130,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const char *filter_path;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:vrGhHinpLet")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:vrGhHinpLetI")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -200,6 +201,10 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'H':
 			seccomp_filter_usage(argv[0]);
 			exit(1);
+		case 'I':
+			minijail_namespace_pids(j);
+			minijail_run_as_init(j);
+			break;
 		default:
 			usage(argv[0]);
 			exit(1);
