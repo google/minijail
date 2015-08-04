@@ -43,6 +43,8 @@ LOCAL_SRC_FILES := \
 	libminijail.c \
 	signal_handler.c \
 	syscall_filter.c \
-	util.c
+	util.c \
+
 LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
