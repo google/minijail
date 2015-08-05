@@ -76,8 +76,9 @@ static void usage(const char *progn)
 {
 	size_t i;
 
-	printf("Usage: %s [-Ghinprsvt] [-b <src>,<dest>[,<writeable>]] "
+	printf("Usage: %s [-GhiInprsvtU] [-b <src>,<dest>[,<writeable>]] "
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
+	       "[-m <uid> <loweruid> <count>] [-M <gid> <lowergid> <count>] "
 	       "<program> [args...]\n"
 	       "  -b:         binds <src> to <dest> in chroot. Multiple "
 	       "instances allowed\n"
@@ -98,6 +99,12 @@ static void usage(const char *progn)
 		printf("%s ", log_syscalls[i]);
 
 	printf("\n"
+	       "  -m:         set the uid mapping of a user namespace (implies -pU).\n"
+	       "              Same arguments as newuidmap(1)\n"
+	       "              Not compatible with -b without writable\n"
+	       "  -M:         set the gid mapping of a user namespace (implies -pU).\n"
+	       "              Same arguments as newgidmap(1)\n"
+	       "              Not compatible with -b without writable\n"
 	       "  -n:         set no_new_privs\n"
 	       "  -p:         enter new pid namespace (implies -vr)\n"
 	       "  -r:         remount /proc read-only (implies -v)\n"
@@ -107,6 +114,7 @@ static void usage(const char *progn)
 	       "              Requires -n when not running as root\n"
 	       "  -t:         mount tmpfs at /tmp inside chroot\n"
 	       "  -u <user>:  change uid to <user>\n"
+	       "  -U          enter new user namespace (implies -p)\n"
 	       "  -v:         enter new mount namespace\n"
 	       "  -V <file>:  enter specified mount namespace\n");
 }
@@ -130,7 +138,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const char *filter_path;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:vrGhHinpLetI")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:m:M:vrGhHinpLetIU")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -204,6 +212,26 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'I':
 			minijail_namespace_pids(j);
 			minijail_run_as_init(j);
+			break;
+		case 'U':
+			minijail_namespace_user(j);
+			minijail_namespace_pids(j);
+			break;
+		case 'm':
+			minijail_namespace_user(j);
+			minijail_namespace_pids(j);
+			if (0 != minijail_uidmap(j, optarg)) {
+				fprintf(stderr, "Could not set uidmap\n");
+				exit(1);
+			}
+			break;
+		case 'M':
+			minijail_namespace_user(j);
+			minijail_namespace_pids(j);
+			if (0 != minijail_gidmap(j, optarg)) {
+				fprintf(stderr, "Could not set gidmap\n");
+				exit(1);
+			}
 			break;
 		default:
 			usage(argv[0]);

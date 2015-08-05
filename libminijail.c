@@ -86,6 +86,7 @@ struct minijail {
 		int enter_vfs:1;
 		int pids:1;
 		int net:1;
+		int userns:1;
 		int seccomp:1;
 		int readonly:1;
 		int usergroups:1;
@@ -107,6 +108,8 @@ struct minijail {
 	int filter_len;
 	int binding_count;
 	char *chrootdir;
+	char *uidmap;
+	char *gidmap;
 	struct sock_fprog *filter_prog;
 	struct binding *bindings_head;
 	struct binding *bindings_tail;
@@ -135,6 +138,7 @@ void minijail_preexec(struct minijail *j)
 	int vfs = j->flags.vfs;
 	int enter_vfs = j->flags.enter_vfs;
 	int readonly = j->flags.readonly;
+	int userns = j->flags.userns;
 	if (j->user)
 		free(j->user);
 	j->user = NULL;
@@ -143,6 +147,7 @@ void minijail_preexec(struct minijail *j)
 	j->flags.vfs = vfs;
 	j->flags.enter_vfs = enter_vfs;
 	j->flags.readonly = readonly;
+	j->flags.userns = userns;
 	/* Note, |pids| will already have been used before this call. */
 }
 
@@ -291,6 +296,27 @@ void API minijail_remount_readonly(struct minijail *j)
 {
 	j->flags.vfs = 1;
 	j->flags.readonly = 1;
+}
+
+void API minijail_namespace_user(struct minijail *j)
+{
+	j->flags.userns = 1;
+}
+
+int API minijail_uidmap(struct minijail *j, const char *uidmap)
+{
+	j->uidmap = strdup(uidmap);
+	if (!j->uidmap)
+		return -ENOMEM;
+	return 0;
+}
+
+int API minijail_gidmap(struct minijail *j, const char *gidmap)
+{
+	j->gidmap = strdup(gidmap);
+	if (!j->gidmap)
+		return -ENOMEM;
+	return 0;
 }
 
 void API minijail_inherit_usergroups(struct minijail *j)
@@ -584,6 +610,59 @@ out:
 	return ret;
 }
 
+static void write_ugid_mappings(const struct minijail *j, int *pipe_fds)
+{
+	int fd, ret, len;
+	size_t sz;
+	char fname[32];
+	close(pipe_fds[0]);
+
+	sz = sizeof(fname);
+	if (j->uidmap) {
+		ret = snprintf(fname, sz, "/proc/%d/uid_map", j->initpid);
+		if (ret < 0 || ret >= sz)
+			die("failed to write file name of uid_map");
+		fd = open(fname, O_WRONLY);
+		if (fd < 0)
+			pdie("failed to open '%s'", fname);
+		len = strlen(j->uidmap);
+		if (write(fd, j->uidmap, len) < len)
+			die("failed to set uid_map");
+		close(fd);
+	}
+	if (j->gidmap) {
+		ret = snprintf(fname, sz, "/proc/%d/gid_map", j->initpid);
+		if (ret < 0 || ret >= sz)
+			die("failed to write file name of gid_map");
+		fd = open(fname, O_WRONLY);
+		if (fd < 0)
+			pdie("failed to open '%s'", fname);
+		len = strlen(j->gidmap);
+		if (write(fd, j->gidmap, len) < len)
+			die("failed to set gid_map");
+		close(fd);
+	}
+
+	close(pipe_fds[1]);
+}
+
+static void enter_user_namespace(const struct minijail *j, int *pipe_fds)
+{
+	char buf;
+
+	close(pipe_fds[1]);
+
+	/* Wait for parent to set up uid/gid mappings. */
+	if (read(pipe_fds[0], &buf, 1) != 0)
+		die("failed to sync with parent");
+	close(pipe_fds[0]);
+
+	if (j->uidmap && setresuid(0, 0, 0))
+		pdie("setresuid");
+	if (j->gidmap && setresgid(0, 0, 0))
+		pdie("setresgid");
+}
+
 /* bind_one: Applies bindings from @b for @j, recursing as needed.
  * @j Minijail these bindings are for
  * @b Head of list of bindings
@@ -634,7 +713,7 @@ int mount_tmp(void)
 	return mount("none", "/tmp", "tmpfs", 0, "size=64M,mode=777");
 }
 
-int remount_readonly(void)
+int remount_readonly(const struct minijail *j)
 {
 	const char *kProcPath = "/proc";
 	const unsigned int kSafeFlags = MS_NODEV | MS_NOEXEC | MS_NOSUID;
@@ -643,9 +722,10 @@ int remount_readonly(void)
 	 * /proc in our namespace, which means using MS_REMOUNT here would
 	 * mutate our parent's mount as well, even though we're in a VFS
 	 * namespace (!). Instead, remove their mount from our namespace
-	 * and make our own.
+	 * and make our own. However, if we are in a new user namespace, /proc
+	 * is not seen as mounted, so don't return error if umount() fails.
 	 */
-	if (umount(kProcPath))
+	if (umount(kProcPath) && !j->flags.userns)
 		return -errno;
 	if (mount("", kProcPath, "proc", kSafeFlags | MS_RDONLY, ""))
 		return -errno;
@@ -816,7 +896,7 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.mount_tmp && mount_tmp())
 		pdie("mount_tmp");
 
-	if (j->flags.readonly && remount_readonly())
+	if (j->flags.readonly && remount_readonly(j))
 		pdie("remount");
 
 	if (j->flags.caps) {
@@ -1046,6 +1126,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	int stdin_fds[2];
 	int stdout_fds[2];
 	int stderr_fds[2];
+	int userns_pipe_fds[2];
 	int ret;
 	/* We need to remember this across the minijail_preexec() call. */
 	int pid_namespace = j->flags.pids;
@@ -1108,6 +1189,15 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 			return -EFAULT;
 	}
 
+	/*
+	 * If we want to set up a new uid/gid mapping in the user namespace,
+	 * create the pipe(2) to sync between parent and child.
+	 */
+	if (j->flags.userns) {
+		if (pipe(userns_pipe_fds))
+			return -EFAULT;
+	}
+
 	/* Use sys_clone() if and only if we're creating a pid namespace.
 	 *
 	 * tl;dr: WARNING: do not mix pid namespaces and multithreading.
@@ -1148,8 +1238,12 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	 * problem is fixable or not. It would be nice if we worked in this
 	 * case.
 	 */
-	if (pid_namespace)
-		child_pid = syscall(SYS_clone, CLONE_NEWPID | SIGCHLD, NULL);
+	if (pid_namespace) {
+		int clone_flags = CLONE_NEWPID | SIGCHLD;
+		if (j->flags.userns)
+			clone_flags |= CLONE_NEWUSER;
+		child_pid = syscall(SYS_clone, clone_flags, NULL);
+	}
 	else
 		child_pid = fork();
 
@@ -1169,6 +1263,9 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		unsetenv(kFdEnvVar);
 
 		j->initpid = child_pid;
+
+		if (j->flags.userns)
+			write_ugid_mappings(j, userns_pipe_fds);
 
 		/* Send marshalled minijail. */
 		close(pipe_fds[0]);	/* read endpoint */
@@ -1209,6 +1306,10 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		return 0;
 	}
 	free(oldenv_copy);
+
+
+	if (j->flags.userns)
+		enter_user_namespace(j, userns_pipe_fds);
 
 	/*
 	 * If we want to write to the jailed process' standard input,
@@ -1279,14 +1380,28 @@ int API minijail_run_static(struct minijail *j, const char *filename,
 			    char *const argv[])
 {
 	pid_t child_pid;
+	int userns_pipe_fds[2];
 	int pid_namespace = j->flags.pids;
 	int do_init = j->flags.do_init;
 
 	if (j->flags.caps)
 		die("caps not supported with static targets");
 
-	if (pid_namespace)
-		child_pid = syscall(SYS_clone, CLONE_NEWPID | SIGCHLD, NULL);
+	/*
+	 * If we want to set up a new uid/gid mapping in the user namespace,
+	 * create the pipe(2) to sync between parent and child.
+	 */
+	if (j->flags.userns) {
+		if (pipe(userns_pipe_fds))
+			return -EFAULT;
+	}
+
+	if (pid_namespace) {
+		int clone_flags = CLONE_NEWPID | SIGCHLD;
+		if (j->flags.userns)
+			clone_flags |= CLONE_NEWUSER;
+		child_pid = syscall(SYS_clone, clone_flags, NULL);
+	}
 	else
 		child_pid = fork();
 
@@ -1295,8 +1410,15 @@ int API minijail_run_static(struct minijail *j, const char *filename,
 	}
 	if (child_pid > 0 ) {
 		j->initpid = child_pid;
+
+		if (j->flags.userns)
+			write_ugid_mappings(j, userns_pipe_fds);
+
 		return 0;
 	}
+
+	if (j->flags.userns)
+		enter_user_namespace(j, userns_pipe_fds);
 
 	/*
 	 * We can now drop this child into the sandbox

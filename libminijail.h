@@ -55,6 +55,9 @@ void minijail_namespace_net(struct minijail *j);
  * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
  */
 void minijail_namespace_pids(struct minijail *j);
+void minijail_namespace_user(struct minijail *j);
+int minijail_uidmap(struct minijail *j, const char *uidmap);
+int minijail_gidmap(struct minijail *j, const char *gidmap);
 void minijail_remount_readonly(struct minijail *j);
 void minijail_run_as_init(struct minijail *j);
 void minijail_inherit_usergroups(struct minijail *j);
