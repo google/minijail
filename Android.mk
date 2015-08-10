@@ -14,6 +14,8 @@
 
 LOCAL_PATH := $(call my-dir)
 
+ifeq ($(HOST_OS),linux)
+
 # Common variables
 # ========================================================
 
@@ -48,3 +50,5 @@ LOCAL_SRC_FILES := \
 LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
+
+endif # HOST_OS == linux
