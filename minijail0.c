@@ -76,7 +76,7 @@ static void usage(const char *progn)
 {
 	size_t i;
 
-	printf("Usage: %s [-GhiInprsvtU] [-b <src>,<dest>[,<writeable>]] "
+	printf("Usage: %s [-GhiInprsvtU] [-b <src>,<dest>[,<writeable>]] [-f <file>]"
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
 	       "[-m <uid> <loweruid> <count>] [-M <gid> <lowergid> <count>] "
 	       "<program> [args...]\n"
@@ -85,6 +85,7 @@ static void usage(const char *progn)
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
 	       "  -e:         enter new network namespace\n"
+	       "  -f <file>:  write the pid of the jailed process to <file>\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
 	       "  -h:         help (this message)\n"
@@ -138,7 +139,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const char *filter_path;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:m:M:vrGhHinpLetIU")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:f:m:M:vrGhHinpLetIU")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -179,6 +180,12 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'C':
 			if (0 != minijail_enter_chroot(j, optarg)) {
 				fprintf(stderr, "Could not set chroot.\n");
+				exit(1);
+			}
+			break;
+		case 'f':
+			if (0 != minijail_write_pid_file(j, optarg)) {
+				fprintf(stderr, "Could not prepare pid file path.\n");
 				exit(1);
 			}
 			break;

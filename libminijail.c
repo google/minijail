@@ -97,6 +97,7 @@ struct minijail {
 		int chroot:1;
 		int mount_tmp:1;
 		int do_init:1;
+		int pid_file:1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -108,6 +109,7 @@ struct minijail {
 	int filter_len;
 	int binding_count;
 	char *chrootdir;
+	char *pid_file_path;
 	char *uidmap;
 	char *gidmap;
 	struct sock_fprog *filter_prog;
@@ -127,6 +129,7 @@ void minijail_preenter(struct minijail *j)
 	j->flags.readonly = 0;
 	j->flags.pids = 0;
 	j->flags.do_init = 0;
+	j->flags.pid_file = 0;
 }
 
 /*
@@ -352,6 +355,15 @@ int API minijail_enter_chroot(struct minijail *j, const char *dir)
 void API minijail_mount_tmp(struct minijail *j)
 {
 	j->flags.mount_tmp = 1;
+}
+
+int API minijail_write_pid_file(struct minijail *j, const char *path)
+{
+	j->pid_file_path = strdup(path);
+	if (!j->pid_file_path)
+		return -ENOMEM;
+	j->flags.pid_file = 1;
+	return 0;
 }
 
 int API minijail_bind(struct minijail *j, const char *src, const char *dest,
@@ -730,6 +742,18 @@ int remount_readonly(const struct minijail *j)
 	if (mount("", kProcPath, "proc", kSafeFlags | MS_RDONLY, ""))
 		return -errno;
 	return 0;
+}
+
+static void write_pid_file(const struct minijail *j)
+{
+	FILE *fp = fopen(j->pid_file_path, "w");
+
+	if (!fp)
+		pdie("failed to open '%s'", j->pid_file_path);
+	if (fprintf(fp, "%d\n", (int)j->initpid) < 0)
+		pdie("fprintf(%s)", j->pid_file_path);
+	if (fclose(fp))
+		pdie("fclose(%s)", j->pid_file_path);
 }
 
 void drop_ugid(const struct minijail *j)
@@ -1264,6 +1288,9 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 
 		j->initpid = child_pid;
 
+		if (j->flags.pid_file)
+			write_pid_file(j);
+
 		if (j->flags.userns)
 			write_ugid_mappings(j, userns_pipe_fds);
 
@@ -1410,6 +1437,9 @@ int API minijail_run_static(struct minijail *j, const char *filename,
 	}
 	if (child_pid > 0 ) {
 		j->initpid = child_pid;
+
+		if (j->flags.pid_file)
+			write_pid_file(j);
 
 		if (j->flags.userns)
 			write_ugid_mappings(j, userns_pipe_fds);
