@@ -95,6 +95,7 @@ struct minijail {
 		int seccomp_filter:1;
 		int log_seccomp_filter:1;
 		int chroot:1;
+		int pivot_root:1;
 		int mount_tmp:1;
 		int do_init:1;
 		int pid_file:1;
@@ -359,6 +360,17 @@ int API minijail_enter_chroot(struct minijail *j, const char *dir)
 	if (!j->chrootdir)
 		return -ENOMEM;
 	j->flags.chroot = 1;
+	return 0;
+}
+
+int API minijail_enter_pivot_root(struct minijail *j, const char *dir)
+{
+	if (j->chrootdir)
+		return -EINVAL;
+	j->chrootdir = strdup(dir);
+	if (!j->chrootdir)
+		return -ENOMEM;
+	j->flags.pivot_root = 1;
 	return 0;
 }
 
@@ -730,6 +742,36 @@ int enter_chroot(const struct minijail *j)
 	return 0;
 }
 
+int enter_pivot_root(const struct minijail *j)
+{
+	int ret;
+	if (j->bindings_head && (ret = bind_one(j, j->bindings_head)))
+		return ret;
+
+	/* To ensure chrootdir is the root of a file system, do a self bind mount. */
+	if (mount(j->chrootdir, j->chrootdir, "bind", MS_BIND | MS_REC, ""))
+		pdie("failed to bind mount '%s'", j->chrootdir);
+	if (chdir(j->chrootdir))
+		return -errno;
+	if (mkdir(".minijail_pivot", 0755))
+		pdie("mkdir(.minijail_pivot)");
+	if (syscall(SYS_pivot_root, ".", ".minijail_pivot")) {
+		remove(".minijail_pivot");
+		pdie("pivot_root");
+	}
+	/* The old root might be busy, so use lazy unmount. */
+	if (umount2(".minijail_pivot", MNT_DETACH))
+		pdie("umount(.minijail_pivot");
+	if (chdir("/"))
+		return -errno;
+	if (chroot("/"))
+		return -errno;
+	if (remove(".minijail_pivot"))
+		return -errno;
+
+	return 0;
+}
+
 int mount_tmp(void)
 {
 	return mount("none", "/tmp", "tmpfs", 0, "size=64M,mode=777");
@@ -926,6 +968,9 @@ void API minijail_enter(const struct minijail *j)
 
 	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");
+
+	if (j->flags.pivot_root && enter_pivot_root(j))
+		pdie("pivot_root");
 
 	if (j->flags.mount_tmp && mount_tmp())
 		pdie("mount_tmp");

@@ -75,6 +75,7 @@ void minijail_disable_ptrace(struct minijail *j);
  * Returns 0 on success.
  */
 int minijail_enter_chroot(struct minijail *j, const char *dir);
+int minijail_enter_pivot_root(struct minijail *j, const char *dir);
 
 /* minijail_mount_tmp: enables mounting of a tmpfs filesystem on /tmp.
  * As be rules of bind mounts, /tmp must exist in chroot.

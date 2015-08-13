@@ -85,6 +85,7 @@ static void usage(const char *progn)
 	       "instances allowed\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
+	       "              Not compatible with -P\n"
 	       "  -e:         enter new network namespace\n"
 	       "  -f <file>:  write the pid of the jailed process to <file>\n"
 	       "  -G:         inherit secondary groups from uid\n"
@@ -109,6 +110,8 @@ static void usage(const char *progn)
 	       "              Not compatible with -b without writable\n"
 	       "  -n:         set no_new_privs\n"
 	       "  -p:         enter new pid namespace (implies -vr)\n"
+	       "  -P <dir>:   pivot_root to <dir> (implies -v)\n"
+	       "              Not compatible with -C\n"
 	       "  -r:         remount /proc read-only (implies -v)\n"
 	       "  -s:         use seccomp\n"
 	       "  -S <file>:  set seccomp filter using <file>\n"
@@ -136,11 +139,12 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 {
 	int opt;
 	int use_seccomp_filter = 0;
+	int pivot_root = 0, chroot = 0;
 	const size_t path_max = 4096;
 	const char *filter_path;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:b:V:f:m:M:vrGhHinpLetIU")) != -1) {
+	while ((opt = getopt(argc, argv, "u:g:sS:c:C:P:b:V:f:m:M:vrGhHinpLetIU")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -179,10 +183,29 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			use_caps(j, optarg);
 			break;
 		case 'C':
+			if (pivot_root) {
+				fprintf(stderr, "Could not set chroot because "
+				                "'-P' was specified.\n");
+				exit(1);
+			}
 			if (0 != minijail_enter_chroot(j, optarg)) {
 				fprintf(stderr, "Could not set chroot.\n");
 				exit(1);
 			}
+			chroot = 1;
+			break;
+		case 'P':
+			if (chroot) {
+				fprintf(stderr, "Could not set pivot_root because "
+				                "'-C' was specified.\n");
+				exit(1);
+			}
+			if (0 != minijail_enter_pivot_root(j, optarg)) {
+				fprintf(stderr, "Could not set pivot_root.\n");
+				exit(1);
+			}
+			minijail_namespace_vfs(j);
+			pivot_root = 1;
 			break;
 		case 'f':
 			if (0 != minijail_write_pid_file(j, optarg)) {
