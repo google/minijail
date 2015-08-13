@@ -1,0 +1,8 @@
+bslot=@BSLOT@
+include_dir=@INCLUDE_DIR@
+
+Name: libminijail
+Description: Minijail shared library.
+Version: ${bslot}
+CFlags: -I${include_dir}
+Libs: -lminijail
