@@ -19,8 +19,7 @@ ifeq ($(HOST_OS),linux)
 # Common variables
 # ========================================================
 
-minijailCommonCFlags := -D__BRILLO__ -Wall -Werror \
-	-Wno-unused-function -Wno-unused-parameter
+minijailCommonCFlags := -Wall -Werror -Wno-unused-function -Wno-unused-parameter
 minijailCommonSharedLibraries := libcap-ng
 
 # libminijail shared library for target

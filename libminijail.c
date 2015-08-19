@@ -683,7 +683,7 @@ static int run_cap_valid(unsigned int cap)
 
 void drop_caps(const struct minijail *j)
 {
-#if defined(__BRILLO__)
+#if defined(__ANDROID__)
 	/*
 	 * Temporarily disable capabilities support until Minijail can use
 	 * libcap-ng.
@@ -951,7 +951,7 @@ int API minijail_to_fd(struct minijail *j, int fd)
 
 int setup_preload(void)
 {
-#if defined(__BRILLO__)
+#if defined(__ANDROID__)
 	/* Don't use LDPRELOAD on Brillo. */
 	return 0;
 #else
