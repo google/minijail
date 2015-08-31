@@ -311,6 +311,11 @@ int API minijail_uidmap(struct minijail *j, const char *uidmap)
 	j->uidmap = strdup(uidmap);
 	if (!j->uidmap)
 		return -ENOMEM;
+	char *ch;
+	for (ch = j->uidmap; *ch; ch++) {
+		if (*ch == ',')
+			*ch = '\n';
+	}
 	return 0;
 }
 
@@ -319,6 +324,11 @@ int API minijail_gidmap(struct minijail *j, const char *gidmap)
 	j->gidmap = strdup(gidmap);
 	if (!j->gidmap)
 		return -ENOMEM;
+	char *ch;
+	for (ch = j->gidmap; *ch; ch++) {
+		if (*ch == ',')
+			*ch = '\n';
+	}
 	return 0;
 }
 

@@ -78,7 +78,8 @@ static void usage(const char *progn)
 
 	printf("Usage: %s [-GhiInprsvtU] [-b <src>,<dest>[,<writeable>]] [-f <file>]"
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
-	       "[-m <uid> <loweruid> <count>] [-M <gid> <lowergid> <count>] "
+	       "[-m \"<uid> <loweruid> <count>[,<uid> <loweruid> <count>]\"] "
+	       "[-M \"<gid> <lowergid> <count>[,<uid> <loweruid> <count>]\"] "
 	       "<program> [args...]\n"
 	       "  -b:         binds <src> to <dest> in chroot. Multiple "
 	       "instances allowed\n"
@@ -101,10 +102,10 @@ static void usage(const char *progn)
 
 	printf("\n"
 	       "  -m:         set the uid mapping of a user namespace (implies -pU).\n"
-	       "              Same arguments as newuidmap(1)\n"
+	       "              Same arguments as newuidmap(1), multiple mappings should be separated by ',' (comma).\n"
 	       "              Not compatible with -b without writable\n"
 	       "  -M:         set the gid mapping of a user namespace (implies -pU).\n"
-	       "              Same arguments as newgidmap(1)\n"
+	       "              Same arguments as newgidmap(1), multiple mappings should be separated by ',' (comma).\n"
 	       "              Not compatible with -b without writable\n"
 	       "  -n:         set no_new_privs\n"
 	       "  -p:         enter new pid namespace (implies -vr)\n"
