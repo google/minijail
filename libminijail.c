@@ -744,29 +744,39 @@ int enter_chroot(const struct minijail *j)
 
 int enter_pivot_root(const struct minijail *j)
 {
-	int ret;
+	int ret, oldroot, newroot;
 	if (j->bindings_head && (ret = bind_one(j, j->bindings_head)))
 		return ret;
+
+	/* Keep the fd for both old and new root. It will be used in fchdir later. */
+	oldroot = open("/", O_DIRECTORY | O_RDONLY);
+	if (oldroot < 0)
+		pdie("failed to open / for fchdir");
+	newroot = open(j->chrootdir, O_DIRECTORY | O_RDONLY);
+	if (newroot < 0)
+		pdie("failed to open %s for fchdir", j->chrootdir);
 
 	/* To ensure chrootdir is the root of a file system, do a self bind mount. */
 	if (mount(j->chrootdir, j->chrootdir, "bind", MS_BIND | MS_REC, ""))
 		pdie("failed to bind mount '%s'", j->chrootdir);
 	if (chdir(j->chrootdir))
 		return -errno;
-	if (mkdir(".minijail_pivot", 0755))
-		pdie("mkdir(.minijail_pivot)");
-	if (syscall(SYS_pivot_root, ".", ".minijail_pivot")) {
-		remove(".minijail_pivot");
+	if (syscall(SYS_pivot_root, ".", "."))
 		pdie("pivot_root");
-	}
+
+	/*
+	 * Now the old root is mounted on top of the new root. Use fchdir to
+	 * change to the old root and unmount it.
+	 */
+	if (fchdir(oldroot))
+		pdie("failed to fchdir to old /");
 	/* The old root might be busy, so use lazy unmount. */
-	if (umount2(".minijail_pivot", MNT_DETACH))
-		pdie("umount(.minijail_pivot");
-	if (chdir("/"))
+	if (umount2(".", MNT_DETACH))
+		pdie("umount(/)");
+	/* Change back to the new root. */
+	if (fchdir(newroot))
 		return -errno;
 	if (chroot("/"))
-		return -errno;
-	if (remove(".minijail_pivot"))
 		return -errno;
 
 	return 0;
