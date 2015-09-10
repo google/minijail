@@ -20,7 +20,7 @@ ifeq ($(HOST_OS),linux)
 # ========================================================
 
 minijailCommonCFlags := -Wall -Werror -Wno-unused-function -Wno-unused-parameter
-minijailCommonSharedLibraries := libcap-ng
+minijailCommonSharedLibraries := libcap
 
 # libminijail shared library for target
 # ========================================================

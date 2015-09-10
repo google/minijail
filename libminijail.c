@@ -683,13 +683,6 @@ static int run_cap_valid(unsigned int cap)
 
 void drop_caps(const struct minijail *j)
 {
-#if defined(__ANDROID__)
-	/*
-	 * Temporarily disable capabilities support until Minijail can use
-	 * libcap-ng.
-	 */
-	(void) j;
-#else
 	cap_t caps = cap_get_proc();
 	cap_value_t flag[1];
 	const uint64_t one = 1;
@@ -745,7 +738,6 @@ void drop_caps(const struct minijail *j)
 		die("can't apply final cleaned capset");
 
 	cap_free(caps);
-#endif
 }
 
 void set_seccomp_filter(const struct minijail *j)
