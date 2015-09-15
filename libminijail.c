@@ -88,7 +88,7 @@ struct minijail {
 		int net:1;
 		int userns:1;
 		int seccomp:1;
-		int readonly:1;
+		int remount_proc_ro:1;
 		int usergroups:1;
 		int ptrace:1;
 		int no_new_privs:1;
@@ -127,7 +127,7 @@ void minijail_preenter(struct minijail *j)
 {
 	j->flags.vfs = 0;
 	j->flags.enter_vfs = 0;
-	j->flags.readonly = 0;
+	j->flags.remount_proc_ro = 0;
 	j->flags.pids = 0;
 	j->flags.do_init = 0;
 	j->flags.pid_file = 0;
@@ -141,7 +141,7 @@ void minijail_preexec(struct minijail *j)
 {
 	int vfs = j->flags.vfs;
 	int enter_vfs = j->flags.enter_vfs;
-	int readonly = j->flags.readonly;
+	int remount_proc_ro = j->flags.remount_proc_ro;
 	int userns = j->flags.userns;
 	if (j->user)
 		free(j->user);
@@ -150,7 +150,7 @@ void minijail_preexec(struct minijail *j)
 	/* Now restore anything we meant to keep. */
 	j->flags.vfs = vfs;
 	j->flags.enter_vfs = enter_vfs;
-	j->flags.readonly = readonly;
+	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
 	/* Note, |pids| will already have been used before this call. */
 }
@@ -286,7 +286,7 @@ void API minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path)
 void API minijail_namespace_pids(struct minijail *j)
 {
 	j->flags.vfs = 1;
-	j->flags.readonly = 1;
+	j->flags.remount_proc_ro = 1;
 	j->flags.pids = 1;
 	j->flags.do_init = 1;
 }
@@ -296,10 +296,10 @@ void API minijail_namespace_net(struct minijail *j)
 	j->flags.net = 1;
 }
 
-void API minijail_remount_readonly(struct minijail *j)
+void API minijail_remount_proc_readonly(struct minijail *j)
 {
 	j->flags.vfs = 1;
-	j->flags.readonly = 1;
+	j->flags.remount_proc_ro = 1;
 }
 
 void API minijail_namespace_user(struct minijail *j)
@@ -787,7 +787,7 @@ int mount_tmp(void)
 	return mount("none", "/tmp", "tmpfs", 0, "size=64M,mode=777");
 }
 
-int remount_readonly(const struct minijail *j)
+int remount_proc_readonly(const struct minijail *j)
 {
 	const char *kProcPath = "/proc";
 	const unsigned int kSafeFlags = MS_NODEV | MS_NOEXEC | MS_NOSUID;
@@ -985,7 +985,7 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.mount_tmp && mount_tmp())
 		pdie("mount_tmp");
 
-	if (j->flags.readonly && remount_readonly(j))
+	if (j->flags.remount_proc_ro && remount_proc_readonly(j))
 		pdie("remount");
 
 	if (j->flags.caps) {
@@ -1433,6 +1433,10 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 			die("failed to set up stderr pipe");
 	}
 
+	/* If running an init program, let it decide when/how to mount /proc. */
+	if (pid_namespace && !do_init)
+		j->flags.remount_proc_ro = 0;
+
 	/* Strip out flags that cannot be inherited across execve. */
 	minijail_preexec(j);
 	/* Jail this process and its descendants... */
@@ -1514,6 +1518,10 @@ int API minijail_run_static(struct minijail *j, const char *filename,
 
 	if (j->flags.userns)
 		enter_user_namespace(j, userns_pipe_fds);
+
+	/* If running an init program, let it decide when/how to mount /proc. */
+	if (pid_namespace && !do_init)
+		j->flags.remount_proc_ro = 0;
 
 	/*
 	 * We can now drop this child into the sandbox

@@ -223,7 +223,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_namespace_enter_vfs(j, optarg);
 			break;
 		case 'r':
-			minijail_remount_readonly(j);
+			minijail_remount_proc_readonly(j);
 			break;
 		case 'G':
 			minijail_inherit_usergroups(j);
