@@ -86,7 +86,7 @@ static void usage(const char *progn)
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
 	       "              Not compatible with -P\n"
-	       "  -e:         enter new network namespace\n"
+	       "  -e[file]:   enter new network namespace, or existing one if 'file' is provided\n"
 	       "  -f <file>:  write the pid of the jailed process to <file>\n"
 	       "  -G:         inherit secondary groups from uid\n"
 	       "  -g <group>: change gid to <group>\n"
@@ -145,7 +145,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
 	while ((opt = getopt(argc, argv,
-			     "u:g:sS:c:C:P:b:V:f:m:M:vrGhHinpLetIU")) != -1) {
+			     "u:g:sS:c:C:P:b:V:f:m:M:e::vrGhHinpLtIU")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -233,7 +233,10 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_namespace_pids(j);
 			break;
 		case 'e':
-			minijail_namespace_net(j);
+			if (optarg)
+				minijail_namespace_enter_net(j, optarg);
+			else
+				minijail_namespace_net(j);
 			break;
 		case 'i':
 			*exit_immediately = 1;

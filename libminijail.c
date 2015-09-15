@@ -87,6 +87,7 @@ struct minijail {
 		int enter_vfs:1;
 		int pids:1;
 		int net:1;
+		int enter_net:1;
 		int userns:1;
 		int seccomp:1;
 		int remount_proc_ro:1;
@@ -108,6 +109,7 @@ struct minijail {
 	uint64_t caps;
 	pid_t initpid;
 	int mountns_fd;
+	int netns_fd;
 	int filter_len;
 	int binding_count;
 	char *chrootdir;
@@ -295,6 +297,16 @@ void API minijail_namespace_pids(struct minijail *j)
 void API minijail_namespace_net(struct minijail *j)
 {
 	j->flags.net = 1;
+}
+
+void API minijail_namespace_enter_net(struct minijail *j, const char *ns_path)
+{
+	int ns_fd = open(ns_path, O_RDONLY);
+	if (ns_fd < 0) {
+		pdie("failed to open namespace '%s'", ns_path);
+	}
+	j->netns_fd = ns_fd;
+	j->flags.enter_net = 1;
 }
 
 void API minijail_remount_proc_readonly(struct minijail *j)
@@ -1011,8 +1023,12 @@ void API minijail_enter(const struct minijail *j)
             pdie("mount(/, private)");
         }
 
-	if (j->flags.net && unshare(CLONE_NEWNET))
+	if (j->flags.enter_net) {
+		if (setns(j->netns_fd, CLONE_NEWNET))
+			pdie("setns(CLONE_NEWNET)");
+	} else if (j->flags.net && unshare(CLONE_NEWNET)) {
 		pdie("unshare(net)");
+	}
 
 	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");
