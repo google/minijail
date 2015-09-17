@@ -295,20 +295,33 @@ int main(int argc, char *argv[])
 	struct minijail *j = minijail_new();
 	char *dl_mesg = NULL;
 	int exit_immediately = 0;
+	char *program_path;
 	int consumed = parse_args(j, argc, argv, &exit_immediately);
 	ElfType elftype = ELFERROR;
 	argc -= consumed;
 	argv += consumed;
 
+	/* Get the path to the program adjusted for changing root. */
+	program_path = minijail_get_original_path(j, argv[0]);
+
 	/* Check that we can access the target program. */
-	if (access(argv[0], X_OK)) {
+	if (!minijail_has_bind_mounts(j) && access(program_path, X_OK)) {
 		fprintf(stderr, "Target program '%s' is not accessible.\n",
 			argv[0]);
 		return 1;
 	}
 
 	/* Check if target is statically or dynamically linked. */
-	elftype = get_elf_linkage(argv[0]);
+	if (minijail_has_bind_mounts(j)) {
+		/* We can't tell what the internal path to the binary is so
+		 * assume it's dynamically linked.
+		 */
+		elftype = ELFDYNAMIC;
+		warn("assuming program '%s' is dynamically linked\n", argv[0]);
+	} else {
+		elftype = get_elf_linkage(program_path);
+	}
+
 	if (elftype == ELFSTATIC) {
 		/*
 		 * Target binary is statically linked so we cannot use
@@ -334,6 +347,8 @@ int main(int argc, char *argv[])
 			argv[0]);
 		return 1;
 	}
+
+	free(program_path);
 
 	if (exit_immediately) {
 		info("not running init loop, exiting immediately");

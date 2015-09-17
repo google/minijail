@@ -375,6 +375,22 @@ int API minijail_enter_pivot_root(struct minijail *j, const char *dir)
 	return 0;
 }
 
+char *minijail_get_original_path(struct minijail *j, const char *chroot_path)
+{
+	char *external_path;
+	size_t pathlen;
+
+	if (!j->chrootdir)
+		return strdup(chroot_path);
+
+	/* One extra char for '/' and one for '\0', hence + 2. */
+	pathlen = strlen(chroot_path) + strlen(j->chrootdir) + 2;
+	external_path = malloc(pathlen);
+	snprintf(external_path, pathlen, "%s/%s", j->chrootdir, chroot_path);
+
+	return external_path;
+}
+
 void API minijail_mount_tmp(struct minijail *j)
 {
 	j->flags.mount_tmp = 1;
@@ -429,6 +445,11 @@ error:
 	free(b->dest);
 	free(b);
 	return -ENOMEM;
+}
+
+int API minijail_has_bind_mounts(const struct minijail *j)
+{
+	return j->bindings_head != NULL;
 }
 
 void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)

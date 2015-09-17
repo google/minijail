@@ -77,6 +77,18 @@ void minijail_disable_ptrace(struct minijail *j);
 int minijail_enter_chroot(struct minijail *j, const char *dir);
 int minijail_enter_pivot_root(struct minijail *j, const char *dir);
 
+/* minijail_get_original_path: returns the path of a given file outside of the
+ * chroot.
+ * @j           minijail to obtain the path from.
+ * @chroot_path path inside of the chroot() to.
+ *
+ * When executing a binary in a chroot or pivot_root, return path to the binary
+ * outside of the chroot.
+ *
+ * Returns a string containing the path.  This must be freed by the caller.
+ */
+char *minijail_get_original_path(struct minijail *j, const char *chroot_path);
+
 /* minijail_mount_tmp: enables mounting of a tmpfs filesystem on /tmp.
  * As be rules of bind mounts, /tmp must exist in chroot.
  */
@@ -93,6 +105,11 @@ void minijail_mount_tmp(struct minijail *j);
  */
 int minijail_bind(struct minijail *j, const char *src, const char *dest,
 		  int writeable);
+
+/* minijail_has_bind_mounts: Checks if there are any bind mounts configured.
+ * @j         minijail to check
+ */
+int minijail_has_bind_mounts(const struct minijail *j);
 
 /* Lock this process into the given minijail. Note that this procedure cannot fail,
  * since there is no way to undo privilege-dropping; therefore, if any part of
