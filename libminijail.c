@@ -869,22 +869,20 @@ void drop_ugid(const struct minijail *j)
  * uncommon for that to be less (if an older kernel) or more (if a newer
  * kernel).  So suck up the answer via /proc.
  */
-static int run_cap_valid(unsigned int cap)
+static int get_last_valid_cap()
 {
-	static unsigned int last_cap;
+	const char cap_file[] = "/proc/sys/kernel/cap_last_cap";
+	FILE *fp = fopen(cap_file, "re");
+	int last_valid_cap;
 
-	if (!last_cap) {
-		const char cap_file[] = "/proc/sys/kernel/cap_last_cap";
-		FILE *fp = fopen(cap_file, "re");
-		if (fscanf(fp, "%u", &last_cap) != 1)
-			pdie("fscanf(%s)", cap_file);
-		fclose(fp);
-	}
+	if (fscanf(fp, "%u", &last_valid_cap) != 1)
+		pdie("fscanf(%s)", cap_file);
+	fclose(fp);
 
-	return cap <= last_cap;
+	return last_valid_cap;
 }
 
-void drop_caps(const struct minijail *j)
+void drop_caps(const struct minijail *j, int last_valid_cap)
 {
 	cap_t caps = cap_get_proc();
 	cap_value_t flag[1];
@@ -898,7 +896,7 @@ void drop_caps(const struct minijail *j)
 		die("can't clear effective caps");
 	if (cap_clear_flag(caps, CAP_PERMITTED))
 		die("can't clear permitted caps");
-	for (i = 0; i < sizeof(j->caps) * 8 && run_cap_valid(i); ++i) {
+	for (i = 0; i < sizeof(j->caps) * 8 && i <= last_valid_cap; ++i) {
 		/* Keep CAP_SETPCAP for dropping bounding set bits. */
 		if (i != CAP_SETPCAP && !(j->caps & (one << i)))
 			continue;
@@ -919,7 +917,7 @@ void drop_caps(const struct minijail *j)
 	 * have been used above to raise a capability that wasn't already
 	 * present. This requires CAP_SETPCAP, so we raised/kept it above.
 	 */
-	for (i = 0; i < sizeof(j->caps) * 8 && run_cap_valid(i); ++i) {
+	for (i = 0; i < sizeof(j->caps) * 8 && i <= last_valid_cap; ++i) {
 		if (j->caps & (one << i))
 			continue;
 		if (prctl(PR_CAPBSET_DROP, i))
@@ -980,6 +978,12 @@ void set_seccomp_filter(const struct minijail *j)
 
 void API minijail_enter(const struct minijail *j)
 {
+	/*
+	 * Get the last valid cap from /proc, since /proc can be unmounted
+	 * before drop_caps().
+	 */
+	int last_valid_cap = get_last_valid_cap();
+
 	if (j->flags.pids)
 		die("tried to enter a pid-namespaced jail;"
 		    " try minijail_run()?");
@@ -1044,7 +1048,7 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.no_new_privs) {
 		drop_ugid(j);
 		if (j->flags.caps)
-			drop_caps(j);
+			drop_caps(j, last_valid_cap);
 
 		set_seccomp_filter(j);
 	} else {
@@ -1059,7 +1063,7 @@ void API minijail_enter(const struct minijail *j)
 
 		drop_ugid(j);
 		if (j->flags.caps)
-			drop_caps(j);
+			drop_caps(j, last_valid_cap);
 	}
 
 	/*
