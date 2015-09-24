@@ -14,8 +14,6 @@
 
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(HOST_OS),linux)
-
 # Common variables
 # ========================================================
 
@@ -32,7 +30,7 @@ LOCAL_MODULE := libminijail
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 intermediates := $(local-generated-sources-dir)
 GEN := $(intermediates)/libsyscalls.c
-$(GEN): PRIVATE_CUSTOM_TOOL = $< $(lastword $(CLANG)) $@
+$(GEN): PRIVATE_CUSTOM_TOOL = $< "$(lastword $(CLANG)) -isystem bionic/libc/kernel/uapi/asm-$(TARGET_ARCH)" $@
 $(GEN): $(LOCAL_PATH)/gen_syscalls.sh
 	$(transform-generated-source)
 LOCAL_GENERATED_SOURCES += $(GEN)
@@ -49,5 +47,3 @@ LOCAL_SRC_FILES := \
 LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
-
-endif # HOST_OS == linux
