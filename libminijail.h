@@ -51,7 +51,7 @@ void minijail_use_caps(struct minijail *j, uint64_t capmask);
 void minijail_namespace_vfs(struct minijail *j);
 void minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path);
 void minijail_namespace_net(struct minijail *j);
-/* Implies namespace_vfs and remount_readonly.
+/* Implies namespace_vfs and remount_proc_readonly.
  * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
  */
 void minijail_namespace_pids(struct minijail *j);
@@ -103,32 +103,32 @@ int minijail_bind(struct minijail *j, const char *src, const char *dest,
  */
 void minijail_enter(const struct minijail *j);
 
-/* Run the specified command in the given minijail, execve(3)-style. This is
+/* Run the specified command in the given minijail, execve(2)-style. This is
  * required if minijail_namespace_pids() was used.
  */
 int minijail_run(struct minijail *j, const char *filename,
 		 char *const argv[]);
 
-/* Run the specified command in the given minijail, execve(3)-style.
- * Used with static binaries.
+/* Run the specified command in the given minijail, execve(2)-style.
+ * Used with static binaries, or on systems without support for LD_PRELOAD.
  */
-int minijail_run_static(struct minijail *j, const char *filename,
-			char *const argv[]);
+int minijail_run_no_preload(struct minijail *j, const char *filename,
+			    char *const argv[]);
 
-/* Run the specified command in the given minijail, execve(3)-style.
+/* Run the specified command in the given minijail, execve(2)-style.
  * Update |*pchild_pid| with the pid of the child.
  */
 int minijail_run_pid(struct minijail *j, const char *filename,
 		     char *const argv[], pid_t *pchild_pid);
 
-/* Run the specified command in the given minijail, execve(3)-style.
+/* Run the specified command in the given minijail, execve(2)-style.
  * Update |*pstdin_fd| with a fd that allows writing to the child's
  * standard input.
  */
 int minijail_run_pipe(struct minijail *j, const char *filename,
 		      char *const argv[], int *pstdin_fd);
 
-/* Run the specified command in the given minijail, execve(3)-style.
+/* Run the specified command in the given minijail, execve(2)-style.
  * Update |*pchild_pid| with the pid of the child.
  * Update |*pstdin_fd| with a fd that allows writing to the child's
  * standard input.
@@ -137,7 +137,7 @@ int minijail_run_pid_pipe(struct minijail *j, const char *filename,
 			  char *const argv[], pid_t *pchild_pid,
 			  int *pstdin_fd);
 
-/* Run the specified command in the given minijail, execve(3)-style.
+/* Run the specified command in the given minijail, execve(2)-style.
  * Update |*pchild_pid| with the pid of the child.
  * Update |*pstdin_fd| with a fd that allows writing to the child's
  * standard input.

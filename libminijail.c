@@ -18,6 +18,7 @@
 #include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -549,7 +550,7 @@ char *consumestr(char **buf, size_t *buflength)
 {
 	size_t len = strnlen(*buf, *buflength);
 	if (len == *buflength)
-		/* There's no null-terminator */
+		/* There's no null-terminator. */
 		return NULL;
 	return consumebytes(len + 1, buf, buflength);
 }
@@ -1077,7 +1078,7 @@ int API minijail_from_fd(int fd, struct minijail *j)
 	int r;
 	if (sizeof(sz) != bytes)
 		return -EINVAL;
-	if (sz > USHRT_MAX)	/* Arbitrary sanity check */
+	if (sz > USHRT_MAX)	/* arbitrary sanity check */
 		return -E2BIG;
 	buf = malloc(sz);
 	if (!buf)
@@ -1137,7 +1138,7 @@ int setup_preload(void)
 	sprintf(newenv, "%s%s%s", oldenv, strlen(oldenv) ? " " : "",
 		PRELOADPATH);
 
-	/* setenv() makes a copy of the string we give it */
+	/* setenv() makes a copy of the string we give it. */
 	setenv(kLdPreloadEnvVar, newenv, 1);
 	free(newenv);
 	return 0;
@@ -1176,38 +1177,59 @@ int setup_and_dupe_pipe_end(int fds[2], size_t index, int fd)
 	return dup2(fds[index], fd);
 }
 
+int minijail_run_internal(struct minijail *j, const char *filename,
+			  char *const argv[], pid_t *pchild_pid,
+			  int *pstdin_fd, int *pstdout_fd, int *pstderr_fd,
+			  int use_preload);
+
 int API minijail_run(struct minijail *j, const char *filename,
 		     char *const argv[])
 {
-	return minijail_run_pid_pipes(j, filename, argv,
-				      NULL, NULL, NULL, NULL);
+	return minijail_run_internal(j, filename, argv, NULL, NULL, NULL, NULL,
+				     true);
 }
 
 int API minijail_run_pid(struct minijail *j, const char *filename,
 			 char *const argv[], pid_t *pchild_pid)
 {
-	return minijail_run_pid_pipes(j, filename, argv, pchild_pid,
-				      NULL, NULL, NULL);
+	return minijail_run_internal(j, filename, argv, pchild_pid,
+				     NULL, NULL, NULL, true);
 }
 
 int API minijail_run_pipe(struct minijail *j, const char *filename,
 			  char *const argv[], int *pstdin_fd)
 {
-	return minijail_run_pid_pipes(j, filename, argv, NULL, pstdin_fd,
-				      NULL, NULL);
+	return minijail_run_internal(j, filename, argv, NULL, pstdin_fd,
+				     NULL, NULL, true);
 }
 
 int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
 			      char *const argv[], pid_t *pchild_pid,
 			      int *pstdin_fd)
 {
-	return minijail_run_pid_pipes(j, filename, argv, pchild_pid, pstdin_fd,
-				      NULL, NULL);
+	return minijail_run_internal(j, filename, argv, pchild_pid, pstdin_fd,
+				     NULL, NULL, true);
 }
 
 int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 			       char *const argv[], pid_t *pchild_pid,
 			       int *pstdin_fd, int *pstdout_fd, int *pstderr_fd)
+{
+	return minijail_run_internal(j, filename, argv, pchild_pid,
+				     pstdin_fd, pstdout_fd, pstderr_fd, true);
+}
+
+int API minijail_run_no_preload(struct minijail *j, const char *filename,
+				char *const argv[])
+{
+	return minijail_run_internal(j, filename, argv, NULL, NULL, NULL, NULL,
+				     false);
+}
+
+int minijail_run_internal(struct minijail *j, const char *filename,
+			  char *const argv[], pid_t *pchild_pid,
+			  int *pstdin_fd, int *pstdout_fd, int *pstderr_fd,
+			  int use_preload)
 {
 	char *oldenv, *oldenv_copy = NULL;
 	pid_t child_pid;
@@ -1221,15 +1243,23 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	int pid_namespace = j->flags.pids;
 	int do_init = j->flags.do_init;
 
-	oldenv = getenv(kLdPreloadEnvVar);
-	if (oldenv) {
-		oldenv_copy = strdup(oldenv);
-		if (!oldenv_copy)
-			return -ENOMEM;
+	if (use_preload) {
+		oldenv = getenv(kLdPreloadEnvVar);
+		if (oldenv) {
+			oldenv_copy = strdup(oldenv);
+			if (!oldenv_copy)
+				return -ENOMEM;
+		}
+
+		if (setup_preload())
+			return -EFAULT;
 	}
 
-	if (setup_preload())
-		return -EFAULT;
+	if (!use_preload) {
+		if (j->flags.caps)
+			die("Capabilities are not supported without "
+			    "LD_PRELOAD");
+	}
 
 	/*
 	 * Make the process group ID of this process equal to its PID, so that
@@ -1244,12 +1274,14 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		}
 	}
 
-	/*
-	 * Before we fork(2) and execve(2) the child process, we need to open
-	 * a pipe(2) to send the minijail configuration over.
-	 */
-	if (setup_pipe(pipe_fds))
-		return -EFAULT;
+	if (use_preload) {
+		/*
+		 * Before we fork(2) and execve(2) the child process, we need
+		 * to open a pipe(2) to send the minijail configuration over.
+		 */
+		if (setup_pipe(pipe_fds))
+			return -EFAULT;
+	}
 
 	/*
 	 * If we want to write to the child process' standard input,
@@ -1332,24 +1364,28 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		if (j->flags.userns)
 			clone_flags |= CLONE_NEWUSER;
 		child_pid = syscall(SYS_clone, clone_flags, NULL);
-	}
-	else
+	} else {
 		child_pid = fork();
+	}
 
 	if (child_pid < 0) {
-		free(oldenv_copy);
+		if (use_preload) {
+			free(oldenv_copy);
+		}
 		die("failed to fork child");
 	}
 
 	if (child_pid) {
-		/* Restore parent's LD_PRELOAD. */
-		if (oldenv_copy) {
-			setenv(kLdPreloadEnvVar, oldenv_copy, 1);
-			free(oldenv_copy);
-		} else {
-			unsetenv(kLdPreloadEnvVar);
+		if (use_preload) {
+			/* Restore parent's LD_PRELOAD. */
+			if (oldenv_copy) {
+				setenv(kLdPreloadEnvVar, oldenv_copy, 1);
+				free(oldenv_copy);
+			} else {
+				unsetenv(kLdPreloadEnvVar);
+			}
+			unsetenv(kFdEnvVar);
 		}
-		unsetenv(kFdEnvVar);
 
 		j->initpid = child_pid;
 
@@ -1359,13 +1395,15 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		if (j->flags.userns)
 			write_ugid_mappings(j, userns_pipe_fds);
 
-		/* Send marshalled minijail. */
-		close(pipe_fds[0]);	/* read endpoint */
-		ret = minijail_to_fd(j, pipe_fds[1]);
-		close(pipe_fds[1]);	/* write endpoint */
-		if (ret) {
-			kill(j->initpid, SIGKILL);
-			die("failed to send marshalled minijail");
+		if (use_preload) {
+			/* Send marshalled minijail. */
+			close(pipe_fds[0]);	/* read endpoint */
+			ret = minijail_to_fd(j, pipe_fds[1]);
+			close(pipe_fds[1]);	/* write endpoint */
+			if (ret) {
+				kill(j->initpid, SIGKILL);
+				die("failed to send marshalled minijail");
+			}
 		}
 
 		if (pchild_pid)
@@ -1377,7 +1415,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		 */
 		if (pstdin_fd)
 			*pstdin_fd = setup_pipe_end(stdin_fds,
-						    1	/* write end */);
+						    1 /* write end */);
 
 		/*
 		 * If we want to read from the child process' standard output,
@@ -1385,7 +1423,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		 */
 		if (pstdout_fd)
 			*pstdout_fd = setup_pipe_end(stdout_fds,
-						     0	/* read end */);
+						     0 /* read end */);
 
 		/*
 		 * If we want to read from the child process' standard error,
@@ -1393,12 +1431,11 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		 */
 		if (pstderr_fd)
 			*pstderr_fd = setup_pipe_end(stderr_fds,
-						     0	/* read end */);
+						     0 /* read end */);
 
 		return 0;
 	}
 	free(oldenv_copy);
-
 
 	if (j->flags.userns)
 		enter_user_namespace(j, userns_pipe_fds);
@@ -1437,16 +1474,20 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	if (pid_namespace && !do_init)
 		j->flags.remount_proc_ro = 0;
 
-	/* Strip out flags that cannot be inherited across execve. */
-	minijail_preexec(j);
-	/* Jail this process and its descendants... */
+	if (use_preload) {
+		/* Strip out flags that cannot be inherited across execve(2). */
+		minijail_preexec(j);
+	} else {
+		j->flags.pids = 0;
+	}
+	/* Jail this process, then execve() the target. */
 	minijail_enter(j);
 
 	if (pid_namespace && do_init) {
 		/*
 		 * pid namespace: this process will become init inside the new
 		 * namespace. We don't want all programs we might exec to have
-		 * to know how to be init. Normally |do_init == 1| we fork off
+		 * to know how to be init. Normally (do_init == 1) we fork off
 		 * a child to actually run the program. If |do_init == 0|, we
 		 * let the program keep pid 1 and be init.
 		 *
@@ -1461,7 +1502,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	}
 
 	/*
-	 * If we aren't pid-namespaced, or jailed program asked to be init:
+	 * If we aren't pid-namespaced, or the jailed program asked to be init:
 	 *   calling process
 	 *   -> execve()-ing process
 	 * If we are:
@@ -1469,86 +1510,6 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 	 *   -> init()-ing process
 	 *      -> execve()-ing process
 	 */
-	_exit(execve(filename, argv, environ));
-}
-
-int API minijail_run_static(struct minijail *j, const char *filename,
-			    char *const argv[])
-{
-	pid_t child_pid;
-	int userns_pipe_fds[2];
-	int pid_namespace = j->flags.pids;
-	int do_init = j->flags.do_init;
-
-	if (j->flags.caps)
-		die("caps not supported with static targets");
-
-	/*
-	 * If we want to set up a new uid/gid mapping in the user namespace,
-	 * create the pipe(2) to sync between parent and child.
-	 */
-	if (j->flags.userns) {
-		if (pipe(userns_pipe_fds))
-			return -EFAULT;
-	}
-
-	if (pid_namespace) {
-		int clone_flags = CLONE_NEWPID | SIGCHLD;
-		if (j->flags.userns)
-			clone_flags |= CLONE_NEWUSER;
-		child_pid = syscall(SYS_clone, clone_flags, NULL);
-	}
-	else
-		child_pid = fork();
-
-	if (child_pid < 0) {
-		die("failed to fork child");
-	}
-	if (child_pid > 0 ) {
-		j->initpid = child_pid;
-
-		if (j->flags.pid_file)
-			write_pid_file(j);
-
-		if (j->flags.userns)
-			write_ugid_mappings(j, userns_pipe_fds);
-
-		return 0;
-	}
-
-	if (j->flags.userns)
-		enter_user_namespace(j, userns_pipe_fds);
-
-	/* If running an init program, let it decide when/how to mount /proc. */
-	if (pid_namespace && !do_init)
-		j->flags.remount_proc_ro = 0;
-
-	/*
-	 * We can now drop this child into the sandbox
-	 * then execve the target.
-	 */
-
-	j->flags.pids = 0;
-	minijail_enter(j);
-
-	if (pid_namespace && do_init) {
-		/*
-		 * pid namespace: this process will become init inside the new
-		 * namespace. We don't want all programs we might exec to have
-		 * to know how to be init. Normally |do_init == 1| we fork off
-		 * a child to actually run the program. If |do_init == 0|, we
-		 * let the program keep pid 1 and be init.
-		 *
-		 * If we're multithreaded, we'll probably deadlock here. See
-		 * WARNING above.
-		 */
-		child_pid = fork();
-		if (child_pid < 0)
-			_exit(child_pid);
-		else if (child_pid > 0)
-			init(child_pid);	/* never returns */
-	}
-
 	_exit(execve(filename, argv, environ));
 }
 

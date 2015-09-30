@@ -144,7 +144,8 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const char *filter_path;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
-	while ((opt = getopt(argc, argv, "u:g:sS:c:C:P:b:V:f:m:M:vrGhHinpLetIU")) != -1) {
+	while ((opt = getopt(argc, argv,
+			     "u:g:sS:c:C:P:b:V:f:m:M:vrGhHinpLetIU")) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -309,8 +310,11 @@ int main(int argc, char *argv[])
 	/* Check if target is statically or dynamically linked. */
 	elftype = get_elf_linkage(argv[0]);
 	if (elftype == ELFSTATIC) {
-		/* Target binary is static. */
-		minijail_run_static(j, argv[0], argv);
+		/*
+		 * Target binary is statically linked so we cannot use
+		 * libminijailpreload.so.
+		 */
+		minijail_run_no_preload(j, argv[0], argv);
 	} else if (elftype == ELFDYNAMIC) {
 		/*
 		 * Target binary is dynamically linked so we can
