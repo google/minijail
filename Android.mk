@@ -17,7 +17,8 @@ LOCAL_PATH := $(call my-dir)
 # Common variables
 # ========================================================
 
-minijailCommonCFlags := -Wall -Werror -Wno-unused-function -Wno-unused-parameter
+minijailCommonCFlags := -Wall -Werror -Wno-unused-function \
+    -Wno-unused-parameter -Wno-sign-compare
 minijailCommonSharedLibraries := libcap
 
 # libminijail shared library for target
@@ -32,6 +33,12 @@ intermediates := $(local-generated-sources-dir)
 GEN := $(intermediates)/libsyscalls.c
 $(GEN): PRIVATE_CUSTOM_TOOL = $< "$(lastword $(CLANG)) -isystem bionic/libc/kernel/uapi/asm-$(TARGET_ARCH)" $@
 $(GEN): $(LOCAL_PATH)/gen_syscalls.sh
+	$(transform-generated-source)
+LOCAL_GENERATED_SOURCES += $(GEN)
+
+GEN := $(intermediates)/libconstants.c
+$(GEN): PRIVATE_CUSTOM_TOOL = $< "$(lastword $(CLANG)) -isystem bionic/libc/kernel/uapi/asm-$(TARGET_ARCH)" $@
+$(GEN): $(LOCAL_PATH)/gen_constants.sh
 	$(transform-generated-source)
 LOCAL_GENERATED_SOURCES += $(GEN)
 
