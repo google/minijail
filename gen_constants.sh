@@ -11,16 +11,14 @@
 
 set -e
 
-if [ $# -ne 1 ] && [ $# -ne 3]; then
+if [ $# -ne 1 ] && [ $# -ne 2 ]; then
   echo "Usage: $(basename "$0") OUTFILE"
-  echo "Usage: $(basename "$0") CC CFLAGS OUTFILE"
+  echo "Usage: $(basename "$0") CC OUTFILE"
   exit 1
 fi
 
-if [ $# -eq 3 ]; then
+if [ $# -eq 2 ]; then
   CC="$1"
-  shift
-  CFLAGS="$1"
   shift
 fi
 OUTFILE="$1"
@@ -45,7 +43,7 @@ $INCLUDES
 #include "libconstants.h"
 const struct constant_entry constant_table[] = {
 $(echo "$INCLUDES" | \
-  ${CC} ${CFLAGS} -dD - -E | \
+  ${CC} -dD - -E | \
   grep '^#define [A-Z][A-Z0-9_]* ' | \
   grep -v '\(SIGRTMAX\|SIGRTMIN\|SIG_\|NULL\)' | \
   sort | \
