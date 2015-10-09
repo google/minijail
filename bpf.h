@@ -10,6 +10,7 @@
 #define BPF_H
 
 #include <asm/bitsperlong.h>   /* for __BITS_PER_LONG */
+#include <endian.h>
 #include <linux/audit.h>
 #include <linux/filter.h>
 #include <stddef.h>
@@ -84,7 +85,7 @@ struct seccomp_data {
 #define bpf_comp_jset bpf_comp_jset64
 
 /* Ensure that we load the logically correct offset. */
-#if defined(__LITTLE_ENDIAN__)
+#if defined(__LITTLE_ENDIAN__) || __BYTE_ORDER == __LITTLE_ENDIAN
 #define LO_ARG(idx) offsetof(struct seccomp_data, args[(idx)])
 #define HI_ARG(idx) offsetof(struct seccomp_data, args[(idx)]) + sizeof(__u32)
 #else

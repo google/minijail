@@ -24,22 +24,24 @@ tests: CC_BINARY(libminijail_unittest) CC_BINARY(syscall_filter_unittest)
 
 CC_BINARY(minijail0): LDLIBS += -lcap -ldl
 CC_BINARY(minijail0): libconstants.gen.o libsyscalls.gen.o libminijail.o \
-		syscall_filter.o signal.o bpf.o util.o elfparse.o minijail0.o
+		syscall_filter.o signal_handler.o bpf.o util.o elfparse.o minijail0.o
 clean: CLEAN(minijail0)
 
 CC_LIBRARY(libminijail.so): LDLIBS += -lcap
-CC_LIBRARY(libminijail.so): libminijail.o syscall_filter.o signal.o bpf.o \
-		util.o libconstants.gen.o libsyscalls.gen.o
+CC_LIBRARY(libminijail.so): libminijail.o syscall_filter.o signal_handler.o \
+    bpf.o util.o libconstants.gen.o libsyscalls.gen.o
 clean: CLEAN(libminijail.so)
 
 CC_BINARY(libminijail_unittest): LDLIBS += -lcap
 CC_BINARY(libminijail_unittest): libminijail_unittest.o libminijail.o \
-		syscall_filter.o signal.o bpf.o util.o libconstants.gen.o libsyscalls.gen.o
+		syscall_filter.o signal_handler.o bpf.o util.o libconstants.gen.o \
+		libsyscalls.gen.o
 clean: CLEAN(libminijail_unittest)
 
 CC_LIBRARY(libminijailpreload.so): LDLIBS += -lcap -ldl
 CC_LIBRARY(libminijailpreload.so): libminijailpreload.o libminijail.o \
-		libconstants.gen.o libsyscalls.gen.o syscall_filter.o signal.o bpf.o util.o
+		libconstants.gen.o libsyscalls.gen.o syscall_filter.o signal_handler.o \
+		bpf.o util.o
 clean: CLEAN(libminijailpreload.so)
 
 CC_BINARY(syscall_filter_unittest): syscall_filter_unittest.o syscall_filter.o \
