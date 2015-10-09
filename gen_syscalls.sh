@@ -12,13 +12,16 @@
 
 set -e
 
-if [ $# -ne 2 ]; then
+if [ $# -ne 1 ] && [ $# -ne 2 ]; then
+  echo "Usage: $(basename "$0") OUTFILE"
   echo "Usage: $(basename "$0") CC OUTFILE"
   exit 1
 fi
 
-CC="$1"
-shift
+if [ $# -eq 2 ]; then
+  CC="$1"
+  shift
+fi
 OUTFILE="$1"
 
 # sed expression which extracts system calls that are
