@@ -800,6 +800,9 @@ int enter_pivot_root(const struct minijail *j)
 		return -errno;
 	if (chroot("/"))
 		return -errno;
+	/* Set correct CWD for getcwd(3). */
+	if (chdir("/"))
+		return -errno;
 
 	return 0;
 }
