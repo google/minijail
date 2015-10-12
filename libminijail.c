@@ -821,7 +821,7 @@ int remount_proc_readonly(const struct minijail *j)
 	 * and make our own. However, if we are in a new user namespace, /proc
 	 * is not seen as mounted, so don't return error if umount() fails.
 	 */
-	if (umount(kProcPath) && !j->flags.userns)
+	if (umount2(kProcPath, MNT_DETACH) && !j->flags.userns)
 		return -errno;
 	if (mount("", kProcPath, "proc", kSafeFlags | MS_RDONLY, ""))
 		return -errno;
@@ -992,8 +992,17 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.enter_vfs && setns(j->mountns_fd, CLONE_NEWNS))
 		pdie("setns(CLONE_NEWNS)");
 
-	if (j->flags.vfs && unshare(CLONE_NEWNS))
-		pdie("unshare(vfs)");
+	if (j->flags.vfs) {
+          if (unshare(CLONE_NEWNS))
+            pdie("unshare(vfs)");
+          /*
+           * Remount all filesystems as private. If they are shared
+           * new bind mounts will creep out of our namespace.
+           * https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
+           */
+          if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL))
+            pdie("mount(/, private)");
+        }
 
 	if (j->flags.net && unshare(CLONE_NEWNET))
 		pdie("unshare(net)");
