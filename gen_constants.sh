@@ -33,6 +33,16 @@ INCLUDES='
 #include <sys/stat.h>
 #include <sys/types.h>'
 
+# sed expression which extracts constants and converts them from:
+#   #define AT_FDWCD foo
+# to:
+# #ifdef AT_FDCWD
+#   { "AT_FDWCD", AT_FDCWD },
+# endif
+SED_MULTILINE='s/#define \([A-Z][A-Z0-9_]*\).*/#ifdef \1\
+  { "\1", \1 },\
+#endif  \/\/ \1/'
+
 # Passes the previous list of #includes to the C preprocessor and prints out
 # all #defines whose name is all-caps.  Excludes a few symbols that are known
 # macro functions that don't evaluate to a constant.
@@ -48,7 +58,7 @@ $(echo "$INCLUDES" | \
   grep -v '\(SIGRTMAX\|SIGRTMIN\|SIG_\|NULL\)' | \
   sort | \
   uniq | \
-  sed -e 's/#define \([A-Z0-9_]\+\).*$/#ifdef \1\n  { "\1", \1 },\n#endif  \/\/ \1/')
+  sed -e "${SED_MULTILINE}")
   { NULL, 0 },
 };
 EOF
