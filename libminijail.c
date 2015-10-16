@@ -1259,6 +1259,14 @@ int API minijail_run_no_preload(struct minijail *j, const char *filename,
 				     false);
 }
 
+int API minijail_run_pid_pipes_no_preload(struct minijail *j,
+					  const char *filename, char *const argv[],
+					  pid_t *pchild_pid,
+					  int *pstdin_fd, int *pstdout_fd, int *pstderr_fd) {
+	return minijail_run_internal(j, filename, argv, pchild_pid,
+				     pstdin_fd, pstdout_fd, pstderr_fd, false);
+}
+
 int minijail_run_internal(struct minijail *j, const char *filename,
 			  char *const argv[], pid_t *pchild_pid,
 			  int *pstdin_fd, int *pstdout_fd, int *pstderr_fd,
