@@ -56,8 +56,7 @@ $(echo "$INCLUDES" | \
   ${CC} -dD - -E | \
   grep '^#define [[:upper:]][[:upper:]0-9_]* ' | \
   grep -Ev '(SIGRTMAX|SIGRTMIN|SIG_|NULL)' | \
-  sort | \
-  uniq | \
+  sort -u | \
   sed -e "${SED_MULTILINE}")
   { NULL, 0 },
 };
