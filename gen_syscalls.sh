@@ -31,7 +31,7 @@ OUTFILE="$1"
 # #ifdef __NR_read
 #  { "read", __NR_read },
 # #endif
-SED_MULTILINE='s/#define __(ARM_)?(NR_)([a-z0-9_]*) (.*)$/#ifdef __\1\2\3\
+SED_MULTILINE='s/#define __(ARM_)?(NR_)([[:lower:]0-9_]*) (.*)$/#ifdef __\1\2\3\
 { "\1\3", __\1\2\3 },\
 #endif/g p;'
 

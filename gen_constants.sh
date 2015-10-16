@@ -39,7 +39,7 @@ INCLUDES='
 # #ifdef AT_FDCWD
 #   { "AT_FDWCD", AT_FDCWD },
 # endif
-SED_MULTILINE='s/#define \([A-Z][A-Z0-9_]*\).*/#ifdef \1\
+SED_MULTILINE='s/#define \([[:upper:]][[:upper:]0-9_]*\).*/#ifdef \1\
   { "\1", \1 },\
 #endif  \/\/ \1/'
 
@@ -54,7 +54,7 @@ $INCLUDES
 const struct constant_entry constant_table[] = {
 $(echo "$INCLUDES" | \
   ${CC} -dD - -E | \
-  grep '^#define [A-Z][A-Z0-9_]* ' | \
+  grep '^#define [[:upper:]][[:upper:]0-9_]* ' | \
   grep -v '\(SIGRTMAX\|SIGRTMIN\|SIG_\|NULL\)' | \
   sort | \
   uniq | \
