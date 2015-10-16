@@ -39,9 +39,9 @@ INCLUDES='
 # #ifdef AT_FDCWD
 #   { "AT_FDWCD", AT_FDCWD },
 # endif
-SED_MULTILINE='s/#define \([[:upper:]][[:upper:]0-9_]*\).*/#ifdef \1\
+SED_MULTILINE='s@#define ([[:upper:]][[:upper:]0-9_]*).*@#ifdef \1\
   { "\1", \1 },\
-#endif  \/\/ \1/'
+#endif  // \1@'
 
 # Passes the previous list of #includes to the C preprocessor and prints out
 # all #defines whose name is all-caps.  Excludes a few symbols that are known
@@ -57,7 +57,7 @@ $(echo "$INCLUDES" | \
   grep '^#define [[:upper:]][[:upper:]0-9_]* ' | \
   grep -Ev '(SIGRTMAX|SIGRTMIN|SIG_|NULL)' | \
   sort -u | \
-  sed -e "${SED_MULTILINE}")
+  sed -Ee "${SED_MULTILINE}")
   { NULL, 0 },
 };
 EOF
