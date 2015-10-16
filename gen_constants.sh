@@ -55,7 +55,7 @@ const struct constant_entry constant_table[] = {
 $(echo "$INCLUDES" | \
   ${CC} -dD - -E | \
   grep '^#define [[:upper:]][[:upper:]0-9_]* ' | \
-  grep -v '\(SIGRTMAX\|SIGRTMIN\|SIG_\|NULL\)' | \
+  grep -Ev '(SIGRTMAX|SIGRTMIN|SIG_|NULL)' | \
   sort | \
   uniq | \
   sed -e "${SED_MULTILINE}")
