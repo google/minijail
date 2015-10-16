@@ -1236,14 +1236,6 @@ int API minijail_run_pipe(struct minijail *j, const char *filename,
 				     NULL, NULL, true);
 }
 
-int API minijail_run_pid_pipe(struct minijail *j, const char *filename,
-			      char *const argv[], pid_t *pchild_pid,
-			      int *pstdin_fd)
-{
-	return minijail_run_internal(j, filename, argv, pchild_pid, pstdin_fd,
-				     NULL, NULL, true);
-}
-
 int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 			       char *const argv[], pid_t *pchild_pid,
 			       int *pstdin_fd, int *pstdout_fd, int *pstderr_fd)

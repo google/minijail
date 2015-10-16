@@ -149,15 +149,6 @@ int minijail_run_pipe(struct minijail *j, const char *filename,
  * Update |*pchild_pid| with the pid of the child.
  * Update |*pstdin_fd| with a fd that allows writing to the child's
  * standard input.
- */
-int minijail_run_pid_pipe(struct minijail *j, const char *filename,
-			  char *const argv[], pid_t *pchild_pid,
-			  int *pstdin_fd);
-
-/* Run the specified command in the given minijail, execve(2)-style.
- * Update |*pchild_pid| with the pid of the child.
- * Update |*pstdin_fd| with a fd that allows writing to the child's
- * standard input.
  * Update |*pstdout_fd| with a fd that allows reading from the child's
  * standard output.
  * Update |*pstderr_fd| with a fd that allows reading from the child's
