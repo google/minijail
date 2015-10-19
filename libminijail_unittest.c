@@ -145,30 +145,6 @@ TEST_F(marshal, 0xff) {
 
 /*
  * TODO(jorgelo): rewrite these tests to not depend on libminijailpreload.so.
-TEST(test_minijail_run_pid_pipe) {
-  pid_t pid;
-  int child_stdin;
-  int mj_run_ret;
-  ssize_t write_ret;
-  int status;
-  char filename[] = "test/read_stdin";
-  char *argv[2];
-  argv[0] = filename;
-  argv[1] = NULL;
-
-  struct minijail *j = minijail_new();
-  mj_run_ret = minijail_run_pid_pipe(j, argv[0], argv, &pid, &child_stdin);
-  EXPECT_EQ(mj_run_ret, 0);
-  write_ret = write(child_stdin, "test\n", strlen("test\n"));
-  EXPECT_GT(write_ret, -1);
-
-  waitpid(pid, &status, 0);
-  ASSERT_TRUE(WIFEXITED(status));
-  EXPECT_EQ(WEXITSTATUS(status), 0);
-
-  minijail_destroy(j);
-}
-
 TEST(test_minijail_run_pid_pipes) {
   pid_t pid;
   int child_stdin, child_stdout, child_stderr;
