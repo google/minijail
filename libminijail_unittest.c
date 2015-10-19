@@ -143,9 +143,7 @@ TEST_F(marshal, 0xff) {
   EXPECT_EQ(-EINVAL, minijail_unmarshal(self->j, self->buf, sizeof(self->buf)));
 }
 
-/*
- * TODO(jorgelo): rewrite these tests to not depend on libminijailpreload.so.
-TEST(test_minijail_run_pid_pipes) {
+TEST(test_minijail_run_pid_pipes_no_preload) {
   pid_t pid;
   int child_stdin, child_stdout, child_stderr;
   int mj_run_ret;
@@ -162,8 +160,10 @@ TEST(test_minijail_run_pid_pipes) {
 
   argv[0] = filename;
   argv[1] = NULL;
-  mj_run_ret = minijail_run_pid_pipes(j, argv[0], argv,
-                                      &pid, &child_stdin, &child_stdout, NULL);
+  mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv,
+                                                 &pid,
+                                                 &child_stdin, &child_stdout,
+                                                 NULL);
   EXPECT_EQ(mj_run_ret, 0);
 
   write_ret = write(child_stdin, teststr, teststr_len);
@@ -183,8 +183,9 @@ TEST(test_minijail_run_pid_pipes) {
   argv[1] = "-c";
   argv[2] = "echo test >&2";
   argv[3] = NULL;
-  mj_run_ret = minijail_run_pid_pipes(j, argv[0], argv, &pid, &child_stdin,
-                                      &child_stdout, &child_stderr);
+  mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv, &pid,
+                                                 &child_stdin, &child_stdout,
+                                                 &child_stderr);
   EXPECT_EQ(mj_run_ret, 0);
 
   read_ret = read(child_stderr, buf, buf_len);
@@ -196,6 +197,5 @@ TEST(test_minijail_run_pid_pipes) {
 
   minijail_destroy(j);
 }
-*/
 
 TEST_HARNESS_MAIN
