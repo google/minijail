@@ -72,17 +72,37 @@ static void add_binding(struct minijail *j, char *arg)
 	}
 }
 
+static void add_mount(struct minijail *j, char *arg)
+{
+	char *src = strtok(arg, ",");
+	char *dest = strtok(NULL, ",");
+	char *type = strtok(NULL, ",");
+	char *flags = strtok(NULL, ",");
+	if (!src || !dest || !type) {
+		fprintf(stderr, "Bad mount: %s %s %s\n", src, dest, type);
+		exit(1);
+	}
+	if (minijail_mount(j, src, dest, type,
+			   flags ? strtoul(flags, NULL, 16) : 0)) {
+		fprintf(stderr, "minijail_mount failed.\n");
+		exit(1);
+	}
+}
+
 static void usage(const char *progn)
 {
 	size_t i;
 
 	printf("Usage: %s [-GhiInprsvtU] [-b <src>,<dest>[,<writeable>]] [-f <file>]"
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
+	       "[-k <src>,<dest>,<type>[,<flags>]] "
 	       "[-m \"<uid> <loweruid> <count>[,<uid> <loweruid> <count>]\"] "
 	       "[-M \"<gid> <lowergid> <count>[,<uid> <loweruid> <count>]\"] "
 	       "<program> [args...]\n"
 	       "  -b:         binds <src> to <dest> in chroot. Multiple "
 	       "instances allowed\n"
+	       "  -k:         mount <src> to <dest> in chroot. Multiple "
+	       "instances allowed, flags are passed to mount(2)\n"
 	       "  -c <caps>:  restrict caps to <caps>\n"
 	       "  -C <dir>:   chroot to <dir>\n"
 	       "              Not compatible with -P\n"
@@ -145,7 +165,8 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
 	while ((opt = getopt(argc, argv,
-			     "u:g:sS:c:C:P:b:V:f:m:M:e::vrGhHinpLtIU")) != -1) {
+			     "u:g:sS:c:C:P:b:V:f:m:M:k:e::vrGhHinpLtIU"))
+	       != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -194,6 +215,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 				exit(1);
 			}
 			chroot = 1;
+			break;
+		case 'k':
+			add_mount(j, optarg);
 			break;
 		case 'P':
 			if (chroot) {

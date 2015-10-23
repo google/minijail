@@ -67,11 +67,12 @@
 # define SECCOMP_SOFTFAIL 0
 #endif
 
-struct binding {
+struct mountpoint {
 	char *src;
 	char *dest;
-	int writeable;
-	struct binding *next;
+	char *type;
+	unsigned long flags;
+	struct mountpoint *next;
 };
 
 struct minijail {
@@ -111,14 +112,14 @@ struct minijail {
 	int mountns_fd;
 	int netns_fd;
 	int filter_len;
-	int binding_count;
 	char *chrootdir;
 	char *pid_file_path;
 	char *uidmap;
 	char *gidmap;
 	struct sock_fprog *filter_prog;
-	struct binding *bindings_head;
-	struct binding *bindings_tail;
+	struct mountpoint *mounts_head;
+	struct mountpoint *mounts_tail;
+	int mounts_count;
 };
 
 /*
@@ -404,28 +405,28 @@ static char *append_external_path(const char *external_path,
 char API *minijail_get_original_path(struct minijail *j,
 				     const char *path_inside_chroot)
 {
-	struct binding *b;
+	struct mountpoint *b;
 
-	b = j->bindings_head;
+	b = j->mounts_head;
 	while (b) {
 		/*
 		 * If |path_inside_chroot| is the exact destination of a
-		 * bind mount, then the original path is exactly the source of
-		 * the bind mount.
+		 * mount, then the original path is exactly the source of
+		 * the mount.
 		 *  for example: "-b /some/path/exe,/chroot/path/exe"
-		 *    bind source = /some/path/exe, bind dest = /chroot/path/exe
-		 *    Then when getting the original path of "/chroot/path/exe",
-		 *    the source of that bind mount, "/some/path/exe" is what
-		 *    should be returned.
+		 *    mount source = /some/path/exe, mount dest =
+		 *    /chroot/path/exe Then when getting the original path of
+		 *    "/chroot/path/exe", the source of that mount,
+		 *    "/some/path/exe" is what should be returned.
 		 */
 		if (!strcmp(b->dest, path_inside_chroot))
 			return strdup(b->src);
 
 		/*
 		 * If |path_inside_chroot| is within the destination path of a
-		 * bind mount, take the suffix of the chroot path relative to
-		 * the bind mount destination path, and append it to the bind
-		 * mount source path.
+		 * mount, take the suffix of the chroot path relative to the
+		 * mount destination path, and append it to the mount source
+		 * path.
 		 */
 		if (!strncmp(b->dest, path_inside_chroot, strlen(b->dest))) {
 			const char *relative_path =
@@ -457,46 +458,60 @@ int API minijail_write_pid_file(struct minijail *j, const char *path)
 	return 0;
 }
 
-int API minijail_bind(struct minijail *j, const char *src, const char *dest,
-		      int writeable)
+int API minijail_mount(struct minijail *j, const char *src, const char *dest,
+		       const char *type, unsigned long flags)
 {
-	struct binding *b;
+	struct mountpoint *m;
 
 	if (*dest != '/')
 		return -EINVAL;
-	b = calloc(1, sizeof(*b));
-	if (!b)
+	m = calloc(1, sizeof(*m));
+	if (!m)
 		return -ENOMEM;
-	b->dest = strdup(dest);
-	if (!b->dest)
+	m->dest = strdup(dest);
+	if (!m->dest)
 		goto error;
-	b->src = strdup(src);
-	if (!b->src)
+	m->src = strdup(src);
+	if (!m->src)
 		goto error;
-	b->writeable = writeable;
+	m->type = strdup(type);
+	if (!m->type)
+		goto error;
+	m->flags = flags;
 
-	info("bind %s -> %s", src, dest);
+	info("mount %s -> %s type %s", src, dest, type);
 
 	/*
-	 * Force vfs namespacing so the bind mounts don't leak out into the
+	 * Force vfs namespacing so the mounts don't leak out into the
 	 * containing vfs namespace.
 	 */
 	minijail_namespace_vfs(j);
 
-	if (j->bindings_tail)
-		j->bindings_tail->next = b;
+	if (j->mounts_tail)
+		j->mounts_tail->next = m;
 	else
-		j->bindings_head = b;
-	j->bindings_tail = b;
-	j->binding_count++;
+		j->mounts_head = m;
+	j->mounts_tail = m;
+	j->mounts_count++;
 
 	return 0;
 
 error:
-	free(b->src);
-	free(b->dest);
-	free(b);
+	free(m->src);
+	free(m->dest);
+	free(m);
 	return -ENOMEM;
+}
+
+int API minijail_bind(struct minijail *j, const char *src, const char *dest,
+		      int writeable)
+{
+	unsigned long flags = MS_BIND;
+
+	if (!writeable)
+		flags |= MS_RDONLY;
+
+	return minijail_mount(j, src, dest, "", flags);
 }
 
 void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
@@ -556,7 +571,7 @@ void marshal_append(struct marshal_state *state,
 void minijail_marshal_helper(struct marshal_state *state,
 			     const struct minijail *j)
 {
-	struct binding *b = NULL;
+	struct mountpoint *m = NULL;
 	marshal_append(state, (char *)j, sizeof(*j));
 	if (j->user)
 		marshal_append(state, j->user, strlen(j->user) + 1);
@@ -567,11 +582,11 @@ void minijail_marshal_helper(struct marshal_state *state,
 		marshal_append(state, (char *)fp->filter,
 				fp->len * sizeof(struct sock_filter));
 	}
-	for (b = j->bindings_head; b; b = b->next) {
-		marshal_append(state, b->src, strlen(b->src) + 1);
-		marshal_append(state, b->dest, strlen(b->dest) + 1);
-		marshal_append(state, (char *)&b->writeable,
-				sizeof(b->writeable));
+	for (m = j->mounts_head; m; m = m->next) {
+		marshal_append(state, m->src, strlen(m->src) + 1);
+		marshal_append(state, m->dest, strlen(m->dest) + 1);
+		marshal_append(state, m->type, strlen(m->type) + 1);
+		marshal_append(state, (char *)&m->flags, sizeof(m->flags));
 	}
 }
 
@@ -636,8 +651,8 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 	length -= sizeof(*j);
 
 	/* Potentially stale pointers not used as signals. */
-	j->bindings_head = NULL;
-	j->bindings_tail = NULL;
+	j->mounts_head = NULL;
+	j->mounts_tail = NULL;
 	j->filter_prog = NULL;
 
 	if (j->user) {		/* stale pointer */
@@ -675,27 +690,31 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 		memcpy(j->filter_prog->filter, program, program_len);
 	}
 
-	count = j->binding_count;
-	j->binding_count = 0;
+	count = j->mounts_count;
+	j->mounts_count = 0;
 	for (i = 0; i < count; ++i) {
-		int *writeable;
+		unsigned long *flags;
 		const char *dest;
+		const char *type;
 		const char *src = consumestr(&serialized, &length);
 		if (!src)
-			goto bad_bindings;
+			goto bad_mounts;
 		dest = consumestr(&serialized, &length);
 		if (!dest)
-			goto bad_bindings;
-		writeable = consumebytes(sizeof(*writeable), &serialized, &length);
-		if (!writeable)
-			goto bad_bindings;
-		if (minijail_bind(j, src, dest, *writeable))
-			goto bad_bindings;
+			goto bad_mounts;
+		type = consumestr(&serialized, &length);
+		if (!type)
+			goto bad_mounts;
+		flags = consumebytes(sizeof(*flags), &serialized, &length);
+		if (!flags)
+			goto bad_mounts;
+		if (minijail_mount(j, src, dest, type, *flags))
+			goto bad_mounts;
 	}
 
 	return 0;
 
-bad_bindings:
+bad_mounts:
 	if (j->flags.seccomp_filter && j->filter_len > 0) {
 		free(j->filter_prog->filter);
 		free(j->filter_prog);
@@ -766,40 +785,55 @@ static void enter_user_namespace(const struct minijail *j, int *pipe_fds)
 		pdie("setresgid");
 }
 
-/* bind_one: Applies bindings from @b for @j, recursing as needed.
- * @j Minijail these bindings are for
- * @b Head of list of bindings
+/* mount_one: Applies mounts from @m for @j, recursing as needed.
+ * @j Minijail these mounts are for
+ * @m Head of list of mounts
  *
  * Returns 0 for success.
  */
-int bind_one(const struct minijail *j, struct binding *b)
+static int mount_one(const struct minijail *j, struct mountpoint *m)
 {
-	int ret = 0;
-	char *dest = NULL;
-	if (ret)
-		return ret;
+	int ret;
+	char *dest;
+	int remount_ro = 0;
+
 	/* dest has a leading "/" */
-	if (asprintf(&dest, "%s%s", j->chrootdir, b->dest) < 0)
+	if (asprintf(&dest, "%s%s", j->chrootdir, m->dest) < 0)
 		return -ENOMEM;
-	ret = mount(b->src, dest, NULL, MS_BIND, NULL);
-	if (ret)
-		pdie("bind: %s -> %s", b->src, dest);
-	if (!b->writeable) {
-		ret = mount(b->src, dest, NULL,
-			    MS_BIND | MS_REMOUNT | MS_RDONLY, NULL);
-		if (ret)
-			pdie("bind ro: %s -> %s", b->src, dest);
+
+	/*
+	 * R/O bind mounts have to be remounted since bind and ro can't both be
+	 * specified in the original bind mount. Remount R/O after the initial
+	 * mount.
+	 */
+	if ((m->flags & MS_BIND) && (m->flags & MS_RDONLY)) {
+		remount_ro = 1;
+		m->flags &= ~MS_RDONLY;
 	}
+
+	ret = mount(m->src, dest, m->type, m->flags, NULL);
+	if (ret)
+		pdie("mount: %s -> %s", m->src, dest);
+
+	if (remount_ro) {
+		m->flags |= MS_RDONLY;
+		ret = mount(m->src, dest, NULL,
+			    m->flags | MS_REMOUNT, NULL);
+		if (ret)
+			pdie("bind ro: %s -> %s", m->src, dest);
+	}
+
 	free(dest);
-	if (b->next)
-		return bind_one(j, b->next);
+	if (m->next)
+		return mount_one(j, m->next);
 	return ret;
 }
 
 int enter_chroot(const struct minijail *j)
 {
 	int ret;
-	if (j->bindings_head && (ret = bind_one(j, j->bindings_head)))
+
+	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
 		return ret;
 
 	if (chroot(j->chrootdir))
@@ -814,7 +848,8 @@ int enter_chroot(const struct minijail *j)
 int enter_pivot_root(const struct minijail *j)
 {
 	int ret, oldroot, newroot;
-	if (j->bindings_head && (ret = bind_one(j, j->bindings_head)))
+
+	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
 		return ret;
 
 	/* Keep the fd for both old and new root. It will be used in fchdir later. */
@@ -1653,14 +1688,15 @@ void API minijail_destroy(struct minijail *j)
 		free(j->filter_prog->filter);
 		free(j->filter_prog);
 	}
-	while (j->bindings_head) {
-		struct binding *b = j->bindings_head;
-		j->bindings_head = j->bindings_head->next;
-		free(b->dest);
-		free(b->src);
-		free(b);
+	while (j->mounts_head) {
+		struct mountpoint *m = j->mounts_head;
+		j->mounts_head = j->mounts_head->next;
+		free(m->type);
+		free(m->dest);
+		free(m->src);
+		free(m);
 	}
-	j->bindings_tail = NULL;
+	j->mounts_tail = NULL;
 	if (j->user)
 		free(j->user);
 	if (j->chrootdir)

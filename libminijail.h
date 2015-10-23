@@ -95,6 +95,19 @@ char *minijail_get_original_path(struct minijail *j, const char *chroot_path);
  */
 void minijail_mount_tmp(struct minijail *j);
 
+/* minijail_mount: when entering minijail @j, mounts @src at @dst with @flags
+ * @j         minijail to bind inside
+ * @src       source to bind
+ * @dest      location to bind (inside chroot)
+ * @type      type of filesystem
+ * @flags     flags passed to mount
+ *
+ * This may be called multiple times; all bindings will be applied in the order
+ * of minijail_mount() calls.
+ */
+int minijail_mount(struct minijail *j, const char *src, const char *dest,
+		    const char *type, unsigned long flags);
+
 /* minijail_bind: bind-mounts @src into @j as @dest, optionally writeable
  * @j         minijail to bind inside
  * @src       source to bind
