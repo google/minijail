@@ -308,23 +308,14 @@ int main(int argc, char *argv[])
 	program_path = minijail_get_original_path(j, argv[0]);
 
 	/* Check that we can access the target program. */
-	if (!minijail_has_bind_mounts(j) && access(program_path, X_OK)) {
+	if (access(program_path, X_OK)) {
 		fprintf(stderr, "Target program '%s' is not accessible.\n",
 			argv[0]);
 		return 1;
 	}
 
 	/* Check if target is statically or dynamically linked. */
-	if (minijail_has_bind_mounts(j)) {
-		/* We can't tell what the internal path to the binary is so
-		 * assume it's dynamically linked.
-		 */
-		elftype = ELFDYNAMIC;
-		warn("assuming program '%s' is dynamically linked\n", argv[0]);
-	} else {
-		elftype = get_elf_linkage(program_path);
-	}
-
+	elftype = get_elf_linkage(program_path);
 	if (elftype == ELFSTATIC) {
 		/*
 		 * Target binary is statically linked so we cannot use

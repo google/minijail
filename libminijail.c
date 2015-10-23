@@ -387,20 +387,60 @@ int API minijail_enter_pivot_root(struct minijail *j, const char *dir)
 	return 0;
 }
 
-char *minijail_get_original_path(struct minijail *j, const char *chroot_path)
+static char *append_external_path(const char *external_path,
+				  const char *path_inside_chroot)
 {
-	char *external_path;
+	char *path;
 	size_t pathlen;
 
-	if (!j->chrootdir)
-		return strdup(chroot_path);
-
 	/* One extra char for '/' and one for '\0', hence + 2. */
-	pathlen = strlen(chroot_path) + strlen(j->chrootdir) + 2;
-	external_path = malloc(pathlen);
-	snprintf(external_path, pathlen, "%s/%s", j->chrootdir, chroot_path);
+	pathlen = strlen(path_inside_chroot) + strlen(external_path) + 2;
+	path = malloc(pathlen);
+	snprintf(path, pathlen, "%s/%s", external_path, path_inside_chroot);
 
-	return external_path;
+	return path;
+}
+
+char API *minijail_get_original_path(struct minijail *j,
+				     const char *path_inside_chroot)
+{
+	struct binding *b;
+
+	b = j->bindings_head;
+	while (b) {
+		/*
+		 * If |path_inside_chroot| is the exact destination of a
+		 * bind mount, then the original path is exactly the source of
+		 * the bind mount.
+		 *  for example: "-b /some/path/exe,/chroot/path/exe"
+		 *    bind source = /some/path/exe, bind dest = /chroot/path/exe
+		 *    Then when getting the original path of "/chroot/path/exe",
+		 *    the source of that bind mount, "/some/path/exe" is what
+		 *    should be returned.
+		 */
+		if (!strcmp(b->dest, path_inside_chroot))
+			return strdup(b->src);
+
+		/*
+		 * If |path_inside_chroot| is within the destination path of a
+		 * bind mount, take the suffix of the chroot path relative to
+		 * the bind mount destination path, and append it to the bind
+		 * mount source path.
+		 */
+		if (!strncmp(b->dest, path_inside_chroot, strlen(b->dest))) {
+			const char *relative_path =
+				path_inside_chroot + strlen(b->dest);
+			return append_external_path(b->src, relative_path);
+		}
+		b = b->next;
+	}
+
+	/* If there is a chroot path, append |path_inside_chroot| to that. */
+	if (j->chrootdir)
+		return append_external_path(j->chrootdir, path_inside_chroot);
+
+	/* No chroot, so the path outside is the same as it is inside. */
+	return strdup(path_inside_chroot);
 }
 
 void API minijail_mount_tmp(struct minijail *j)
