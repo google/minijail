@@ -688,7 +688,7 @@ static void write_ugid_mappings(const struct minijail *j, int *pipe_fds)
 	sz = sizeof(fname);
 	if (j->uidmap) {
 		ret = snprintf(fname, sz, "/proc/%d/uid_map", j->initpid);
-		if (ret < 0 || ret >= sz)
+		if (ret < 0 || (size_t)ret >= sz)
 			die("failed to write file name of uid_map");
 		fd = open(fname, O_WRONLY);
 		if (fd < 0)
@@ -700,7 +700,7 @@ static void write_ugid_mappings(const struct minijail *j, int *pipe_fds)
 	}
 	if (j->gidmap) {
 		ret = snprintf(fname, sz, "/proc/%d/gid_map", j->initpid);
-		if (ret < 0 || ret >= sz)
+		if (ret < 0 || (size_t)ret >= sz)
 			die("failed to write file name of gid_map");
 		fd = open(fname, O_WRONLY);
 		if (fd < 0)
@@ -881,11 +881,11 @@ void drop_ugid(const struct minijail *j)
  * uncommon for that to be less (if an older kernel) or more (if a newer
  * kernel).  So suck up the answer via /proc.
  */
-static int get_last_valid_cap()
+static unsigned int get_last_valid_cap()
 {
 	const char cap_file[] = "/proc/sys/kernel/cap_last_cap";
 	FILE *fp = fopen(cap_file, "re");
-	int last_valid_cap;
+	unsigned int last_valid_cap;
 
 	if (fscanf(fp, "%u", &last_valid_cap) != 1)
 		pdie("fscanf(%s)", cap_file);
@@ -894,7 +894,7 @@ static int get_last_valid_cap()
 	return last_valid_cap;
 }
 
-void drop_caps(const struct minijail *j, int last_valid_cap)
+void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 {
 	cap_t caps = cap_get_proc();
 	cap_value_t flag[1];
@@ -994,7 +994,7 @@ void API minijail_enter(const struct minijail *j)
 	 * Get the last valid cap from /proc, since /proc can be unmounted
 	 * before drop_caps().
 	 */
-	int last_valid_cap = get_last_valid_cap();
+	unsigned int last_valid_cap = get_last_valid_cap();
 
 	if (j->flags.pids)
 		die("tried to enter a pid-namespaced jail;"

@@ -17,8 +17,7 @@ LOCAL_PATH := $(call my-dir)
 # Common variables
 # ========================================================
 
-minijailCommonCFlags := -Wall -Werror -Wno-unused-function \
-    -Wno-unused-parameter -Wno-sign-compare
+minijailCommonCFlags := -Wall -Werror
 minijailCommonSharedLibraries := libcap
 
 # libminijail shared library for target
