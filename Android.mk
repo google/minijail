@@ -64,7 +64,7 @@ LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
 
-# Native unit tests. Run with:
+# libminijail native unit tests. Run with:
 # adb shell /data/nativetest/libminijail_unittest/libminijail_unittest
 # ========================================================
 include $(CLEAR_VARS)
@@ -77,10 +77,31 @@ LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
 	bpf.c \
-	libminijail_unittest.c \
 	libminijail.c \
+	libminijail_unittest.c \
 	signal_handler.c \
 	syscall_filter.c \
+	util.c \
+
+LOCAL_STATIC_LIBRARIES := libminijail_generated
+LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
+include $(BUILD_NATIVE_TEST)
+
+# Syscall filtering native unit tests. Run with:
+# adb shell /data/nativetest/libminijail_unittest/syscall_filter_unittest
+# ========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := syscall_filter_unittest
+ifdef BRILLO
+  LOCAL_MODULE_TAGS := debug
+endif
+
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	bpf.c \
+	syscall_filter.c \
+	syscall_filter_unittest.c \
 	util.c \
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
