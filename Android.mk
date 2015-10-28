@@ -16,30 +16,39 @@ LOCAL_PATH := $(call my-dir)
 
 # Common variables
 # ========================================================
-
 minijailCommonCFlags := -Wall -Werror
 minijailCommonSharedLibraries := libcap
 
-# libminijail shared library for target
+# Static library for generated code.
 # ========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := libminijail_generated
 
+LOCAL_MODULE_CLASS := STATIC_LIBRARIES
+generated_sources_dir := $(local-generated-sources-dir)
+
+$(generated_sources_dir)/libsyscalls.c: PRIVATE_CUSTOM_TOOL = $< "$(lastword $(CLANG)) -isystem bionic/libc/kernel/uapi/asm-$(TARGET_ARCH)" $@
+$(generated_sources_dir)/libsyscalls.c: $(LOCAL_PATH)/gen_syscalls.sh
+	$(transform-generated-source)
+LOCAL_GENERATED_SOURCES += $(generated_sources_dir)/libsyscalls.c
+
+$(generated_sources_dir)/libconstants.c: PRIVATE_CUSTOM_TOOL = $< "$(lastword $(CLANG)) -isystem bionic/libc/kernel/uapi/asm-$(TARGET_ARCH)" $@
+$(generated_sources_dir)/libconstants.c: $(LOCAL_PATH)/gen_constants.sh
+	$(transform-generated-source)
+LOCAL_GENERATED_SOURCES += $(generated_sources_dir)/libconstants.c
+
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+include $(BUILD_STATIC_LIBRARY)
+
+# libminijail shared library for target.
+# ========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail
 
 # LOCAL_MODULE_CLASS must be defined before calling $(local-generated-sources-dir)
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 intermediates := $(local-generated-sources-dir)
-GEN := $(intermediates)/libsyscalls.c
-$(GEN): PRIVATE_CUSTOM_TOOL = $< "$(lastword $(CLANG)) -isystem bionic/libc/kernel/uapi/asm-$(TARGET_ARCH)" $@
-$(GEN): $(LOCAL_PATH)/gen_syscalls.sh
-	$(transform-generated-source)
-LOCAL_GENERATED_SOURCES += $(GEN)
-
-GEN := $(intermediates)/libconstants.c
-$(GEN): PRIVATE_CUSTOM_TOOL = $< "$(lastword $(CLANG)) -isystem bionic/libc/kernel/uapi/asm-$(TARGET_ARCH)" $@
-$(GEN): $(LOCAL_PATH)/gen_constants.sh
-	$(transform-generated-source)
-LOCAL_GENERATED_SOURCES += $(GEN)
 
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
@@ -50,6 +59,30 @@ LOCAL_SRC_FILES := \
 	syscall_filter.c \
 	util.c \
 
+LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
+
+# Native unit tests. Run with:
+# adb shell /data/nativetest/libminijail_unittest/libminijail_unittest
+# ========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := libminijail_unittest
+ifdef BRILLO
+  LOCAL_MODULE_TAGS := debug
+endif
+
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	bpf.c \
+	libminijail_unittest.c \
+	libminijail.c \
+	signal_handler.c \
+	syscall_filter.c \
+	util.c \
+
+LOCAL_STATIC_LIBRARIES := libminijail_generated
+LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
+include $(BUILD_NATIVE_TEST)
