@@ -107,11 +107,6 @@ void minijail_mount_tmp(struct minijail *j);
 int minijail_bind(struct minijail *j, const char *src, const char *dest,
 		  int writeable);
 
-/* minijail_has_bind_mounts: Checks if there are any bind mounts configured.
- * @j         minijail to check
- */
-int minijail_has_bind_mounts(const struct minijail *j);
-
 /* Lock this process into the given minijail. Note that this procedure cannot fail,
  * since there is no way to undo privilege-dropping; therefore, if any part of
  * the privilege-drop fails, minijail_enter() will abort the entire process.

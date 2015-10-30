@@ -499,11 +499,6 @@ error:
 	return -ENOMEM;
 }
 
-int API minijail_has_bind_mounts(const struct minijail *j)
-{
-	return j->bindings_head != NULL;
-}
-
 void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
 	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL)) {
