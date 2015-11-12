@@ -8,6 +8,10 @@ minijail0 \- sandbox a process
 .PP
 Runs PROGRAM inside a sandbox.
 .TP
+\fB-a <table>\fR
+Run using the alternate syscall table named <table>.  Only available on kernels
+and architectures that support the PR_ALT_SYSCALL option of prctl(2).
+.TP
 \fB-b <src>,<dest>[,<writeable>]
 Bind-mount <src> into the chroot directory at <dest>, optionally writeable.
 .TP

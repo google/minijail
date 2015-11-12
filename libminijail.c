@@ -53,6 +53,10 @@
 # define PR_SET_SECCOMP 22
 #endif
 
+#ifndef PR_ALT_SYSCALL
+# define PR_ALT_SYSCALL 0x43724f53
+#endif
+
 /* For seccomp_filter using BPF. */
 #ifndef PR_SET_NO_NEW_PRIVS
 # define PR_SET_NO_NEW_PRIVS 38
@@ -102,6 +106,7 @@ struct minijail {
 		int mount_tmp:1;
 		int do_init:1;
 		int pid_file:1;
+		int alt_syscall:1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -116,6 +121,7 @@ struct minijail {
 	char *pid_file_path;
 	char *uidmap;
 	char *gidmap;
+	char *alt_syscall_table;
 	struct sock_fprog *filter_prog;
 	struct mountpoint *mounts_head;
 	struct mountpoint *mounts_tail;
@@ -539,6 +545,15 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 	fclose(file);
 }
 
+int API minijail_use_alt_syscall(struct minijail *j, const char *table)
+{
+	j->alt_syscall_table = strdup(table);
+	if (!j->alt_syscall_table)
+		return -ENOMEM;
+	j->flags.alt_syscall = 1;
+	return 0;
+}
+
 struct marshal_state {
 	size_t available;
 	size_t total;
@@ -577,6 +592,10 @@ void minijail_marshal_helper(struct marshal_state *state,
 		marshal_append(state, j->user, strlen(j->user) + 1);
 	if (j->chrootdir)
 		marshal_append(state, j->chrootdir, strlen(j->chrootdir) + 1);
+	if (j->alt_syscall_table) {
+		marshal_append(state, j->alt_syscall_table,
+			       strlen(j->alt_syscall_table) + 1);
+	}
 	if (j->flags.seccomp_filter && j->filter_prog) {
 		struct sock_fprog *fp = j->filter_prog;
 		marshal_append(state, (char *)fp->filter,
@@ -673,6 +692,15 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 			goto bad_chrootdir;
 	}
 
+	if (j->alt_syscall_table) {	/* stale pointer */
+		char *alt_syscall_table = consumestr(&serialized, &length);
+		if (!alt_syscall_table)
+			goto bad_syscall_table;
+		j->alt_syscall_table = strdup(alt_syscall_table);
+		if (!j->alt_syscall_table)
+			goto bad_syscall_table;
+	}
+
 	if (j->flags.seccomp_filter && j->filter_len > 0) {
 		size_t ninstrs = j->filter_len;
 		if (ninstrs > (SIZE_MAX / sizeof(struct sock_filter)) ||
@@ -720,6 +748,9 @@ bad_mounts:
 		free(j->filter_prog);
 	}
 bad_filters:
+	if (j->alt_syscall_table)
+		free(j->alt_syscall_table);
+bad_syscall_table:
 	if (j->chrootdir)
 		free(j->chrootdir);
 bad_chrootdir:
@@ -728,6 +759,7 @@ bad_chrootdir:
 clear_pointers:
 	j->user = NULL;
 	j->chrootdir = NULL;
+	j->alt_syscall_table = NULL;
 out:
 	return ret;
 }
@@ -1150,6 +1182,15 @@ void API minijail_enter(const struct minijail *j)
 		drop_ugid(j);
 		if (j->flags.caps)
 			drop_caps(j, last_valid_cap);
+	}
+
+	/*
+	 * Select the specified alternate syscall table.  The table must not
+	 * block prctl(2) if we're using seccomp as well.
+	 */
+	if (j->flags.alt_syscall) {
+		if (prctl(PR_ALT_SYSCALL, 1, j->alt_syscall_table))
+			pdie("prctl(PR_ALT_SYSCALL)");
 	}
 
 	/*
@@ -1701,5 +1742,7 @@ void API minijail_destroy(struct minijail *j)
 		free(j->user);
 	if (j->chrootdir)
 		free(j->chrootdir);
+	if (j->alt_syscall_table)
+		free(j->alt_syscall_table);
 	free(j);
 }

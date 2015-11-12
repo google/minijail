@@ -99,6 +99,7 @@ static void usage(const char *progn)
 	       "[-m \"<uid> <loweruid> <count>[,<uid> <loweruid> <count>]\"] "
 	       "[-M \"<gid> <lowergid> <count>[,<uid> <loweruid> <count>]\"] "
 	       "<program> [args...]\n"
+	       "  -a <table>: use alternate syscall table <table>\n"
 	       "  -b:         binds <src> to <dest> in chroot. Multiple "
 	       "instances allowed\n"
 	       "  -k:         mount <src> to <dest> in chroot. Multiple "
@@ -165,7 +166,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
 	while ((opt = getopt(argc, argv,
-			     "u:g:sS:c:C:P:b:V:f:m:M:k:e::vrGhHinpLtIU"))
+			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::vrGhHinpLtIU"))
 	       != -1) {
 		switch (opt) {
 		case 'u':
@@ -289,6 +290,12 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_namespace_pids(j);
 			if (0 != minijail_gidmap(j, optarg)) {
 				fprintf(stderr, "Could not set gidmap\n");
+				exit(1);
+			}
+			break;
+		case 'a':
+			if (0 != minijail_use_alt_syscall(j, optarg)) {
+				fprintf(stderr, "Could not set alt-syscall table\n");
 				exit(1);
 			}
 			break;
