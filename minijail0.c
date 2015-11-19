@@ -93,7 +93,7 @@ static void usage(const char *progn)
 {
 	size_t i;
 
-	printf("Usage: %s [-GhiInprsvtU] [-b <src>,<dest>[,<writeable>]] [-f <file>]"
+	printf("Usage: %s [-GhiInprsvtUl] [-b <src>,<dest>[,<writeable>]] [-f <file>]"
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
 	       "[-k <src>,<dest>,<type>[,<flags>]] "
 	       "[-m \"<uid> <loweruid> <count>[,<uid> <loweruid> <count>]\"] "
@@ -116,6 +116,7 @@ static void usage(const char *progn)
 	       "  -i:         exit immediately after fork (do not act as init)\n"
 	       "              Not compatible with -p\n"
 	       "  -I:         run <program> as init (pid 1) inside a new pid namespace (implies -p)\n"
+	       "  -l:         enter new IPC namespace\n"
 	       "  -L:         report blocked syscalls to syslog when using seccomp filter.\n"
 	       "              Forces the following syscalls to be allowed:\n"
 	       "                  ", progn);
@@ -166,7 +167,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
 	while ((opt = getopt(argc, argv,
-			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::vrGhHinpLtIU"))
+			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::vrGhHinplLtIU"))
 	       != -1) {
 		switch (opt) {
 		case 'u':
@@ -195,6 +196,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 				exit(1);
 			}
 			use_seccomp_filter = 1;
+			break;
+		case 'l':
+			minijail_namespace_ipc(j);
 			break;
 		case 'L':
 			minijail_log_seccomp_filter_failures(j);

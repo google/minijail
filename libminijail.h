@@ -50,6 +50,7 @@ void minijail_log_seccomp_filter_failures(struct minijail *j);
 void minijail_use_caps(struct minijail *j, uint64_t capmask);
 void minijail_namespace_vfs(struct minijail *j);
 void minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path);
+void minijail_namespace_ipc(struct minijail *j);
 void minijail_namespace_net(struct minijail *j);
 void minijail_namespace_enter_net(struct minijail *j, const char *ns_path);
 /* Implies namespace_vfs and remount_proc_readonly.

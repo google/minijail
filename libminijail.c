@@ -91,6 +91,7 @@ struct minijail {
 		int vfs:1;
 		int enter_vfs:1;
 		int pids:1;
+		int ipc:1;
 		int net:1;
 		int enter_net:1;
 		int userns:1;
@@ -299,6 +300,11 @@ void API minijail_namespace_pids(struct minijail *j)
 	j->flags.remount_proc_ro = 1;
 	j->flags.pids = 1;
 	j->flags.do_init = 1;
+}
+
+void API minijail_namespace_ipc(struct minijail *j)
+{
+	j->flags.ipc = 1;
 }
 
 void API minijail_namespace_net(struct minijail *j)
@@ -1124,6 +1130,10 @@ void API minijail_enter(const struct minijail *j)
           if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL))
             pdie("mount(/, private)");
         }
+
+	if (j->flags.ipc && unshare(CLONE_NEWIPC)) {
+		pdie("unshare(ipc)");
+	}
 
 	if (j->flags.enter_net) {
 		if (setns(j->netns_fd, CLONE_NEWNET))

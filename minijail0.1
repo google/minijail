@@ -49,6 +49,10 @@ Print a help message detailing supported system call names for seccomp_filter.
 (Other direct numbers may be specified if minijail0 is not in sync with the
  host kernel or something like 32/64-bit compatibility issues exist.)
 .TP
+\fB-l\fR
+Run inside a new IPC namespace. This option makes the program's System V IPC
+namespace independent.
+.TP
 \fB-p\fR
 Run inside a new PID namespace. This option will make it impossible for the
 program to see or affect processes that are not its descendants. This implies
