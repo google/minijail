@@ -17,20 +17,27 @@ Bind-mount <src> into the chroot directory at <dest>, optionally writeable.
 .TP
 \fB-c <caps>\fR
 Restrict capabilities to \fIcaps\fR. When used in conjunction with \fB-u\fR and
-.TP
-\fB-C <dir>\fR
-Change root (using chroot(2)) to <dir>.
-.TP
-\fB-t\fR
-Mounts a tmpfs filesystem on /tmp. /tmp must exist in the chroot.
-This must be used with -C. The default filesystem has a max size of 128M
-and has standard /tmp permissions (777).
-.TP
 \fB-g\fR, this allows a program to have access to only certain parts of root's
 default privileges while running as another user and group ID altogether. Note
 that these capabilities are not inherited by subprocesses of the process given
 capabilities unless those subprocesses have POSIX file capabilities. See
 \fBcapabilities\fR(7).
+.TP
+\fB-C <dir>\fR
+Change root (using chroot(2)) to <dir>.
+.TP
+\fB-e[file]\fR
+Enter a new network namespace, or if \fIfile\fR is specified, Enter an existing
+network namespace specified by \fIfile\fR which is typically of the form
+/proc/<pid>/ns/net.
+.TP
+\fB-f <file>\fR
+Write the pid of the jailed process to \fIfile\fR.
+.TP
+\fB-t\fR
+Mounts a tmpfs filesystem on /tmp. /tmp must exist in the chroot.
+This must be used with -C. The default filesystem has a max size of 128M
+and has standard /tmp permissions (777).
 .TP
 \fB-G\fR
 Inherit all the supplementary groups of the user specified with \fB-u\fR. It
@@ -53,17 +60,28 @@ Print a help message detailing supported system call names for seccomp_filter.
 Run inside a new IPC namespace. This option makes the program's System V IPC
 namespace independent.
 .TP
+\fB-m "<uid> <loweruid> <count>[,<uid> <loweruid> <count>]"\fR
+Set the uid mapping of a user namespace (implies \fB-pU\fR).  Same arguments as
+\fBnewuidmap(1)\fR.  Multiple mappings should be separated by ','.
+.TP
+\fB-M "<uid> <loweruid> <count>[,<uid> <loweruid> <count>]"\fR
+Set the gid mapping of a user namespace (implies \fB-pU\fR).  Same arguments as
+\fBnewgidmap(1)\fR.  Multiple mappings should be separated by ','.
+.TP
 \fB-p\fR
 Run inside a new PID namespace. This option will make it impossible for the
 program to see or affect processes that are not its descendants. This implies
 \fB-v\fR and \fB-r\fR, since otherwise the process can see outside its namespace
 by inspecting /proc.
 .TP
+\fB-P <dir>\fR
+Set \fIdir\fR as the root fs using \fBpivot_root\fR. Implies \fB-v\fR, not
+compatible with \fB-C\fR.
+.TP
 \fB-r\fR
-Remount certain filesystems readonly. Currently this only remounts /proc. This
-implies \fB-v\fR. Remounting /proc readonly means that even if the process has
-write access to a system config knob in /proc (e.g., in /sys/kernel), it cannot
-change the value.
+Remount /proc readonly. This implies \fB-v\fR. Remounting /proc readonly means
+that even if the process has write access to a system config knob in /proc
+(e.g., in /sys/kernel), it cannot change the value.
 .TP
 \fB-s\fR
 Enable seccomp(2) in mode 1, which restricts the child process to a very small
@@ -81,6 +99,9 @@ ID.
 \fB-v\fR
 Run inside a new VFS namespace. This option makes the program's mountpoints
 independent of the rest of the system's.
+.TP
+\fB-V <file>\fR
+Enter the VFS namespace specified by \fIfile\fR.
 .SH IMPLEMENTATION
 This program is broken up into two parts: \fBminijail0\fR (the frontend) and a helper
 library called \fBlibminijailpreload\fR. Some jailings can only be achieved from
