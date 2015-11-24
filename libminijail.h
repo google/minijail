@@ -3,7 +3,8 @@
  * found in the LICENSE file.
  */
 
-/* The general pattern of use here:
+/*
+ * The general pattern of use here:
  * 1) Construct a minijail with minijail_new()
  * 2) Apply the desired restrictions to it
  * 3) Enter it, which locks the current process inside it, or:
@@ -32,7 +33,8 @@ struct minijail;
 /* Allocates a new minijail with no restrictions. */
 struct minijail *minijail_new(void);
 
-/* These functions add restrictions to the minijail. They are not applied until
+/*
+ * These functions add restrictions to the minijail. They are not applied until
  * minijail_enter() is called. See the documentation in minijail0.1 for
  * explanations in detail of what the restrictions do.
  */
@@ -53,7 +55,8 @@ void minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path);
 void minijail_namespace_ipc(struct minijail *j);
 void minijail_namespace_net(struct minijail *j);
 void minijail_namespace_enter_net(struct minijail *j, const char *ns_path);
-/* Implies namespace_vfs and remount_proc_readonly.
+/*
+ * Implies namespace_vfs and remount_proc_readonly.
  * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
  */
 void minijail_namespace_pids(struct minijail *j);
@@ -65,12 +68,14 @@ void minijail_run_as_init(struct minijail *j);
 int minijail_write_pid_file(struct minijail *j, const char *path);
 void minijail_inherit_usergroups(struct minijail *j);
 void minijail_disable_ptrace(struct minijail *j);
-/* Changes the jailed process's syscall table to the alt_syscall table
+/*
+ * Changes the jailed process's syscall table to the alt_syscall table
  * named |table|.
  */
 int minijail_use_alt_syscall(struct minijail *j, const char *table);
 
-/* minijail_enter_chroot: enables chroot() restriction for @j
+/*
+ * minijail_enter_chroot: enables chroot() restriction for @j
  * @j   minijail to apply restriction to
  * @dir directory to chroot() to. Owned by caller.
  *
@@ -83,7 +88,8 @@ int minijail_use_alt_syscall(struct minijail *j, const char *table);
 int minijail_enter_chroot(struct minijail *j, const char *dir);
 int minijail_enter_pivot_root(struct minijail *j, const char *dir);
 
-/* minijail_get_original_path: returns the path of a given file outside of the
+/*
+ * minijail_get_original_path: returns the path of a given file outside of the
  * chroot.
  * @j           minijail to obtain the path from.
  * @chroot_path path inside of the chroot() to.
@@ -95,12 +101,14 @@ int minijail_enter_pivot_root(struct minijail *j, const char *dir);
  */
 char *minijail_get_original_path(struct minijail *j, const char *chroot_path);
 
-/* minijail_mount_tmp: enables mounting of a tmpfs filesystem on /tmp.
+/*
+ * minijail_mount_tmp: enables mounting of a tmpfs filesystem on /tmp.
  * As be rules of bind mounts, /tmp must exist in chroot.
  */
 void minijail_mount_tmp(struct minijail *j);
 
-/* minijail_mount: when entering minijail @j, mounts @src at @dst with @flags
+/*
+ * minijail_mount: when entering minijail @j, mounts @src at @dst with @flags
  * @j         minijail to bind inside
  * @src       source to bind
  * @dest      location to bind (inside chroot)
@@ -113,7 +121,8 @@ void minijail_mount_tmp(struct minijail *j);
 int minijail_mount(struct minijail *j, const char *src, const char *dest,
 		    const char *type, unsigned long flags);
 
-/* minijail_bind: bind-mounts @src into @j as @dest, optionally writeable
+/*
+ * minijail_bind: bind-mounts @src into @j as @dest, optionally writeable
  * @j         minijail to bind inside
  * @src       source to bind
  * @dest      location to bind (inside chroot)
@@ -125,7 +134,8 @@ int minijail_mount(struct minijail *j, const char *src, const char *dest,
 int minijail_bind(struct minijail *j, const char *src, const char *dest,
 		  int writeable);
 
-/* Lock this process into the given minijail. Note that this procedure cannot fail,
+/*
+ * Lock this process into the given minijail. Note that this procedure cannot fail,
  * since there is no way to undo privilege-dropping; therefore, if any part of
  * the privilege-drop fails, minijail_enter() will abort the entire process.
  *
@@ -134,32 +144,37 @@ int minijail_bind(struct minijail *j, const char *src, const char *dest,
  */
 void minijail_enter(const struct minijail *j);
 
-/* Run the specified command in the given minijail, execve(2)-style. This is
+/*
+ * Run the specified command in the given minijail, execve(2)-style. This is
  * required if minijail_namespace_pids() was used.
  */
 int minijail_run(struct minijail *j, const char *filename,
 		 char *const argv[]);
 
-/* Run the specified command in the given minijail, execve(2)-style.
+/*
+ * Run the specified command in the given minijail, execve(2)-style.
  * Used with static binaries, or on systems without support for LD_PRELOAD.
  */
 int minijail_run_no_preload(struct minijail *j, const char *filename,
 			    char *const argv[]);
 
-/* Run the specified command in the given minijail, execve(2)-style.
+/*
+ * Run the specified command in the given minijail, execve(2)-style.
  * Update |*pchild_pid| with the pid of the child.
  */
 int minijail_run_pid(struct minijail *j, const char *filename,
 		     char *const argv[], pid_t *pchild_pid);
 
-/* Run the specified command in the given minijail, execve(2)-style.
+/*
+ * Run the specified command in the given minijail, execve(2)-style.
  * Update |*pstdin_fd| with a fd that allows writing to the child's
  * standard input.
  */
 int minijail_run_pipe(struct minijail *j, const char *filename,
 		      char *const argv[], int *pstdin_fd);
 
-/* Run the specified command in the given minijail, execve(2)-style.
+/*
+ * Run the specified command in the given minijail, execve(2)-style.
  * Update |*pchild_pid| with the pid of the child.
  * Update |*pstdin_fd| with a fd that allows writing to the child's
  * standard input.
@@ -172,7 +187,8 @@ int minijail_run_pid_pipes(struct minijail *j, const char *filename,
 			   char *const argv[], pid_t *pchild_pid,
 			   int *pstdin_fd, int *pstdout_fd, int *pstderr_fd);
 
-/* Run the specified command in the given minijail, execve(2)-style.
+/*
+ * Run the specified command in the given minijail, execve(2)-style.
  * Update |*pchild_pid| with the pid of the child.
  * Update |*pstdin_fd| with a fd that allows writing to the child's
  * standard input.
@@ -186,18 +202,22 @@ int minijail_run_pid_pipes_no_preload(struct minijail *j, const char *filename,
 				      char *const argv[], pid_t *pchild_pid,
 				      int *pstdin_fd, int *pstdout_fd, int *pstderr_fd);
 
-/* Kill the specified minijail. The minijail must have been created with pid
+/*
+ * Kill the specified minijail. The minijail must have been created with pid
  * namespacing; if it was, all processes inside it are atomically killed.
  */
 int minijail_kill(struct minijail *j);
 
-/* Wait for all processed in the specified minijail to exit. Returns the exit
+/*
+ * Wait for all processed in the specified minijail to exit. Returns the exit
  * status of the _first_ process spawned in the jail.
  */
 int minijail_wait(struct minijail *j);
 
-/* Frees the given minijail. It does not matter if the process is inside the minijail or
- * not. */
+/*
+ * Frees the given minijail. It does not matter if the process is inside the minijail or
+ * not.
+ */
 void minijail_destroy(struct minijail *j);
 
 #ifdef __cplusplus

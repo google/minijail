@@ -98,7 +98,6 @@ struct minijail {
 		int seccomp:1;
 		int remount_proc_ro:1;
 		int usergroups:1;
-		int ptrace:1;
 		int no_new_privs:1;
 		int seccomp_filter:1;
 		int log_seccomp_filter:1;
@@ -364,11 +363,6 @@ void API minijail_inherit_usergroups(struct minijail *j)
 	j->flags.usergroups = 1;
 }
 
-void API minijail_disable_ptrace(struct minijail *j)
-{
-	j->flags.ptrace = 1;
-}
-
 void API minijail_run_as_init(struct minijail *j)
 {
 	/*
@@ -631,7 +625,8 @@ int minijail_marshal(const struct minijail *j, char *buf, size_t available)
 	return (state.total > available);
 }
 
-/* consumebytes: consumes @length bytes from a buffer @buf of length @buflength
+/*
+ * consumebytes: consumes @length bytes from a buffer @buf of length @buflength
  * @length    Number of bytes to consume
  * @buf       Buffer to consume from
  * @buflength Size of @buf
@@ -648,7 +643,8 @@ void *consumebytes(size_t length, char **buf, size_t *buflength)
 	return p;
 }
 
-/* consumestr: consumes a C string from a buffer @buf of length @length
+/*
+ * consumestr: consumes a C string from a buffer @buf of length @length
  * @buf    Buffer to consume
  * @length Length of buffer
  *
@@ -823,7 +819,8 @@ static void enter_user_namespace(const struct minijail *j, int *pipe_fds)
 		pdie("setresgid");
 }
 
-/* mount_one: Applies mounts from @m for @j, recursing as needed.
+/*
+ * mount_one: Applies mounts from @m for @j, recursing as needed.
  * @j Minijail these mounts are for
  * @m Head of list of mounts
  *
@@ -969,8 +966,10 @@ void drop_ugid(const struct minijail *j)
 		if (initgroups(j->user, j->usergid))
 			pdie("initgroups");
 	} else {
-		/* Only attempt to clear supplemental groups if we are changing
-		 * users. */
+		/*
+		 * Only attempt to clear supplemental groups if we are changing
+		 * users.
+		 */
 		if ((j->uid || j->gid) && setgroups(0, NULL))
 			pdie("setgroups");
 	}
@@ -1493,7 +1492,8 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 			return -EFAULT;
 	}
 
-	/* Use sys_clone() if and only if we're creating a pid namespace.
+	/*
+	 * Use sys_clone() if and only if we're creating a pid namespace.
 	 *
 	 * tl;dr: WARNING: do not mix pid namespaces and multithreading.
 	 *
