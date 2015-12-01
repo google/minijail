@@ -151,7 +151,11 @@ TEST(test_minijail_run_pid_pipes_no_preload) {
   const size_t buf_len = 128;
   char buf[buf_len];
   int status;
+#if defined(__ANDROID__)
+  char filename[] = "/system/bin/cat";
+#else
   char filename[] = "/bin/cat";
+#endif
   char teststr[] = "test\n";
   size_t teststr_len = strlen(teststr);
   char *argv[4];
@@ -179,7 +183,11 @@ TEST(test_minijail_run_pid_pipes_no_preload) {
   ASSERT_TRUE(WIFSIGNALED(status));
   EXPECT_EQ(WTERMSIG(status), SIGTERM);
 
+#if defined(__ANDROID__)
+  argv[0] = "/system/bin/sh";
+#else
   argv[0] = "/bin/sh";
+#endif
   argv[1] = "-c";
   argv[2] = "echo test >&2";
   argv[3] = NULL;
