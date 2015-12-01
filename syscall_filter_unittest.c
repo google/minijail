@@ -536,6 +536,11 @@ TEST_F(arg_filter, invalid) {
 
 FIXTURE(filter) {};
 
+/*
+ * When compiling for Android, disable tests that require data files.
+ * TODO(b/259497279): Re-enable this.
+ */
+#if !defined(__ANDROID__)
 FIXTURE_SETUP(filter) {}
 FIXTURE_TEARDOWN(filter) {}
 
@@ -662,5 +667,6 @@ TEST_F(filter, log) {
 	free(actual.filter);
 	fclose(policy);
 }
+#endif	/* __ANDROID__ */
 
 TEST_HARNESS_MAIN
