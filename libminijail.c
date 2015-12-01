@@ -116,16 +116,16 @@ struct minijail {
 	pid_t initpid;
 	int mountns_fd;
 	int netns_fd;
-	int filter_len;
 	char *chrootdir;
 	char *pid_file_path;
 	char *uidmap;
 	char *gidmap;
-	char *alt_syscall_table;
+	size_t filter_len;
 	struct sock_fprog *filter_prog;
+	char *alt_syscall_table;
 	struct mountpoint *mounts_head;
 	struct mountpoint *mounts_tail;
-	int mounts_count;
+	size_t mounts_count;
 };
 
 /*
@@ -661,8 +661,8 @@ char *consumestr(char **buf, size_t *buflength)
 
 int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 {
-	int i;
-	int count;
+	size_t i;
+	size_t count;
 	int ret = -EINVAL;
 
 	if (length < sizeof(*j))
