@@ -87,6 +87,8 @@ struct minijail {
 	struct {
 		int uid:1;
 		int gid:1;
+		int usergroups:1;
+		int suppl_gids:1;
 		int caps:1;
 		int vfs:1;
 		int enter_vfs:1;
@@ -97,7 +99,6 @@ struct minijail {
 		int userns:1;
 		int seccomp:1;
 		int remount_proc_ro:1;
-		int usergroups:1;
 		int no_new_privs:1;
 		int seccomp_filter:1;
 		int log_seccomp_filter:1;
@@ -112,6 +113,8 @@ struct minijail {
 	gid_t gid;
 	gid_t usergid;
 	char *user;
+	size_t suppl_gid_count;
+	gid_t *suppl_gid_list;
 	uint64_t caps;
 	pid_t initpid;
 	int mountns_fd;
@@ -186,6 +189,28 @@ void API minijail_change_gid(struct minijail *j, gid_t gid)
 		die("useless change to gid 0");
 	j->gid = gid;
 	j->flags.gid = 1;
+}
+
+int API minijail_set_supplementary_gids(struct minijail *j, size_t size,
+					const gid_t *list)
+{
+	if (j->flags.usergroups)
+		die("cannot inherit *and* set supplementary groups");
+
+	if (size == 0)
+		return -EINVAL;
+
+	/* Copy the gid_t array. */
+	j->suppl_gid_list = calloc(size, sizeof(gid_t));
+	if (!j->suppl_gid_list) {
+		return -ENOMEM;
+	}
+	for (size_t i = 0; i < size; i++) {
+		j->suppl_gid_list[i] = list[i];
+	}
+	j->suppl_gid_count = size;
+	j->flags.suppl_gids = 1;
+	return 0;
 }
 
 int API minijail_change_user(struct minijail *j, const char *user)
@@ -962,12 +987,21 @@ static void write_pid_file(const struct minijail *j)
 
 void drop_ugid(const struct minijail *j)
 {
+	if (j->flags.usergroups && j->flags.suppl_gids) {
+		die("tried to inherit *and* set supplementary groups;"
+		    " can only do one");
+	}
+
 	if (j->flags.usergroups) {
 		if (initgroups(j->user, j->usergid))
 			pdie("initgroups");
+	} else if (j->flags.suppl_gids) {
+		if (setgroups(j->suppl_gid_count, j->suppl_gid_list)) {
+			pdie("setgroups");
+		}
 	} else {
 		/*
-		 * Only attempt to clear supplemental groups if we are changing
+		 * Only attempt to clear supplementary groups if we are changing
 		 * users.
 		 */
 		if ((j->uid || j->gid) && setgroups(0, NULL))
