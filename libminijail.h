@@ -203,7 +203,8 @@ int minijail_run_pid_pipes(struct minijail *j, const char *filename,
  */
 int minijail_run_pid_pipes_no_preload(struct minijail *j, const char *filename,
 				      char *const argv[], pid_t *pchild_pid,
-				      int *pstdin_fd, int *pstdout_fd, int *pstderr_fd);
+				      int *pstdin_fd, int *pstdout_fd,
+				      int *pstderr_fd);
 
 /*
  * Kill the specified minijail. The minijail must have been created with pid

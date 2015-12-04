@@ -549,7 +549,8 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
 	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL)) {
 		if ((errno == ENOSYS) && SECCOMP_SOFTFAIL) {
-			warn("not loading seccomp filter, seccomp not supported");
+			warn("not loading seccomp filter,"
+			     " seccomp not supported");
 			return;
 		}
 	}
@@ -912,7 +913,10 @@ int enter_pivot_root(const struct minijail *j)
 	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
 		return ret;
 
-	/* Keep the fd for both old and new root. It will be used in fchdir later. */
+	/*
+	 * Keep the fd for both old and new root.
+	 * It will be used in fchdir later.
+	 */
 	oldroot = open("/", O_DIRECTORY | O_RDONLY);
 	if (oldroot < 0)
 		pdie("failed to open / for fchdir");
@@ -920,7 +924,10 @@ int enter_pivot_root(const struct minijail *j)
 	if (newroot < 0)
 		pdie("failed to open %s for fchdir", j->chrootdir);
 
-	/* To ensure chrootdir is the root of a file system, do a self bind mount. */
+	/*
+	 * To ensure chrootdir is the root of a file system,
+	 * do a self bind mount.
+	 */
 	if (mount(j->chrootdir, j->chrootdir, "bind", MS_BIND | MS_REC, ""))
 		pdie("failed to bind mount '%s'", j->chrootdir);
 	if (chdir(j->chrootdir))
@@ -1119,7 +1126,8 @@ void set_seccomp_filter(const struct minijail *j)
 	 * Install the syscall filter.
 	 */
 	if (j->flags.seccomp_filter) {
-		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, j->filter_prog)) {
+		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER,
+			  j->filter_prog)) {
 			if ((errno == ENOSYS) && SECCOMP_SOFTFAIL) {
 				warn("seccomp not supported");
 				return;
@@ -1426,9 +1434,11 @@ int API minijail_run_no_preload(struct minijail *j, const char *filename,
 }
 
 int API minijail_run_pid_pipes_no_preload(struct minijail *j,
-					  const char *filename, char *const argv[],
+					  const char *filename,
+					  char *const argv[],
 					  pid_t *pchild_pid,
-					  int *pstdin_fd, int *pstdout_fd, int *pstderr_fd) {
+					  int *pstdin_fd, int *pstdout_fd,
+					  int *pstderr_fd) {
 	return minijail_run_internal(j, filename, argv, pchild_pid,
 				     pstdin_fd, pstdout_fd, pstderr_fd, false);
 }
