@@ -1153,16 +1153,16 @@ void API minijail_enter(const struct minijail *j)
 		pdie("setns(CLONE_NEWNS)");
 
 	if (j->flags.vfs) {
-          if (unshare(CLONE_NEWNS))
-            pdie("unshare(vfs)");
-          /*
-           * Remount all filesystems as private. If they are shared
-           * new bind mounts will creep out of our namespace.
-           * https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
-           */
-          if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL))
-            pdie("mount(/, private)");
-        }
+		if (unshare(CLONE_NEWNS))
+			pdie("unshare(vfs)");
+		/*
+		 * Remount all filesystems as private. If they are shared
+		 * new bind mounts will creep out of our namespace.
+		 * https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
+		 */
+		if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL))
+			pdie("mount(/, private)");
+	}
 
 	if (j->flags.ipc && unshare(CLONE_NEWIPC)) {
 		pdie("unshare(ipc)");
