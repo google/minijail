@@ -107,3 +107,16 @@ LOCAL_SRC_FILES := \
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
 include $(BUILD_NATIVE_TEST)
+
+# libminijail usage example.
+# ========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := drop_privs
+LOCAL_MODULE_TAGS := optional
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	examples/drop_privs.cpp
+
+LOCAL_SHARED_LIBRARIES := libbase libminijail
+include $(BUILD_EXECUTABLE)
