@@ -159,6 +159,9 @@ void minijail_preexec(struct minijail *j)
 	if (j->user)
 		free(j->user);
 	j->user = NULL;
+	if (j->suppl_gid_list)
+		free(j->suppl_gid_list);
+	j->suppl_gid_list = NULL;
 	memset(&j->flags, 0, sizeof(j->flags));
 	/* Now restore anything we meant to keep. */
 	j->flags.vfs = vfs;
@@ -1794,6 +1797,8 @@ void API minijail_destroy(struct minijail *j)
 	j->mounts_tail = NULL;
 	if (j->user)
 		free(j->user);
+	if (j->suppl_gid_list)
+		free(j->suppl_gid_list);
 	if (j->chrootdir)
 		free(j->chrootdir);
 	if (j->alt_syscall_table)
