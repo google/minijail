@@ -18,7 +18,7 @@
 
 #include <libminijail.h>
 
-#include <base/logging.h>
+#include <android-base/logging.h>
 
 gid_t groups[] = { 1001, 1002 };
 
