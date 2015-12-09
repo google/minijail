@@ -14,10 +14,12 @@
 
 LOCAL_PATH := $(call my-dir)
 
+
 # Common variables
 # ========================================================
 minijailCommonCFlags := -Wall -Werror
 minijailCommonSharedLibraries := libcap
+
 
 # Static library for generated code.
 # ========================================================
@@ -41,14 +43,11 @@ LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 include $(BUILD_STATIC_LIBRARY)
 
+
 # libminijail shared library for target.
 # ========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail
-
-# LOCAL_MODULE_CLASS must be defined before calling $(local-generated-sources-dir)
-LOCAL_MODULE_CLASS := SHARED_LIBRARIES
-intermediates := $(local-generated-sources-dir)
 
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
@@ -63,6 +62,7 @@ LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
+
 
 # libminijail native unit tests. Run with:
 # adb shell /data/nativetest/libminijail_unittest/libminijail_unittest
@@ -87,8 +87,9 @@ LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
 include $(BUILD_NATIVE_TEST)
 
+
 # Syscall filtering native unit tests. Run with:
-# adb shell /data/nativetest/libminijail_unittest/syscall_filter_unittest
+# adb shell /data/nativetest/syscall_filter_unittest/syscall_filter_unittest
 # ========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := syscall_filter_unittest
@@ -107,6 +108,7 @@ LOCAL_SRC_FILES := \
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
 include $(BUILD_NATIVE_TEST)
+
 
 # libminijail usage example.
 # ========================================================
