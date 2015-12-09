@@ -1145,10 +1145,12 @@ void set_seccomp_filter(const struct minijail *j)
 void API minijail_enter(const struct minijail *j)
 {
 	/*
-	 * Get the last valid cap from /proc, since /proc can be unmounted
-	 * before drop_caps().
+	 * If we're dropping caps, get the last valid cap from /proc now,
+	 * since /proc can be unmounted before drop_caps() is called.
 	 */
-	unsigned int last_valid_cap = get_last_valid_cap();
+	unsigned int last_valid_cap = 0;
+	if (j->flags.caps)
+		last_valid_cap = get_last_valid_cap();
 
 	if (j->flags.pids)
 		die("tried to enter a pid-namespaced jail;"
