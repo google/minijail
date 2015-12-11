@@ -600,7 +600,7 @@ void marshal_state_init(struct marshal_state *state,
 }
 
 void marshal_append(struct marshal_state *state,
-		    char *src, size_t length)
+		    void *src, size_t length)
 {
 	size_t copy_len = MIN(state->available, length);
 
@@ -621,6 +621,10 @@ void minijail_marshal_helper(struct marshal_state *state,
 	marshal_append(state, (char *)j, sizeof(*j));
 	if (j->user)
 		marshal_append(state, j->user, strlen(j->user) + 1);
+	if (j->suppl_gid_list) {
+		marshal_append(state, j->suppl_gid_list,
+			       j->suppl_gid_count * sizeof(gid_t));
+	}
 	if (j->chrootdir)
 		marshal_append(state, j->chrootdir, strlen(j->chrootdir) + 1);
 	if (j->alt_syscall_table) {
@@ -716,6 +720,23 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 			goto clear_pointers;
 	}
 
+	if (j->suppl_gid_list) {	/* stale pointer */
+		if (j->suppl_gid_count > NGROUPS_MAX) {
+			goto bad_gid_list;
+		}
+		size_t gid_list_size = j->suppl_gid_count * sizeof(gid_t);
+		void *gid_list_bytes =
+		    consumebytes(gid_list_size, &serialized, &length);
+		if (!gid_list_bytes)
+			goto bad_gid_list;
+
+		j->suppl_gid_list = calloc(j->suppl_gid_count, sizeof(gid_t));
+		if (!j->suppl_gid_list)
+			goto bad_gid_list;
+
+		memcpy(j->suppl_gid_list, gid_list_bytes, gid_list_size);
+	}
+
 	if (j->chrootdir) {	/* stale pointer */
 		char *chrootdir = consumestr(&serialized, &length);
 		if (!chrootdir)
@@ -746,8 +767,14 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 			goto bad_filters;
 
 		j->filter_prog = malloc(sizeof(struct sock_fprog));
+		if (!j->filter_prog)
+			goto bad_filters;
+
 		j->filter_prog->len = ninstrs;
 		j->filter_prog->filter = malloc(program_len);
+		if (!j->filter_prog->filter)
+			goto bad_filter_prog_instrs;
+
 		memcpy(j->filter_prog->filter, program, program_len);
 	}
 
@@ -780,6 +807,9 @@ bad_mounts:
 		free(j->filter_prog->filter);
 		free(j->filter_prog);
 	}
+bad_filter_prog_instrs:
+	if (j->filter_prog)
+		free(j->filter_prog);
 bad_filters:
 	if (j->alt_syscall_table)
 		free(j->alt_syscall_table);
@@ -787,10 +817,14 @@ bad_syscall_table:
 	if (j->chrootdir)
 		free(j->chrootdir);
 bad_chrootdir:
+	if (j->suppl_gid_list)
+		free(j->suppl_gid_list);
+bad_gid_list:
 	if (j->user)
 		free(j->user);
 clear_pointers:
 	j->user = NULL;
+	j->suppl_gid_list = NULL;
 	j->chrootdir = NULL;
 	j->alt_syscall_table = NULL;
 out:
