@@ -25,7 +25,7 @@ libminijailSrcFiles := \
 	util.c
 
 minijailCommonCFlags := -Wall -Werror
-minijailCommonSharedLibraries := libcap
+minijailCommonLibraries := libcap
 
 
 # Static library for generated code.
@@ -61,7 +61,7 @@ LOCAL_CLANG := true
 LOCAL_SRC_FILES := $(libminijailSrcFiles)
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
-LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
 
@@ -75,8 +75,7 @@ LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := $(libminijailSrcFiles)
 
-LOCAL_STATIC_LIBRARIES := libminijail_generated
-LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
+LOCAL_STATIC_LIBRARIES := libminijail_generated $(minijailCommonLibraries)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_STATIC_LIBRARY)
 
@@ -101,7 +100,7 @@ LOCAL_SRC_FILES := \
 	util.c \
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
-LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
 
 
@@ -123,7 +122,7 @@ LOCAL_SRC_FILES := \
 	util.c \
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
-LOCAL_SHARED_LIBRARIES := $(minijailCommonSharedLibraries)
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
 
 
