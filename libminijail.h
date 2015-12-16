@@ -53,6 +53,7 @@ void minijail_use_seccomp_filter(struct minijail *j);
 void minijail_parse_seccomp_filters(struct minijail *j, const char *path);
 void minijail_log_seccomp_filter_failures(struct minijail *j);
 void minijail_use_caps(struct minijail *j, uint64_t capmask);
+void minijail_reset_signal_mask(struct minijail *j);
 void minijail_namespace_vfs(struct minijail *j);
 void minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path);
 void minijail_namespace_ipc(struct minijail *j);
