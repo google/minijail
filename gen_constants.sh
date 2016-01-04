@@ -40,7 +40,7 @@ INCLUDES='
 #   { "AT_FDWCD", AT_FDCWD },
 # endif
 SED_MULTILINE='s@#define ([[:upper:]][[:upper:]0-9_]*).*@#ifdef \1\
-  { "\1", \1 },\
+  { "\1", (unsigned long) \1 },\
 #endif  // \1@'
 
 # Passes the previous list of #includes to the C preprocessor and prints out
@@ -54,7 +54,7 @@ $INCLUDES
 const struct constant_entry constant_table[] = {
 $(echo "$INCLUDES" | \
   ${CC} -dD - -E | \
-  grep '^#define [[:upper:]][[:upper:]0-9_]* ' | \
+  grep -E '^#define [[:upper:]][[:upper:]0-9_]*(\s)+[[:alnum:]]' | \
   grep -Ev '(SIGRTMAX|SIGRTMIN|SIG_|NULL)' | \
   sort -u | \
   sed -Ee "${SED_MULTILINE}")
