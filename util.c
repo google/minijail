@@ -28,7 +28,11 @@
 #if defined(__x86_64__)
 const char *log_syscalls[] = { "connect", "sendto" };
 #elif defined(__i386__)
+#if defined(__ANDROID__)
+const char *log_syscalls[] = { "socketcall", "writev", "fcntl64", "clock_gettime" };
+#else
 const char *log_syscalls[] = { "socketcall", "time" };
+#endif
 #elif defined(__arm__)
 #if defined(__ANDROID__)
 const char *log_syscalls[] = { "clock_gettime", "connect", "fcntl64", "socket", "writev" };
