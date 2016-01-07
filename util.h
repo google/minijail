@@ -29,6 +29,14 @@
 extern const char *log_syscalls[];
 extern const size_t log_syscalls_len;
 
+inline int is_android() {
+#if defined(__ANDROID__)
+	return 1;
+#else
+	return 0;
+#endif
+}
+
 int lookup_syscall(const char *name);
 const char *lookup_syscall_name(int nr);
 long int parse_constant(char *constant_str, char **endptr);
