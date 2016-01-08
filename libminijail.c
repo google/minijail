@@ -1069,20 +1069,31 @@ void drop_ugid(const struct minijail *j)
 /*
  * We specifically do not use cap_valid() as that only tells us the last
  * valid cap we were *compiled* against (i.e. what the version of kernel
- * headers says).  If we run on a different kernel version, then it's not
+ * headers says). If we run on a different kernel version, then it's not
  * uncommon for that to be less (if an older kernel) or more (if a newer
- * kernel).  So suck up the answer via /proc.
+ * kernel).
+ * Normally, we suck up the answer via /proc. On Android, not all processes are
+ * guaranteed to be able to access '/proc/sys/kernel/cap_last_cap' so we
+ * programmatically find the value by calling prctl(PR_CAPBSET_READ).
  */
 static unsigned int get_last_valid_cap()
 {
-	const char cap_file[] = "/proc/sys/kernel/cap_last_cap";
-	FILE *fp = fopen(cap_file, "re");
-	unsigned int last_valid_cap;
+	unsigned int last_valid_cap = 0;
+	if (is_android()) {
+		for (; prctl(PR_CAPBSET_READ, last_valid_cap, 0, 0, 0) >= 0;
+		     ++last_valid_cap);
 
-	if (fscanf(fp, "%u", &last_valid_cap) != 1)
-		pdie("fscanf(%s)", cap_file);
-	fclose(fp);
-
+		/* |last_valid_cap| will be the first failing value. */
+		if (last_valid_cap > 0) {
+			last_valid_cap--;
+		}
+	} else {
+		const char cap_file[] = "/proc/sys/kernel/cap_last_cap";
+		FILE *fp = fopen(cap_file, "re");
+		if (fscanf(fp, "%u", &last_valid_cap) != 1)
+			pdie("fscanf(%s)", cap_file);
+		fclose(fp);
+	}
 	return last_valid_cap;
 }
 
