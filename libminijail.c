@@ -195,8 +195,8 @@ void API minijail_change_gid(struct minijail *j, gid_t gid)
 	j->flags.gid = 1;
 }
 
-int API minijail_set_supplementary_gids(struct minijail *j, size_t size,
-					const gid_t *list)
+void API minijail_set_supplementary_gids(struct minijail *j, size_t size,
+					 const gid_t *list)
 {
 	size_t i;
 
@@ -208,7 +208,7 @@ int API minijail_set_supplementary_gids(struct minijail *j, size_t size,
 		j->suppl_gid_list = NULL;
 		j->suppl_gid_count = 0;
 		j->flags.suppl_gids = 1;
-		return 0;
+		return;
 	}
 
 	/* Copy the gid_t array. */
@@ -221,7 +221,6 @@ int API minijail_set_supplementary_gids(struct minijail *j, size_t size,
 	}
 	j->suppl_gid_count = size;
 	j->flags.suppl_gids = 1;
-	return 0;
 }
 
 int API minijail_change_user(struct minijail *j, const char *user)
