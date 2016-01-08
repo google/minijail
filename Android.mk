@@ -103,7 +103,7 @@ LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := $(libminijailSrcFiles)
 
-LOCAL_STATIC_LIBRARIES := libminijail_generated $(minijailCommonLibraries)
+LOCAL_WHOLE_STATIC_LIBRARIES := libminijail_generated $(minijailCommonLibraries)
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_STATIC_LIBRARY)
 
