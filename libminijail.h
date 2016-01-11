@@ -41,8 +41,8 @@ struct minijail *minijail_new(void);
 void minijail_change_uid(struct minijail *j, uid_t uid);
 void minijail_change_gid(struct minijail *j, gid_t gid);
 /* Copies |list|. */
-int minijail_set_supplementary_gids(struct minijail *j, size_t size,
-				    const gid_t *list);
+void minijail_set_supplementary_gids(struct minijail *j, size_t size,
+				     const gid_t *list);
 /* Stores user to change to and copies |user| for internal consistency. */
 int minijail_change_user(struct minijail *j, const char *user);
 /* Does not take ownership of |group|. */
