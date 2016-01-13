@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/user.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -170,6 +171,34 @@ void minijail_preexec(struct minijail *j)
 	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
 	/* Note, |pids| will already have been used before this call. */
+}
+
+/* Return true if kernel version is less than 3.8. */
+static int seccomp_kernel_support_not_required()
+{
+	int major, minor;
+	struct utsname uts;
+	return (uname(&uts) != -1 &&
+			sscanf(uts.release, "%d.%d", &major, &minor) == 2 &&
+			((major < 3) || ((major == 3) && (minor < 8))));
+}
+
+/*
+ * Allow softfail on Android devices with kernel version < 3.8.
+ */
+static int can_softfail()
+{
+#if SECCOMP_SOFTFAIL
+	if (is_android()) {
+		if (seccomp_kernel_support_not_required())
+			return 1;
+		else
+			return 0;
+	} else {
+		return 1;
+	}
+#endif
+	return 0;
 }
 
 /* Minijail API. */
@@ -562,10 +591,14 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
 	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL)) {
-		if ((errno == ENOSYS) && SECCOMP_SOFTFAIL) {
+		if ((errno == EINVAL) && can_softfail()) {
 			warn("not loading seccomp filter,"
 			     " seccomp not supported");
-			return;
+			j->flags.seccomp_filter = 0;
+			j->flags.log_seccomp_filter = 0;
+			j->filter_len = 0;
+			j->filter_prog = NULL;
+			j->flags.no_new_privs = 0;
 		}
 	}
 	FILE *file = fopen(path, "r");
@@ -1187,7 +1220,7 @@ void set_seccomp_filter(const struct minijail *j)
 	if (j->flags.seccomp_filter) {
 		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER,
 			  j->filter_prog)) {
-			if ((errno == ENOSYS) && SECCOMP_SOFTFAIL) {
+			if ((errno == EINVAL) && can_softfail()) {
 				warn("seccomp not supported");
 				return;
 			}
@@ -1310,7 +1343,7 @@ void API minijail_enter(const struct minijail *j)
 	 * privilege-dropping syscalls :)
 	 */
 	if (j->flags.seccomp && prctl(PR_SET_SECCOMP, 1)) {
-		if ((errno == ENOSYS) && SECCOMP_SOFTFAIL) {
+		if ((errno == EINVAL) && can_softfail()) {
 			warn("seccomp not supported");
 			return;
 		}
