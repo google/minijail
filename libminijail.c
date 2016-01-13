@@ -173,8 +173,8 @@ void minijail_preexec(struct minijail *j)
 	/* Note, |pids| will already have been used before this call. */
 }
 
-/* Return true if kernel version is less than 3.8. */
-static int seccomp_kernel_support_not_required()
+/* Returns true if the kernel version is less than 3.8. */
+int seccomp_kernel_support_not_required()
 {
 	int major, minor;
 	struct utsname uts;
@@ -183,10 +183,8 @@ static int seccomp_kernel_support_not_required()
 			((major < 3) || ((major == 3) && (minor < 8))));
 }
 
-/*
- * Allow softfail on Android devices with kernel version < 3.8.
- */
-static int can_softfail()
+/* Allow seccomp soft-fail on Android devices with kernel version < 3.8. */
+int can_softfail()
 {
 #if SECCOMP_SOFTFAIL
 	if (is_android()) {
