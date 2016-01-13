@@ -871,12 +871,11 @@ out:
 	return ret;
 }
 
-static void write_ugid_mappings(const struct minijail *j, int *pipe_fds)
+static void write_ugid_mappings(const struct minijail *j)
 {
 	int fd, ret, len;
 	size_t sz;
 	char fname[32];
-	close(pipe_fds[0]);
 
 	sz = sizeof(fname);
 	if (j->uidmap) {
@@ -903,21 +902,32 @@ static void write_ugid_mappings(const struct minijail *j, int *pipe_fds)
 			die("failed to set gid_map");
 		close(fd);
 	}
+}
 
+static void parent_setup_complete(int *pipe_fds)
+{
+	close(pipe_fds[0]);
 	close(pipe_fds[1]);
 }
 
-static void enter_user_namespace(const struct minijail *j, int *pipe_fds)
+/*
+ * wait_for_parent_setup: Called by the child process to wait for any
+ * further parent-side setup to complete before continuing.
+ */
+static void wait_for_parent_setup(int *pipe_fds)
 {
 	char buf;
 
 	close(pipe_fds[1]);
 
-	/* Wait for parent to set up uid/gid mappings. */
+	/* Wait for parent to complete setup and close the pipe. */
 	if (read(pipe_fds[0], &buf, 1) != 0)
 		die("failed to sync with parent");
 	close(pipe_fds[0]);
+}
 
+static void enter_user_namespace(const struct minijail *j)
+{
 	if (j->uidmap && setresuid(0, 0, 0))
 		pdie("setresuid");
 	if (j->gidmap && setresgid(0, 0, 0))
@@ -1546,7 +1556,8 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	int stdin_fds[2];
 	int stdout_fds[2];
 	int stderr_fds[2];
-	int userns_pipe_fds[2];
+	int child_sync_pipe_fds[2];
+	int sync_child = 0;
 	int ret;
 	/* We need to remember this across the minijail_preexec() call. */
 	int pid_namespace = j->flags.pids;
@@ -1624,7 +1635,8 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	 * create the pipe(2) to sync between parent and child.
 	 */
 	if (j->flags.userns) {
-		if (pipe(userns_pipe_fds))
+		sync_child = 1;
+		if (pipe(child_sync_pipe_fds))
 			return -EFAULT;
 	}
 
@@ -1703,7 +1715,10 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 			write_pid_file(j);
 
 		if (j->flags.userns)
-			write_ugid_mappings(j, userns_pipe_fds);
+			write_ugid_mappings(j);
+
+		if (sync_child)
+			parent_setup_complete(child_sync_pipe_fds);
 
 		if (use_preload) {
 			/* Send marshalled minijail. */
@@ -1755,8 +1770,11 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 			pdie("sigprocmask failed");
 	}
 
+	if (sync_child)
+		wait_for_parent_setup(child_sync_pipe_fds);
+
 	if (j->flags.userns)
-		enter_user_namespace(j, userns_pipe_fds);
+		enter_user_namespace(j);
 
 	/*
 	 * If we want to write to the jailed process' standard input,
