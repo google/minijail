@@ -27,6 +27,13 @@ libminijailSrcFiles := \
 minijailCommonCFlags := -Wall -Werror
 minijailCommonLibraries := libcap
 
+# Android devices running kernel version < 3.8 are not required to
+# support seccomp. Brillo devices must support seccomp regardless of
+# kernel version.
+# TODO: remove when no longer supporting kernel versions < 3.8.
+ifndef BRILLO
+minijailCommonCFlags += -DUSE_SECCOMP_SOFTFAIL
+endif
 
 # Static library for generated code.
 # ========================================================
