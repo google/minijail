@@ -24,7 +24,7 @@ libminijailSrcFiles := \
 	syscall_filter.c \
 	util.c
 
-minijailCommonCFlags := -Wall -Werror
+minijailCommonCFlags := -DHAVE_SECUREBITS_H -Wall -Werror
 minijailCommonLibraries := libcap
 
 # Android devices running kernel version < 3.8 are not required to
