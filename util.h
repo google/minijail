@@ -29,7 +29,7 @@
 extern const char *log_syscalls[];
 extern const size_t log_syscalls_len;
 
-inline int is_android() {
+static inline int is_android() {
 #if defined(__ANDROID__)
 	return 1;
 #else
