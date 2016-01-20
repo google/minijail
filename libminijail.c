@@ -72,6 +72,8 @@
 # define SECCOMP_SOFTFAIL 0
 #endif
 
+#define MAX_CGROUPS 10 /* 10 different controllers supported by Linux. */
+
 struct mountpoint {
 	char *src;
 	char *dest;
@@ -131,6 +133,8 @@ struct minijail {
 	struct mountpoint *mounts_head;
 	struct mountpoint *mounts_tail;
 	size_t mounts_count;
+	char *cgroups[MAX_CGROUPS];
+	size_t cgroup_count;
 };
 
 /*
@@ -530,6 +534,17 @@ int API minijail_write_pid_file(struct minijail *j, const char *path)
 	return 0;
 }
 
+int API minijail_add_to_cgroup(struct minijail *j, const char *path)
+{
+	if (j->cgroup_count >= MAX_CGROUPS)
+		return -ENOMEM;
+	j->cgroups[j->cgroup_count] = strdup(path);
+	if (!j->cgroups[j->cgroup_count])
+		return -ENOMEM;
+	j->cgroup_count++;
+	return 0;
+}
+
 int API minijail_mount(struct minijail *j, const char *src, const char *dest,
 		       const char *type, unsigned long flags)
 {
@@ -658,6 +673,8 @@ void minijail_marshal_helper(struct marshal_state *state,
 			     const struct minijail *j)
 {
 	struct mountpoint *m = NULL;
+	size_t i;
+
 	marshal_append(state, (char *)j, sizeof(*j));
 	if (j->user)
 		marshal_append(state, j->user, strlen(j->user) + 1);
@@ -682,6 +699,8 @@ void minijail_marshal_helper(struct marshal_state *state,
 		marshal_append(state, m->type, strlen(m->type) + 1);
 		marshal_append(state, (char *)&m->flags, sizeof(m->flags));
 	}
+	for (i = 0; i < j->cgroup_count; ++i)
+		marshal_append(state, j->cgroups[i], strlen(j->cgroups[i]) + 1);
 }
 
 size_t API minijail_size(const struct minijail *j)
@@ -840,8 +859,31 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 			goto bad_mounts;
 	}
 
+	count = j->cgroup_count;
+	j->cgroup_count = 0;
+	for (i = 0; i < count; ++i) {
+		char *cgroup = consumestr(&serialized, &length);
+		if (!cgroup)
+			goto bad_cgroups;
+		j->cgroups[i] = strdup(cgroup);
+		if (!j->cgroups[i])
+			goto bad_cgroups;
+		++j->cgroup_count;
+	}
+
 	return 0;
 
+bad_cgroups:
+	while (j->mounts_head) {
+		struct mountpoint *m = j->mounts_head;
+		j->mounts_head = j->mounts_head->next;
+		free(m->type);
+		free(m->dest);
+		free(m->src);
+		free(m);
+	}
+	for (i = 0; i < j->cgroup_count; ++i)
+		free(j->cgroups[i]);
 bad_mounts:
 	if (j->flags.seccomp_filter && j->filter_len > 0) {
 		free(j->filter_prog->filter);
@@ -867,6 +909,7 @@ clear_pointers:
 	j->suppl_gid_list = NULL;
 	j->chrootdir = NULL;
 	j->alt_syscall_table = NULL;
+	j->cgroup_count = 0;
 out:
 	return ret;
 }
@@ -1069,16 +1112,29 @@ int remount_proc_readonly(const struct minijail *j)
 	return 0;
 }
 
-static void write_pid_file(const struct minijail *j)
+static void write_pid_to_path(pid_t pid, const char *path)
 {
-	FILE *fp = fopen(j->pid_file_path, "w");
+	FILE *fp = fopen(path, "w");
 
 	if (!fp)
-		pdie("failed to open '%s'", j->pid_file_path);
-	if (fprintf(fp, "%d\n", (int)j->initpid) < 0)
-		pdie("fprintf(%s)", j->pid_file_path);
+		pdie("failed to open '%s'", path);
+	if (fprintf(fp, "%d\n", (int)pid) < 0)
+		pdie("fprintf(%s)", path);
 	if (fclose(fp))
-		pdie("fclose(%s)", j->pid_file_path);
+		pdie("fclose(%s)", path);
+}
+
+static void write_pid_file(const struct minijail *j)
+{
+	write_pid_to_path(j->initpid, j->pid_file_path);
+}
+
+static void assign_cgroups(const struct minijail *j)
+{
+	size_t i;
+
+	for (i = 0; i < j->cgroup_count; ++i)
+		write_pid_to_path(j->initpid, j->cgroups[i]);
 }
 
 void drop_ugid(const struct minijail *j)
@@ -1634,7 +1690,7 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	 * If we want to set up a new uid/gid mapping in the user namespace,
 	 * create the pipe(2) to sync between parent and child.
 	 */
-	if (j->flags.userns) {
+	if (j->flags.userns || j->cgroup_count) {
 		sync_child = 1;
 		if (pipe(child_sync_pipe_fds))
 			return -EFAULT;
@@ -1713,6 +1769,8 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 
 		if (j->flags.pid_file)
 			write_pid_file(j);
+
+		assign_cgroups(j);
 
 		if (j->flags.userns)
 			write_ugid_mappings(j);
@@ -1897,6 +1955,8 @@ int API minijail_wait(struct minijail *j)
 
 void API minijail_destroy(struct minijail *j)
 {
+	size_t i;
+
 	if (j->flags.seccomp_filter && j->filter_prog) {
 		free(j->filter_prog->filter);
 		free(j->filter_prog);
@@ -1918,5 +1978,7 @@ void API minijail_destroy(struct minijail *j)
 		free(j->chrootdir);
 	if (j->alt_syscall_table)
 		free(j->alt_syscall_table);
+	for (i = 0; i < j->cgroup_count; ++i)
+		free(j->cgroups[i]);
 	free(j);
 }
