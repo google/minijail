@@ -79,6 +79,14 @@ void minijail_disable_ptrace(struct minijail *j);
 int minijail_use_alt_syscall(struct minijail *j, const char *table);
 
 /*
+ * Adds the jailed process to the cgroup given by |path|.  |path| should be the
+ * full path to the cgroups "tasks" file.
+ * Example: /sys/fs/cgroup/cpu/jailed_procs/tasks adds to the "jailed_procs" cpu
+ * cgroup.
+ */
+int minijail_add_to_cgroup(struct minijail *j, const char *path);
+
+/*
  * minijail_enter_chroot: enables chroot() restriction for @j
  * @j   minijail to apply restriction to
  * @dir directory to chroot() to. Owned by caller.
