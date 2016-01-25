@@ -423,6 +423,20 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog,
 		if (nr < 0) {
 			warn("compile_filter: nonexistent syscall '%s'",
 			     syscall_name);
+			if (log_failures) {
+				/*
+				 * If we're logging failures, assume we're in a
+				 * debugging case and continue.
+				 * This is not super risky because an invalid
+				 * syscall name is likely caused by a typo or by
+				 * leftover lines from a different architecture.
+				 * In either case, not including a policy line
+				 * is equivalent to killing the process if the
+				 * syscall is made, so there's no added attack
+				 * surface.
+				 */
+				continue;
+			}
 			return -1;
 		}
 
