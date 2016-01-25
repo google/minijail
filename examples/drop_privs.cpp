@@ -57,6 +57,9 @@ int main(void) {
     minijail_change_group(j, "system");
     minijail_set_supplementary_gids(j, sizeof(groups) / sizeof(groups[0]), groups);
     // minijail_use_caps(j, CAP_TO_MASK(CAP_SETUID) | CAP_TO_MASK(CAP_SETGID));
+    // minijail_use_seccomp_filter(j);
+    // minijail_log_seccomp_filter_failures(j);
+    // minijail_parse_seccomp_filters(j, "/data/filter.policy");
     minijail_enter(j);
     log_resugid();
     minijail_destroy(j);
