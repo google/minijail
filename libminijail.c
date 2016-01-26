@@ -110,6 +110,7 @@ struct minijail {
 		int mount_tmp:1;
 		int do_init:1;
 		int pid_file:1;
+		int cgroups:1;
 		int alt_syscall:1;
 		int reset_signal_mask:1;
 	} flags;
@@ -150,6 +151,7 @@ void minijail_preenter(struct minijail *j)
 	j->flags.pids = 0;
 	j->flags.do_init = 0;
 	j->flags.pid_file = 0;
+	j->flags.cgroups = 0;
 }
 
 /*
@@ -272,9 +274,9 @@ int API minijail_change_user(struct minijail *j, const char *user)
 		return -ENOMEM;
 	getpwnam_r(user, &pw, buf, sz, &ppw);
 	/*
-	 * We're safe to free the buffer here. The strings inside pw point
-	 * inside buf, but we don't use any of them; this leaves the pointers
-	 * dangling but it's safe. ppw points at pw if getpwnam_r succeeded.
+	 * We're safe to free the buffer here. The strings inside |pw| point
+	 * inside |buf|, but we don't use any of them; this leaves the pointers
+	 * dangling but it's safe. |ppw| points at |pw| if getpwnam_r(3) succeeded.
 	 */
 	free(buf);
 	/* getpwnam_r(3) does *not* set errno when |ppw| is NULL. */
@@ -542,6 +544,7 @@ int API minijail_add_to_cgroup(struct minijail *j, const char *path)
 	if (!j->cgroups[j->cgroup_count])
 		return -ENOMEM;
 	j->cgroup_count++;
+	j->flags.cgroups = 1;
 	return 0;
 }
 
@@ -1129,7 +1132,7 @@ static void write_pid_file(const struct minijail *j)
 	write_pid_to_path(j->initpid, j->pid_file_path);
 }
 
-static void assign_cgroups(const struct minijail *j)
+static void add_to_cgroups(const struct minijail *j)
 {
 	size_t i;
 
@@ -1688,9 +1691,10 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 
 	/*
 	 * If we want to set up a new uid/gid mapping in the user namespace,
-	 * create the pipe(2) to sync between parent and child.
+	 * or if we need to add the child process to cgroups, create the pipe(2)
+	 * to sync between parent and child.
 	 */
-	if (j->flags.userns || j->cgroup_count) {
+	if (j->flags.userns || j->flags.cgroups) {
 		sync_child = 1;
 		if (pipe(child_sync_pipe_fds))
 			return -EFAULT;
@@ -1770,7 +1774,8 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 		if (j->flags.pid_file)
 			write_pid_file(j);
 
-		assign_cgroups(j);
+		if (j->flags.cgroups)
+			add_to_cgroups(j);
 
 		if (j->flags.userns)
 			write_ugid_mappings(j);
