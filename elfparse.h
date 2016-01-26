@@ -24,7 +24,9 @@
  * The compiler could mess with aligmment depending on arch
  * so I'm redefining them here and packing them to 1-byte alignment.
  */
+#if !defined(EI_NIDENT)
 #define EI_NIDENT (16)
+#endif
 #pragma pack(push)
 #pragma pack(1)
 typedef struct
