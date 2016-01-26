@@ -16,7 +16,7 @@ LOCAL_PATH := $(call my-dir)
 
 
 # Common variables.
-# ========================================================
+# =========================================================
 libminijailSrcFiles := \
 	bpf.c \
 	libminijail.c \
@@ -35,8 +35,9 @@ ifndef BRILLO
 minijailCommonCFlags += -DUSE_SECCOMP_SOFTFAIL
 endif
 
+
 # Static library for generated code.
-# ========================================================
+# =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail_generated
 
@@ -87,7 +88,7 @@ include $(BUILD_STATIC_LIBRARY)
 
 
 # libminijail shared library for target.
-# ========================================================
+# =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail
 
@@ -102,7 +103,7 @@ include $(BUILD_SHARED_LIBRARY)
 
 
 # libminijail static library for target.
-# ========================================================
+# =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail
 
@@ -117,7 +118,7 @@ include $(BUILD_STATIC_LIBRARY)
 
 # libminijail native unit tests. Run with:
 # adb shell /data/nativetest/libminijail_unittest/libminijail_unittest
-# ========================================================
+# =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail_unittest
 ifdef BRILLO
@@ -141,7 +142,7 @@ include $(BUILD_NATIVE_TEST)
 
 # Syscall filtering native unit tests. Run with:
 # adb shell /data/nativetest/syscall_filter_unittest/syscall_filter_unittest
-# ========================================================
+# =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := syscall_filter_unittest
 ifdef BRILLO
@@ -162,7 +163,7 @@ include $(BUILD_NATIVE_TEST)
 
 
 # libminijail usage example.
-# ========================================================
+# =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := drop_privs
 LOCAL_MODULE_TAGS := optional
@@ -172,4 +173,24 @@ LOCAL_SRC_FILES := \
 	examples/drop_privs.cpp
 
 LOCAL_SHARED_LIBRARIES := libbase libminijail
+include $(BUILD_EXECUTABLE)
+
+
+# minijail0 executable.
+# This is not currently used on Brillo/Android,
+# but it's convenient to be able to build it.
+# =========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := minijail0
+LOCAL_MODULE_TAGS := optional
+LOCAL_CFLAGS := \
+	$(minijailCommonCFlags) -Wno-missing-field-initializers \
+	-DPRELOADPATH=\"/invalidminijailpreload.so\"
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	elfparse.c \
+	minijail0.c \
+
+LOCAL_STATIC_LIBRARIES := libminijail_generated
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries) libminijail
 include $(BUILD_EXECUTABLE)
