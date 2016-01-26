@@ -67,7 +67,7 @@ static void add_binding(struct minijail *j, char *arg)
 		exit(1);
 	}
 	if (minijail_bind(j, src, dest, flags ? atoi(flags) : 0)) {
-		fprintf(stderr, "Bind failure.\n");
+		fprintf(stderr, "minijail_bind failed.\n");
 		exit(1);
 	}
 }
@@ -161,6 +161,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 {
 	int opt;
 	int use_seccomp_filter = 0;
+	int binding = 0;
 	int pivot_root = 0, chroot = 0;
 	const size_t path_max = 4096;
 	const char *filter_path;
@@ -185,8 +186,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'S':
 			minijail_use_seccomp_filter(j);
 			if (strlen(optarg) >= path_max) {
-				fprintf(stderr,
-					"Filter path is too long.\n");
+				fprintf(stderr, "Filter path is too long.\n");
 				exit(1);
 			}
 			filter_path = strndup(optarg, path_max);
@@ -205,6 +205,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		case 'b':
 			add_binding(j, optarg);
+			binding = 1;
 			break;
 		case 'c':
 			use_caps(j, optarg);
@@ -212,7 +213,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'C':
 			if (pivot_root) {
 				fprintf(stderr, "Could not set chroot because "
-				                "'-P' was specified.\n");
+						"'-P' was specified.\n");
 				exit(1);
 			}
 			if (0 != minijail_enter_chroot(j, optarg)) {
@@ -226,8 +227,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		case 'P':
 			if (chroot) {
-				fprintf(stderr, "Could not set pivot_root because "
-				                "'-C' was specified.\n");
+				fprintf(stderr,
+					"Could not set pivot_root because "
+					"'-C' was specified.\n");
 				exit(1);
 			}
 			if (0 != minijail_enter_pivot_root(j, optarg)) {
@@ -239,7 +241,8 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		case 'f':
 			if (0 != minijail_write_pid_file(j, optarg)) {
-				fprintf(stderr, "Could not prepare pid file path.\n");
+				fprintf(stderr,
+					"Could not prepare pid file path.\n");
 				exit(1);
 			}
 			break;
@@ -285,7 +288,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_namespace_user(j);
 			minijail_namespace_pids(j);
 			if (0 != minijail_uidmap(j, optarg)) {
-				fprintf(stderr, "Could not set uidmap\n");
+				fprintf(stderr, "Could not set uidmap.\n");
 				exit(1);
 			}
 			break;
@@ -293,13 +296,14 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_namespace_user(j);
 			minijail_namespace_pids(j);
 			if (0 != minijail_gidmap(j, optarg)) {
-				fprintf(stderr, "Could not set gidmap\n");
+				fprintf(stderr, "Could not set gidmap.\n");
 				exit(1);
 			}
 			break;
 		case 'a':
 			if (0 != minijail_use_alt_syscall(j, optarg)) {
-				fprintf(stderr, "Could not set alt-syscall table\n");
+				fprintf(stderr,
+					"Could not set alt-syscall table.\n");
 				exit(1);
 			}
 			break;
@@ -309,6 +313,13 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		}
 		if (optind < argc && argv[optind][0] != '-')
 			break;
+	}
+
+	/* Only allow bind mounts when entering a chroot or using pivot_root. */
+	if (binding && !(chroot || pivot_root)) {
+		fprintf(stderr, "Can't add bind mounts without chroot or"
+				" pivot_root.\n");
+		exit(1);
 	}
 
 	/*
