@@ -331,7 +331,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 int main(int argc, char *argv[])
 {
 	struct minijail *j = minijail_new();
-	char *dl_mesg = NULL;
+	const char *dl_mesg = NULL;
 	int exit_immediately = 0;
 	char *program_path;
 	int consumed = parse_args(j, argc, argv, &exit_immediately);
