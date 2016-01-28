@@ -29,7 +29,7 @@
 #if defined(__x86_64__)
 #if defined(__ANDROID__)
 const char *log_syscalls[] = {"socket", "connect", "fcntl", "writev"};
-#elif
+#else
 const char *log_syscalls[] = {"connect", "sendto"};
 #endif
 #elif defined(__i386__)
