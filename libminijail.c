@@ -569,7 +569,7 @@ int API minijail_mount(struct minijail *j, const char *src, const char *dest,
 		goto error;
 	m->flags = flags;
 
-	info("mount %s -> %s type %s", src, dest, type);
+	info("mount %s -> %s type '%s'", src, dest, type);
 
 	/*
 	 * Force vfs namespacing so the mounts don't leak out into the
@@ -1343,9 +1343,6 @@ void API minijail_enter(const struct minijail *j)
 	} else if (j->flags.net && unshare(CLONE_NEWNET)) {
 		pdie("unshare(net)");
 	}
-
-	if (j->mounts_head && !(j->flags.chroot || j->flags.pivot_root))
-		die("can't bind-mount without chroot or pivot_root");
 
 	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");
