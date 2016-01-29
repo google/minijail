@@ -45,7 +45,7 @@ LOCAL_MODULE_CLASS := STATIC_LIBRARIES
 generated_sources_dir := $(local-generated-sources-dir)
 
 my_gen := $(generated_sources_dir)/$(TARGET_ARCH)/libsyscalls.c
-# We need the quotes so the shell script treat them as one argument.
+# We need the quotes so the shell script treats the following as one argument.
 my_cc := "$(lastword $(CLANG)) \
     $(addprefix -isystem ,$(TARGET_C_INCLUDES)) \
     $(CLANG_TARGET_GLOBAL_CFLAGS)"
