@@ -33,12 +33,12 @@ void log_sigsys_handler(int nr, siginfo_t *info, void *void_context)
 	memcpy(&sigsys, &info->_sifields, sizeof(sigsys));
 	syscall_name = lookup_syscall_name(sigsys.nr);
 
-	if (syscall_name)
-		warn("blocked syscall: %s", syscall_name);
-	else
-		warn("blocked syscall: %d", nr);
-
 	(void) void_context;
+
+	if (syscall_name)
+		die("blocked syscall: %s", syscall_name);
+	else
+		die("blocked syscall: %d", nr);
 
 	/*
 	 * We trapped on a syscall that should have killed the process.
