@@ -162,6 +162,23 @@ LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
 
 
+# test_minijail executable for brillo_Minijail test.
+# =========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := libminijail_test
+ifdef BRILLO
+  LOCAL_MODULE_TAGS := eng
+endif
+
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	test/libminijail_test.cpp
+
+LOCAL_SHARED_LIBRARIES := libbase libminijail
+include $(BUILD_EXECUTABLE)
+
+
 # libminijail usage example.
 # =========================================================
 include $(CLEAR_VARS)

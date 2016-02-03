@@ -48,6 +48,7 @@ void log_resugid() {
     for (size_t i = 0; i < (size_t)nsupp_groups; i++) {
         LOG(INFO) << "supp gid " << i + 1 << " " << list[i];
     }
+    free(list);
 }
 
 int main(void) {
