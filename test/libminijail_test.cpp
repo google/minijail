@@ -33,7 +33,7 @@ size_t getgroups_with_alloc(gid_t **plist) {
         return 0;
     }
     if (nsupp_groups == 0) {
-        LOG(INFO) << "no supplemental groups";
+        LOG(INFO) << "No supplementary groups.";
         return 0;
     }
 
@@ -49,16 +49,47 @@ size_t getgroups_with_alloc(gid_t **plist) {
 
 bool check_ugid(uid_t expected_id) {
     bool success = true;
+
     uid_t ruid = getuid();
     if (ruid != expected_id) {
-        LOG(ERROR) << "rUID << " << ruid << " is not " << expected_id;
+        LOG(ERROR) << "rUID " << ruid << " is not " << expected_id;
         success = false;
     }
     gid_t rgid = getgid();
     if (rgid != expected_id) {
-        LOG(ERROR) << "rGID << " << ruid << " is not " << expected_id;
+        LOG(ERROR) << "rGID " << ruid << " is not " << expected_id;
         success = false;
     }
+    return success;
+}
+
+bool check_groups(size_t expected_size, gid_t *expected_list) {
+    bool success = true;
+
+    gid_t *actual_list;
+    size_t actual_size = getgroups_with_alloc(&actual_list);
+
+    if (expected_size != actual_size) {
+        LOG(ERROR) << "Mismatched supplementary group list size: expected "
+                   << expected_size << ", actual " << actual_size;
+        success = false;
+    }
+
+    for (size_t i = 0; i < expected_size; i++) {
+        bool found = false;
+        for (size_t j = 0; j < actual_size; j++) {
+            if (expected_list[i] == actual_list[j]) {
+                // Test next expected GID.
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            LOG(ERROR) << "Expected GID " << expected_list[i] << " not found.";
+            success = false;
+        }
+    }
+    free(actual_list);
     return success;
 }
 
@@ -80,15 +111,16 @@ void log_resugid() {
 }
 
 int main(void) {
-    log_resugid();
     minijail *j = minijail_new();
     minijail_change_user(j, "system");
     minijail_change_group(j, "system");
-    minijail_set_supplementary_gids(j, sizeof(groups) / sizeof(groups[0]), groups);
+    size_t num_groups = sizeof(groups) / sizeof(groups[0]);
+    minijail_set_supplementary_gids(j, num_groups, groups);
     minijail_use_caps(j, CAP_TO_MASK(CAP_SETUID) | CAP_TO_MASK(CAP_SETGID));
     minijail_enter(j);
 
-    check_ugid(kSystemUid);
+    bool success = check_ugid(kSystemUid);
+    success = success && check_groups(num_groups, groups);
 
     minijail_destroy(j);
     minijail *j2 = minijail_new();
@@ -96,7 +128,7 @@ int main(void) {
     minijail_change_gid(j2, 5 * kSystemUid);
     minijail_enter(j2);
 
-    check_ugid(5 * kSystemUid);
+    success = success && check_ugid(5 * kSystemUid);
 
-    return 0;
+    return success? 0 : 1;
 }
