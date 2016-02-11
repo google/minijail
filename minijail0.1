@@ -92,6 +92,10 @@ Enable seccomp(2) in mode 13 which restricts the child process to a set of
 system calls defined in the policy file.  Note that system calls often change
 names based on the architecture or mode. (uname -m is your friend.)
 .TP
+\fB-T <type>\fR
+Assume program's ELF linkage type is \fItype\fR,
+which should be either 'static' or 'dynamic'.
+.TP
 \fB-u <user>\fR
 Change users to \fIuser\fR, which may be either a user name or a numeric user
 ID.

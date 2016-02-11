@@ -95,7 +95,7 @@ static void usage(const char *progn)
 
 	printf("Usage: %s [-GhiInprsvtUl] [-b <src>,<dest>[,<writeable>]] [-f <file>]"
 	       "[-c <caps>] [-C <dir>] [-g <group>] [-S <file>] [-u <user>] "
-	       "[-k <src>,<dest>,<type>[,<flags>]] "
+	       "[-k <src>,<dest>,<type>[,<flags>]] [-T <type>] "
 	       "[-m \"<uid> <loweruid> <count>[,<uid> <loweruid> <count>]\"] "
 	       "[-M \"<gid> <lowergid> <count>[,<uid> <loweruid> <count>]\"] "
 	       "<program> [args...]\n"
@@ -140,6 +140,8 @@ static void usage(const char *progn)
 	       "              E.g., -S /usr/share/filters/<prog>.$(uname -m)\n"
 	       "              Requires -n when not running as root\n"
 	       "  -t:         mount tmpfs at /tmp inside chroot\n"
+	       "  -T <type>:  assume <program> is a <type> ELF binary.\n"
+	       "              Must be 'static' or 'dynamic'.\n"
 	       "  -u <user>:  change uid to <user>\n"
 	       "  -U          enter new user namespace (implies -p)\n"
 	       "  -v:         enter new mount namespace\n"
@@ -157,7 +159,7 @@ static void seccomp_filter_usage(const char *progn)
 }
 
 static int parse_args(struct minijail *j, int argc, char *argv[],
-		      int *exit_immediately)
+		      int *exit_immediately, ElfType *elftype)
 {
 	int opt;
 	int use_seccomp_filter = 0;
@@ -168,7 +170,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
 	while ((opt = getopt(argc, argv,
-			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::vrGhHinplLtIU"))
+			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::T:vrGhHinplLtIU"))
 	       != -1) {
 		switch (opt) {
 		case 'u':
@@ -307,6 +309,16 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 				exit(1);
 			}
 			break;
+		case 'T':
+			if (!strcmp(optarg, "static"))
+				*elftype = ELFSTATIC;
+			else if (!strcmp(optarg, "dynamic"))
+				*elftype = ELFDYNAMIC;
+			else {
+				fprintf(stderr, "ELF type must be 'static' or 'dynamic'.\n");
+				exit(1);
+			}
+			break;
 		default:
 			usage(argv[0]);
 			exit(1);
@@ -344,24 +356,31 @@ int main(int argc, char *argv[])
 	struct minijail *j = minijail_new();
 	const char *dl_mesg = NULL;
 	int exit_immediately = 0;
-	char *program_path;
-	int consumed = parse_args(j, argc, argv, &exit_immediately);
 	ElfType elftype = ELFERROR;
+	int consumed = parse_args(j, argc, argv, &exit_immediately, &elftype);
 	argc -= consumed;
 	argv += consumed;
 
-	/* Get the path to the program adjusted for changing root. */
-	program_path = minijail_get_original_path(j, argv[0]);
+	if (elftype == ELFERROR) {
+		/*
+		 * -T was not specified.
+		 * Get the path to the program adjusted for changing root.
+		 */
+		char *program_path = minijail_get_original_path(j, argv[0]);
 
-	/* Check that we can access the target program. */
-	if (access(program_path, X_OK)) {
-		fprintf(stderr, "Target program '%s' is not accessible.\n",
-			argv[0]);
-		return 1;
+		/* Check that we can access the target program. */
+		if (access(program_path, X_OK)) {
+			fprintf(stderr,
+				"Target program '%s' is not accessible.\n",
+				argv[0]);
+			return 1;
+		}
+
+		/* Check if target is statically or dynamically linked. */
+		elftype = get_elf_linkage(program_path);
+		free(program_path);
 	}
 
-	/* Check if target is statically or dynamically linked. */
-	elftype = get_elf_linkage(program_path);
 	if (elftype == ELFSTATIC) {
 		/*
 		 * Target binary is statically linked so we cannot use
@@ -376,9 +395,9 @@ int main(int argc, char *argv[])
 
 		/* Check that we can dlopen() libminijailpreload.so. */
 		if (!dlopen(PRELOADPATH, RTLD_LAZY | RTLD_LOCAL)) {
-			    dl_mesg = dlerror();
-			    fprintf(stderr, "dlopen(): %s\n", dl_mesg);
-			    return 1;
+			dl_mesg = dlerror();
+			fprintf(stderr, "dlopen(): %s\n", dl_mesg);
+			return 1;
 		}
 		minijail_run(j, argv[0], argv);
 	} else {
@@ -387,8 +406,6 @@ int main(int argc, char *argv[])
 			argv[0]);
 		return 1;
 	}
-
-	free(program_path);
 
 	if (exit_immediately) {
 		info("not running init loop, exiting immediately");
