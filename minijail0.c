@@ -141,8 +141,8 @@ static void usage(const char *progn)
 	       "              E.g., '-S /usr/share/filters/<prog>.$(uname -m)'.\n"
 	       "              Requires -n when not running as root.\n"
 	       "  -t:         Mount tmpfs at /tmp inside chroot.\n"
-	       "  -T <type>:  Assume <program> is a <type> ELF binary.\n"
-	       "              Must be 'static' or 'dynamic'.\n"
+	       "  -T <type>:  Don't access <program> before execve(2), assume <type> ELF binary.\n"
+	       "              <type> must be 'static' or 'dynamic'.\n"
 	       "  -u <user>:  Change uid to <user>.\n"
 	       "  -U          Enter new user namespace (implies -p).\n"
 	       "  -v:         Enter new mount namespace.\n"
@@ -316,7 +316,8 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			else if (!strcmp(optarg, "dynamic"))
 				*elftype = ELFDYNAMIC;
 			else {
-				fprintf(stderr, "ELF type must be 'static' or 'dynamic'.\n");
+				fprintf(stderr, "ELF type must be 'static' or "
+						"'dynamic'.\n");
 				exit(1);
 			}
 			break;

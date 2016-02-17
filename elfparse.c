@@ -69,19 +69,19 @@ ElfType get_elf_linkage(const char *path)
 			if (is_elf_magic(pHeader)) {
 				if ((pHeader[EI_DATA] == ELFDATA2LSB) &&
 				    (pHeader[EI_CLASS] == ELFCLASS64)) {
-					/* 64 bit little endian */
+					/* 64-bit little endian. */
 					ret = parseElf64(elf_file, pHeader, 1);
 				} else if ((pHeader[EI_DATA] == ELFDATA2MSB) &&
 					  (pHeader[EI_CLASS] == ELFCLASS64)) {
-					/* 64 bit big endian */
+					/* 64-bit big endian. */
 					ret = parseElf64(elf_file, pHeader, 0);
 				} else if ((pHeader[EI_DATA] == ELFDATA2LSB) &&
 					  (pHeader[EI_CLASS] == ELFCLASS32)) {
-					/* 32 bit little endian */
+					/* 32-bit little endian. */
 					ret = parseElf32(elf_file, pHeader, 1);
 				} else if ((pHeader[EI_DATA] == ELFDATA2MSB) &&
 					  (pHeader[EI_CLASS] == ELFCLASS32)) {
-					/* 32 bit big endian */
+					/* 32-bit big endian. */
 					ret = parseElf32(elf_file, pHeader, 0);
 				}
 			} else {
@@ -90,9 +90,9 @@ ElfType get_elf_linkage(const char *path)
 				 * script. We should parse the #! line and
 				 * check the interpreter to guard against
 				 * static interpreters escaping the sandbox.
-				 * As minijail is only called from rootfs
+				 * As Minijail is only called from the rootfs
 				 * it was deemed not necessary to check this.
-				 * So we will just let execve decided if this
+				 * So we will just let execve(2) decide if this
 				 * is valid.
 				 */
 				ret = ELFDYNAMIC;
