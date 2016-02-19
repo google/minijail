@@ -92,7 +92,8 @@ struct minijail {
 		int gid:1;
 		int usergroups:1;
 		int suppl_gids:1;
-		int caps:1;
+		int use_caps:1;
+		int capbset_drop:1;
 		int vfs:1;
 		int enter_vfs:1;
 		int pids:1;
@@ -121,6 +122,7 @@ struct minijail {
 	size_t suppl_gid_count;
 	gid_t *suppl_gid_list;
 	uint64_t caps;
+	uint64_t cap_bset;
 	pid_t initpid;
 	int mountns_fd;
 	int netns_fd;
@@ -342,11 +344,42 @@ void API minijail_log_seccomp_filter_failures(struct minijail *j)
 
 void API minijail_use_caps(struct minijail *j, uint64_t capmask)
 {
+	/*
+	 * 'minijail_use_caps' configures a runtime-capabilities-only
+	 * environment, including a bounding set matching the thread's runtime
+	 * (permitted|inheritable|effective) sets.
+	 * Therefore, it will override any existing bounding set configurations
+	 * since the latter would allow gaining extra runtime capabilities from
+	 * file capabilities.
+	 */
+	if (j->flags.capbset_drop) {
+		warn("overriding bounding set configuration");
+		j->cap_bset = 0;
+		j->flags.capbset_drop = 0;
+	}
 	j->caps = capmask;
-	j->flags.caps = 1;
+	j->flags.use_caps = 1;
 }
 
-void API minijail_reset_signal_mask(struct minijail* j) {
+void API minijail_capbset_drop(struct minijail *j, uint64_t capmask)
+{
+	if (j->flags.use_caps) {
+		/*
+		 * 'minijail_use_caps' will have already configured a capability
+		 * bounding set matching the (permitted|inheritable|effective)
+		 * sets. Abort if the user tries to configure a separate
+		 * bounding set. 'minijail_capbset_drop' and 'minijail_use_caps'
+		 * are mutually exclusive.
+		 */
+		die("runtime capabilities already configured, can't drop "
+		    "bounding set separately");
+	}
+	j->cap_bset = capmask;
+	j->flags.capbset_drop = 1;
+}
+
+void API minijail_reset_signal_mask(struct minijail *j)
+{
 	j->flags.reset_signal_mask = 1;
 }
 
@@ -1201,6 +1234,18 @@ static unsigned int get_last_valid_cap()
 	return last_valid_cap;
 }
 
+static void drop_capbset(uint64_t keep_mask, unsigned int last_valid_cap)
+{
+	const uint64_t one = 1;
+	unsigned int i;
+	for (i = 0; i < sizeof(keep_mask) * 8 && i <= last_valid_cap; ++i) {
+		if (keep_mask & (one << i))
+			continue;
+		if (prctl(PR_CAPBSET_DROP, i))
+			pdie("could not drop capability from bounding set");
+	}
+}
+
 void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 {
 	cap_t caps = cap_get_proc();
@@ -1236,12 +1281,7 @@ void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 	 * have been used above to raise a capability that wasn't already
 	 * present. This requires CAP_SETPCAP, so we raised/kept it above.
 	 */
-	for (i = 0; i < sizeof(j->caps) * 8 && i <= last_valid_cap; ++i) {
-		if (j->caps & (one << i))
-			continue;
-		if (prctl(PR_CAPBSET_DROP, i))
-			pdie("prctl(PR_CAPBSET_DROP)");
-	}
+	drop_capbset(j->caps, last_valid_cap);
 
 	/* If CAP_SETPCAP wasn't specifically requested, now we remove it. */
 	if ((j->caps & (one << CAP_SETPCAP)) == 0) {
@@ -1303,7 +1343,7 @@ void API minijail_enter(const struct minijail *j)
 	 * since /proc can be unmounted before drop_caps() is called.
 	 */
 	unsigned int last_valid_cap = 0;
-	if (j->flags.caps)
+	if (j->flags.capbset_drop || j->flags.use_caps)
 		last_valid_cap = get_last_valid_cap();
 
 	if (j->flags.pids)
@@ -1356,7 +1396,15 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.remount_proc_ro && remount_proc_readonly(j))
 		pdie("remount");
 
-	if (j->flags.caps) {
+	/*
+	 * If we're only dropping capabilities from the bounding set, but not
+	 * from the thread's (permitted|inheritable|effective) sets, do it now.
+	 */
+	if (j->flags.capbset_drop) {
+		drop_capbset(j->cap_bset, last_valid_cap);
+	}
+
+	if (j->flags.use_caps) {
 		/*
 		 * POSIX capabilities are a bit tricky. If we drop our
 		 * capability to change uids, our attempt to use setuid()
@@ -1377,7 +1425,7 @@ void API minijail_enter(const struct minijail *j)
 	 */
 	if (j->flags.no_new_privs) {
 		drop_ugid(j);
-		if (j->flags.caps)
+		if (j->flags.use_caps)
 			drop_caps(j, last_valid_cap);
 
 		set_seccomp_filter(j);
@@ -1392,7 +1440,7 @@ void API minijail_enter(const struct minijail *j)
 		set_seccomp_filter(j);
 
 		drop_ugid(j);
-		if (j->flags.caps)
+		if (j->flags.use_caps)
 			drop_caps(j, last_valid_cap);
 	}
 
@@ -1635,7 +1683,7 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	}
 
 	if (!use_preload) {
-		if (j->flags.caps)
+		if (j->flags.use_caps)
 			die("capabilities are not supported without "
 			    "LD_PRELOAD");
 	}
