@@ -162,7 +162,7 @@ LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
 
 
-# test_minijail executable for brillo_Minijail test.
+# libminijail_test executable for brillo_Minijail test.
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail_test
