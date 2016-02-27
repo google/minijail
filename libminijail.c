@@ -1252,6 +1252,10 @@ void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 	cap_value_t flag[1];
 	const uint64_t one = 1;
 	unsigned int i;
+
+	if (!j->flags.use_caps)
+		return;
+
 	if (!caps)
 		die("can't get process caps");
 	if (cap_clear_flag(caps, CAP_INHERITABLE))
@@ -1418,16 +1422,14 @@ void API minijail_enter(const struct minijail *j)
 			pdie("prctl(PR_SET_SECUREBITS)");
 	}
 
-	/*
-	 * If we're setting no_new_privs, we can drop privileges
-	 * before setting seccomp filter. This way filter policies
-	 * don't need to allow privilege-dropping syscalls.
-	 */
 	if (j->flags.no_new_privs) {
+		/*
+		 * If we're setting no_new_privs, we can drop privileges
+		 * before setting seccomp filter. This way filter policies
+		 * don't need to allow privilege-dropping syscalls.
+		 */
 		drop_ugid(j);
-		if (j->flags.use_caps)
-			drop_caps(j, last_valid_cap);
-
+		drop_caps(j, last_valid_cap);
 		set_seccomp_filter(j);
 	} else {
 		/*
@@ -1438,10 +1440,8 @@ void API minijail_enter(const struct minijail *j)
 		 * capget()/capset()/prctl() for dropping caps.
 		 */
 		set_seccomp_filter(j);
-
 		drop_ugid(j);
-		if (j->flags.use_caps)
-			drop_caps(j, last_valid_cap);
+		drop_caps(j, last_valid_cap);
 	}
 
 	/*
