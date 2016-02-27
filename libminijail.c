@@ -1248,14 +1248,13 @@ static void drop_capbset(uint64_t keep_mask, unsigned int last_valid_cap)
 
 void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 {
+	if (!j->flags.use_caps)
+		return;
+
 	cap_t caps = cap_get_proc();
 	cap_value_t flag[1];
 	const uint64_t one = 1;
 	unsigned int i;
-
-	if (!j->flags.use_caps)
-		return;
-
 	if (!caps)
 		die("can't get process caps");
 	if (cap_clear_flag(caps, CAP_INHERITABLE))
