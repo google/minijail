@@ -390,7 +390,7 @@ void API minijail_namespace_vfs(struct minijail *j)
 
 void API minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path)
 {
-	int ns_fd = open(ns_path, O_RDONLY);
+	int ns_fd = open(ns_path, O_RDONLY | O_CLOEXEC);
 	if (ns_fd < 0) {
 		pdie("failed to open namespace '%s'", ns_path);
 	}
@@ -418,7 +418,7 @@ void API minijail_namespace_net(struct minijail *j)
 
 void API minijail_namespace_enter_net(struct minijail *j, const char *ns_path)
 {
-	int ns_fd = open(ns_path, O_RDONLY);
+	int ns_fd = open(ns_path, O_RDONLY | O_CLOEXEC);
 	if (ns_fd < 0) {
 		pdie("failed to open namespace '%s'", ns_path);
 	}
@@ -961,7 +961,7 @@ static void write_ugid_mappings(const struct minijail *j)
 		ret = snprintf(fname, sz, "/proc/%d/uid_map", j->initpid);
 		if (ret < 0 || (size_t)ret >= sz)
 			die("failed to write file name of uid_map");
-		fd = open(fname, O_WRONLY);
+		fd = open(fname, O_WRONLY | O_CLOEXEC);
 		if (fd < 0)
 			pdie("failed to open '%s'", fname);
 		len = strlen(j->uidmap);
@@ -973,7 +973,7 @@ static void write_ugid_mappings(const struct minijail *j)
 		ret = snprintf(fname, sz, "/proc/%d/gid_map", j->initpid);
 		if (ret < 0 || (size_t)ret >= sz)
 			die("failed to write file name of gid_map");
-		fd = open(fname, O_WRONLY);
+		fd = open(fname, O_WRONLY | O_CLOEXEC);
 		if (fd < 0)
 			pdie("failed to open '%s'", fname);
 		len = strlen(j->gidmap);
@@ -1085,10 +1085,10 @@ int enter_pivot_root(const struct minijail *j)
 	 * Keep the fd for both old and new root.
 	 * It will be used in fchdir later.
 	 */
-	oldroot = open("/", O_DIRECTORY | O_RDONLY);
+	oldroot = open("/", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
 	if (oldroot < 0)
 		pdie("failed to open / for fchdir");
-	newroot = open(j->chrootdir, O_DIRECTORY | O_RDONLY);
+	newroot = open(j->chrootdir, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
 	if (newroot < 0)
 		pdie("failed to open %s for fchdir", j->chrootdir);
 
@@ -1114,6 +1114,10 @@ int enter_pivot_root(const struct minijail *j)
 		pdie("umount(/)");
 	/* Change back to the new root. */
 	if (fchdir(newroot))
+		return -errno;
+	if (close(oldroot))
+		return -errno;
+	if (close(newroot))
 		return -errno;
 	if (chroot("/"))
 		return -errno;
