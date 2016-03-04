@@ -1,4 +1,4 @@
-.TH MINIJAIL0 "1" "January 2012" "Chromium OS" "User Commands"
+.TH MINIJAIL0 "1" "March 2016" "Chromium OS" "User Commands"
 .SH NAME
 minijail0 \- sandbox a process
 .SH SYNOPSIS
@@ -9,11 +9,11 @@ minijail0 \- sandbox a process
 Runs PROGRAM inside a sandbox.
 .TP
 \fB-a <table>\fR
-Run using the alternate syscall table named <table>.  Only available on kernels
+Run using the alternate syscall table named \fItable\fR. Only available on kernels
 and architectures that support the PR_ALT_SYSCALL option of prctl(2).
 .TP
 \fB-b <src>,<dest>[,<writeable>]
-Bind-mount <src> into the chroot directory at <dest>, optionally writeable.
+Bind-mount \fIsrc\fR into the chroot directory at \fIdest\fR, optionally writeable.
 .TP
 \fB-c <caps>\fR
 Restrict capabilities to \fIcaps\fR. When used in conjunction with \fB-u\fR and
@@ -24,20 +24,15 @@ capabilities unless those subprocesses have POSIX file capabilities. See
 \fBcapabilities\fR(7).
 .TP
 \fB-C <dir>\fR
-Change root (using chroot(2)) to <dir>.
+Change root (using chroot(2)) to \fIdir\fR.
 .TP
 \fB-e[file]\fR
-Enter a new network namespace, or if \fIfile\fR is specified, Enter an existing
+Enter a new network namespace, or if \fIfile\fR is specified, enter an existing
 network namespace specified by \fIfile\fR which is typically of the form
 /proc/<pid>/ns/net.
 .TP
 \fB-f <file>\fR
 Write the pid of the jailed process to \fIfile\fR.
-.TP
-\fB-t\fR
-Mounts a tmpfs filesystem on /tmp. /tmp must exist in the chroot.
-This must be used with -C. The default filesystem has a max size of 128M
-and has standard /tmp permissions (777).
 .TP
 \fB-G\fR
 Inherit all the supplementary groups of the user specified with \fB-u\fR. It
@@ -56,17 +51,25 @@ Print a help message detailing supported system call names for seccomp_filter.
 (Other direct numbers may be specified if minijail0 is not in sync with the
  host kernel or something like 32/64-bit compatibility issues exist.)
 .TP
+\fB-k <src>,<dest>,<type>[,<flags>]\fR
+Mount \fIsrc\fR, a \fItype\fR filesystem, into the chroot directory at \fIdest\fR, with optional \fIflags\fR.
+.TP
+\fB-K\fR
+Don't mark all existing mounts as MS_PRIVATE.
+This option is \fBdangerous\fR as it negates most of the functionality of \fB-v\fR.
+You very likely don't need this.
+.TP
 \fB-l\fR
 Run inside a new IPC namespace. This option makes the program's System V IPC
 namespace independent.
 .TP
 \fB-m "<uid> <loweruid> <count>[,<uid> <loweruid> <count>]"\fR
-Set the uid mapping of a user namespace (implies \fB-pU\fR).  Same arguments as
-\fBnewuidmap(1)\fR.  Multiple mappings should be separated by ','.
+Set the uid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
+\fBnewuidmap(1)\fR. Multiple mappings should be separated by ','.
 .TP
 \fB-M "<uid> <loweruid> <count>[,<uid> <loweruid> <count>]"\fR
-Set the gid mapping of a user namespace (implies \fB-pU\fR).  Same arguments as
-\fBnewgidmap(1)\fR.  Multiple mappings should be separated by ','.
+Set the gid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
+\fBnewgidmap(1)\fR. Multiple mappings should be separated by ','.
 .TP
 \fB-p\fR
 Run inside a new PID namespace. This option will make it impossible for the
@@ -89,8 +92,13 @@ set of system calls.
 .TP
 \fB-S <arch-specific seccomp_filter policy file>\fR
 Enable seccomp(2) in mode 13 which restricts the child process to a set of
-system calls defined in the policy file.  Note that system calls often change
+system calls defined in the policy file. Note that system calls often change
 names based on the architecture or mode. (uname -m is your friend.)
+.TP
+\fB-t\fR
+Mounts a tmpfs filesystem on /tmp. /tmp must exist in the chroot.
+This must be used with \fB-C\fR. The default filesystem has a max size of 128M
+and has standard /tmp permissions (777).
 .TP
 \fB-T <type>\fR
 Assume program's ELF linkage type is \fItype\fR,
@@ -112,15 +120,16 @@ library called \fBlibminijailpreload\fR. Some jailings can only be achieved from
 the process to which they will actually apply - specifically capability use
 (since capabilities are not inherited to an exec'd process unless the exec'd
 process has POSIX file capabilities), seccomp (since we can't exec() once we're
-seccomp'd), and ptrace-disable (which is always cleared on exec().
+seccomp'd), and ptrace-disable (which is always cleared on exec()).
 
 To this end, \fBlibminijailpreload\fR is forcibly loaded into all
 dynamically-linked target programs if any of these restrictions are in effect;
 we pass the specific restrictions in an environment variable which the preloaded
 library looks for. The forcibly-loaded library then applies the restrictions
 to the newly-loaded program.
+
 .SH AUTHOR
-Written by Elly Jones (ellyjones@chromium.org)
+The Chromium OS Authors <chromiumos-dev@chromium.org>
 .SH COPYRIGHT
 Copyright \(co 2011 The Chromium OS Authors
 License BSD-like.

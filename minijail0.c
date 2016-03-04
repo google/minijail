@@ -101,9 +101,9 @@ static void usage(const char *progn)
 	       "  [-M \"<gid> <lowergid> <count>[,<uid> <loweruid> <count>]\"]\n"
 	       "  <program> [args...]\n"
 	       "  -a <table>: Use alternate syscall table <table>.\n"
-	       "  -b:         Binds <src> to <dest> in chroot.\n"
+	       "  -b:         Bind <src> to <dest> in chroot.\n"
 	       "              Multiple instances allowed.\n"
-	       "  -k:         Mount <src> to <dest> in chroot.\n"
+	       "  -k:         Mount <src> at <dest> in chroot.\n"
 	       "              Multiple instances allowed, flags are passed to mount(2).\n"
 	       "  -c <caps>:  Restrict caps to <caps>.\n"
 	       "  -C <dir>:   chroot(2) to <dir>.\n"
@@ -117,6 +117,7 @@ static void usage(const char *progn)
 	       "  -i:         Exit immediately after fork (do not act as init).\n"
 	       "              Not compatible with -p.\n"
 	       "  -I:         Run <program> as init (pid 1) inside a new pid namespace (implies -p).\n"
+	       "  -K:         Don't mark all existing mounts as MS_PRIVATE.\n"
 	       "  -l:         Enter new IPC namespace.\n"
 	       "  -L:         Report blocked syscalls to syslog when using seccomp filter.\n"
 	       "              Forces the following syscalls to be allowed:\n"
@@ -166,12 +167,13 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int use_seccomp_filter = 0;
 	int binding = 0;
 	int pivot_root = 0, chroot = 0;
+	int mount_ns = 0, skip_remount = 0;
 	const size_t path_max = 4096;
 	const char *filter_path;
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
 	while ((opt = getopt(argc, argv,
-			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::T:vrGhHinplLtIU"))
+			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::T:vrGhHinplLtIUK"))
 	       != -1) {
 		switch (opt) {
 		case 'u':
@@ -228,6 +230,10 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'k':
 			add_mount(j, optarg);
 			break;
+		case 'K':
+			minijail_skip_remount_private(j);
+			skip_remount = 1;
+			break;
 		case 'P':
 			if (chroot) {
 				fprintf(stderr,
@@ -254,6 +260,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		case 'v':
 			minijail_namespace_vfs(j);
+			mount_ns = 1;
 			break;
 		case 'V':
 			minijail_namespace_enter_vfs(j, optarg);
@@ -333,6 +340,16 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	if (binding && !(chroot || pivot_root)) {
 		fprintf(stderr, "Can't add bind mounts without chroot or"
 				" pivot_root.\n");
+		exit(1);
+	}
+
+	/*
+	 * Remounting / as MS_PRIVATE only happens when entering a new mount
+	 * namespace, so skipping it only applies in that case.
+	 */
+	if (skip_remount && !mount_ns) {
+		fprintf(stderr, "Can't skip marking mounts as MS_PRIVATE"
+				" without mount namespaces.\n");
 		exit(1);
 	}
 

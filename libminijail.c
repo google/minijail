@@ -96,6 +96,7 @@ struct minijail {
 		int capbset_drop:1;
 		int vfs:1;
 		int enter_vfs:1;
+		int skip_remount_private:1;
 		int pids:1;
 		int ipc:1;
 		int net:1;
@@ -398,6 +399,11 @@ void API minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path)
 	j->flags.enter_vfs = 1;
 }
 
+void API minijail_skip_remount_private(struct minijail *j)
+{
+	j->flags.skip_remount_private = 1;
+}
+
 void API minijail_namespace_pids(struct minijail *j)
 {
 	j->flags.vfs = 1;
@@ -682,16 +688,15 @@ struct marshal_state {
 	char *buf;
 };
 
-void marshal_state_init(struct marshal_state *state,
-			char *buf, size_t available)
+void marshal_state_init(struct marshal_state *state, char *buf,
+			size_t available)
 {
 	state->available = available;
 	state->buf = buf;
 	state->total = 0;
 }
 
-void marshal_append(struct marshal_state *state,
-		    void *src, size_t length)
+void marshal_append(struct marshal_state *state, void *src, size_t length)
 {
 	size_t copy_len = MIN(state->available, length);
 
@@ -727,7 +732,7 @@ void minijail_marshal_helper(struct marshal_state *state,
 	if (j->flags.seccomp_filter && j->filter_prog) {
 		struct sock_fprog *fp = j->filter_prog;
 		marshal_append(state, (char *)fp->filter,
-				fp->len * sizeof(struct sock_filter));
+			       fp->len * sizeof(struct sock_filter));
 	}
 	for (m = j->mounts_head; m; m = m->next) {
 		marshal_append(state, m->src, strlen(m->src) + 1);
@@ -1372,12 +1377,15 @@ void API minijail_enter(const struct minijail *j)
 		if (unshare(CLONE_NEWNS))
 			pdie("unshare(vfs)");
 		/*
-		 * Remount all filesystems as private. If they are shared
-		 * new bind mounts will creep out of our namespace.
+		 * Unless asked not to, remount all filesystems as private.
+		 * If they are shared, new bind mounts will creep out of our
+		 * namespace.
 		 * https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
 		 */
-		if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL))
-			pdie("mount(/, private)");
+		if (!j->flags.skip_remount_private) {
+			if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL))
+				pdie("mount(/, private)");
+		}
 	}
 
 	if (j->flags.ipc && unshare(CLONE_NEWIPC)) {
@@ -1650,7 +1658,8 @@ int API minijail_run_pid_pipes_no_preload(struct minijail *j,
 					  char *const argv[],
 					  pid_t *pchild_pid,
 					  int *pstdin_fd, int *pstdout_fd,
-					  int *pstderr_fd) {
+					  int *pstderr_fd)
+{
 	return minijail_run_internal(j, filename, argv, pchild_pid,
 				     pstdin_fd, pstdout_fd, pstderr_fd, false);
 }
@@ -1780,13 +1789,13 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	 * We might hack around this by having the clone()d child (init of the
 	 * pid namespace) return directly, rather than leaving the clone()d
 	 * process hanging around to be init for the new namespace (and having
-	 * its fork()ed child return in turn), but that process would be crippled
-	 * with its libc locks potentially broken. We might try fork()ing in the
-	 * parent before we clone() to ensure that we own all the locks, but
-	 * then we have to have the forked child hanging around consuming
-	 * resources (and possibly having file descriptors / shared memory
-	 * regions / etc attached). We'd need to keep the child around to avoid
-	 * having its children get reparented to init.
+	 * its fork()ed child return in turn), but that process would be
+	 * crippled with its libc locks potentially broken. We might try
+	 * fork()ing in the parent before we clone() to ensure that we own all
+	 * the locks, but then we have to have the forked child hanging around
+	 * consuming resources (and possibly having file descriptors / shared
+	 * memory regions / etc attached). We'd need to keep the child around to
+	 * avoid having its children get reparented to init.
 	 *
 	 * TODO(ellyjones): figure out if the "forked child hanging around"
 	 * problem is fixable or not. It would be nice if we worked in this
