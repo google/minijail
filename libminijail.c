@@ -150,6 +150,7 @@ void minijail_preenter(struct minijail *j)
 {
 	j->flags.vfs = 0;
 	j->flags.enter_vfs = 0;
+	j->flags.skip_remount_private = 0;
 	j->flags.remount_proc_ro = 0;
 	j->flags.pids = 0;
 	j->flags.do_init = 0;
@@ -167,6 +168,7 @@ void minijail_preexec(struct minijail *j)
 	int enter_vfs = j->flags.enter_vfs;
 	int remount_proc_ro = j->flags.remount_proc_ro;
 	int userns = j->flags.userns;
+	int skip_remount_private = j->flags.skip_remount_private;
 	if (j->user)
 		free(j->user);
 	j->user = NULL;
@@ -179,6 +181,7 @@ void minijail_preexec(struct minijail *j)
 	j->flags.enter_vfs = enter_vfs;
 	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
+	j->flags.skip_remount_private = skip_remount_private;
 	/* Note, |pids| will already have been used before this call. */
 }
 
