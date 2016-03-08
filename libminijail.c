@@ -166,9 +166,9 @@ void minijail_preexec(struct minijail *j)
 {
 	int vfs = j->flags.vfs;
 	int enter_vfs = j->flags.enter_vfs;
+	int skip_remount_private = j->flags.skip_remount_private;
 	int remount_proc_ro = j->flags.remount_proc_ro;
 	int userns = j->flags.userns;
-	int skip_remount_private = j->flags.skip_remount_private;
 	if (j->user)
 		free(j->user);
 	j->user = NULL;
@@ -179,9 +179,9 @@ void minijail_preexec(struct minijail *j)
 	/* Now restore anything we meant to keep. */
 	j->flags.vfs = vfs;
 	j->flags.enter_vfs = enter_vfs;
+	j->flags.skip_remount_private = skip_remount_private;
 	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
-	j->flags.skip_remount_private = skip_remount_private;
 	/* Note, |pids| will already have been used before this call. */
 }
 
@@ -282,7 +282,8 @@ int API minijail_change_user(struct minijail *j, const char *user)
 	/*
 	 * We're safe to free the buffer here. The strings inside |pw| point
 	 * inside |buf|, but we don't use any of them; this leaves the pointers
-	 * dangling but it's safe. |ppw| points at |pw| if getpwnam_r(3) succeeded.
+	 * dangling but it's safe. |ppw| points at |pw| if getpwnam_r(3)
+	 * succeeded.
 	 */
 	free(buf);
 	/* getpwnam_r(3) does *not* set errno when |ppw| is NULL. */
