@@ -24,9 +24,7 @@ libminijailSrcFiles := \
 	syscall_filter.c \
 	util.c
 
-# TODO(b/27632733): Re-enable including the system's <linux/securebits.h>.
-#minijailCommonCFlags := -DHAVE_SECUREBITS_H -Wall -Werror
-minijailCommonCFlags := -Wall -Werror
+minijailCommonCFlags := -DHAVE_SECUREBITS_H -Wall -Werror
 minijailCommonLibraries := libcap
 
 # Android devices running kernel version < 3.8 are not required to
