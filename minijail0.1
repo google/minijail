@@ -51,6 +51,9 @@ Print a help message detailing supported system call names for seccomp_filter.
 (Other direct numbers may be specified if minijail0 is not in sync with the
  host kernel or something like 32/64-bit compatibility issues exist.)
 .TP
+\fB-I\fR
+Run \fIprogram\fR as init (pid 1) inside a new pid namespace (implies \fB-p\fR).
+.TP
 \fB-k <src>,<dest>,<type>[,<flags>]\fR
 Mount \fIsrc\fR, a \fItype\fR filesystem, into the chroot directory at \fIdest\fR, with optional \fIflags\fR.
 .TP
@@ -63,6 +66,11 @@ You very likely don't need this.
 Run inside a new IPC namespace. This option makes the program's System V IPC
 namespace independent.
 .TP
+\fB-L\fR
+Report blocked syscalls to syslog when using seccomp filter. This option will
+force certain syscalls to be allowed in order to achieve this, depending on the
+system.
+.TP
 \fB-m "<uid> <loweruid> <count>[,<uid> <loweruid> <count>]"\fR
 Set the uid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
 \fBnewuidmap(1)\fR. Multiple mappings should be separated by ','.
@@ -70,6 +78,10 @@ Set the uid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
 \fB-M "<uid> <loweruid> <count>[,<uid> <loweruid> <count>]"\fR
 Set the gid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
 \fBnewgidmap(1)\fR. Multiple mappings should be separated by ','.
+.TP
+\fB-n\fR
+Set the process's \fIno_new_privs\fR bit. See \fBprctl(2)\fR and the kernel
+source file \fIDocumentation/prctl/no_new_privs.txt\fR for more info.
 .TP
 \fB-p\fR
 Run inside a new PID namespace. This option will make it impossible for the
@@ -107,6 +119,9 @@ which should be either 'static' or 'dynamic'.
 \fB-u <user>\fR
 Change users to \fIuser\fR, which may be either a user name or a numeric user
 ID.
+.TP
+\fB-U\fR
+Enter a new user namespace (implies \fB-p\fR).
 .TP
 \fB-v\fR
 Run inside a new VFS namespace. This option makes the program's mountpoints
