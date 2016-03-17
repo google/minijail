@@ -145,7 +145,7 @@ static void usage(const char *progn)
 	       "  -T <type>:  Don't access <program> before execve(2), assume <type> ELF binary.\n"
 	       "              <type> must be 'static' or 'dynamic'.\n"
 	       "  -u <user>:  Change uid to <user>.\n"
-	       "  -U          Enter new user namespace (implies -p).\n"
+	       "  -U:         Enter new user namespace (implies -p).\n"
 	       "  -v:         Enter new mount namespace.\n"
 	       "  -V <file>:  Enter specified mount namespace.\n");
 }
