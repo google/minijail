@@ -1092,7 +1092,7 @@ int enter_pivot_root(const struct minijail *j)
 
 	/*
 	 * Keep the fd for both old and new root.
-	 * It will be used in fchdir later.
+	 * It will be used in fchdir(2) later.
 	 */
 	oldroot = open("/", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
 	if (oldroot < 0)
@@ -1102,7 +1102,7 @@ int enter_pivot_root(const struct minijail *j)
 		pdie("failed to open %s for fchdir", j->chrootdir);
 
 	/*
-	 * To ensure chrootdir is the root of a file system,
+	 * To ensure j->chrootdir is the root of a filesystem,
 	 * do a self bind mount.
 	 */
 	if (mount(j->chrootdir, j->chrootdir, "bind", MS_BIND | MS_REC, ""))
@@ -1113,22 +1113,23 @@ int enter_pivot_root(const struct minijail *j)
 		pdie("pivot_root");
 
 	/*
-	 * Now the old root is mounted on top of the new root. Use fchdir to
+	 * Now the old root is mounted on top of the new root. Use fchdir(2) to
 	 * change to the old root and unmount it.
 	 */
 	if (fchdir(oldroot))
 		pdie("failed to fchdir to old /");
 
 	/*
-	 * If j->flags.skip_remount_private is enabled, there could be a shared
-	 * mount point under |oldroot|. In such a case, mount points under the
-	 * shared mount point will be unmount(2)'ed below, so that it is
-	 * propagated to the original mount namespace. To prevent such
-	 * unexpected unmounting, remove them from peer groups by recursive
-	 * PRIVATE marking.
+	 * If j->flags.skip_remount_private was enabled for minijail_enter(), there
+	 * could be a shared mount point under |oldroot|. In that case, mounts
+	 * under this shared mount point will be unmounted below, and this
+	 * unmounting will propagate to the original mount namespace (because the
+	 * mount point is shared). To prevent this unexpected unmounting, remove
+	 * these mounts from their peer groups by recursively remounting them as
+	 * MS_PRIVATE.
 	 */
 	if (mount(NULL, ".", NULL, MS_REC | MS_PRIVATE, NULL))
-		pdie("failed to mount(/, private) for unmount(/)");
+		pdie("failed to mount(/, private) before umount(/)");
 	/* The old root might be busy, so use lazy unmount. */
 	if (umount2(".", MNT_DETACH))
 		pdie("umount(/)");
