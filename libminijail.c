@@ -1118,6 +1118,17 @@ int enter_pivot_root(const struct minijail *j)
 	 */
 	if (fchdir(oldroot))
 		pdie("failed to fchdir to old /");
+
+	/*
+	 * If j->flags.skip_remount_private is enabled, there could be a shared
+	 * mount point under |oldroot|. In such a case, mount points under the
+	 * shared mount point will be unmount(2)'ed below, so that it is
+	 * propagated to the original mount namespace. To prevent such
+	 * unexpected unmounting, remove them from peer groups by recursive
+	 * PRIVATE marking.
+	 */
+	if (mount(NULL, ".", NULL, MS_REC | MS_PRIVATE, NULL))
+		pdie("failed to mount(/, private) for unmount(/)");
 	/* The old root might be busy, so use lazy unmount. */
 	if (umount2(".", MNT_DETACH))
 		pdie("umount(/)");
