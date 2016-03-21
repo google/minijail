@@ -78,7 +78,6 @@ void minijail_remount_proc_readonly(struct minijail *j);
 void minijail_run_as_init(struct minijail *j);
 int minijail_write_pid_file(struct minijail *j, const char *path);
 void minijail_inherit_usergroups(struct minijail *j);
-void minijail_disable_ptrace(struct minijail *j);
 /*
  * Changes the jailed process's syscall table to the alt_syscall table
  * named |table|.
