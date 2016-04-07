@@ -1355,6 +1355,21 @@ void set_seccomp_filter(const struct minijail *j)
 	}
 
 	/*
+	 * Code running with ASan
+	 * (https://github.com/google/sanitizers/wiki/AddressSanitizer)
+	 * will make system calls not included in the syscall filter policy,
+	 * which will likely crash the program. Skip setting seccomp filter in
+	 * that case.
+	 * 'running_with_asan()' has no inputs and is completely defined at
+	 * build time, so this cannot be used by an attacker to skip setting
+	 * seccomp filter.
+	 */
+	if (j->flags.seccomp_filter && running_with_asan()) {
+		warn("running with ASan, not setting seccomp filter");
+		return;
+	}
+
+	/*
 	 * If we're logging seccomp filter failures,
 	 * install the SIGSYS handler first.
 	 */
