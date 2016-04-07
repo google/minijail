@@ -102,6 +102,25 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
 
 
+# Example ASan-ified libminijail shared library for target.
+# Commented out since it's only needed for local debugging.
+# =========================================================
+# include $(CLEAR_VARS)
+# LOCAL_MODULE := libminijail_asan
+# LOCAL_MODULE_TAGS := optional
+#
+# LOCAL_CFLAGS := $(minijailCommonCFlags)
+# LOCAL_CLANG := true
+# LOCAL_SANITIZE := address
+# LOCAL_MODULE_RELATIVE_PATH := asan
+# LOCAL_SRC_FILES := $(libminijailSrcFiles)
+#
+# LOCAL_STATIC_LIBRARIES := libminijail_generated
+# LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
+# LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
+# include $(BUILD_SHARED_LIBRARY)
+
+
 # libminijail static library for target.
 # =========================================================
 include $(CLEAR_VARS)
