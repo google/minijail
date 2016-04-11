@@ -38,7 +38,11 @@ static inline int is_android() {
 }
 
 static inline int running_with_asan() {
-#if defined(__clang__) && __has_feature(address_sanitizer)
+#ifndef __has_feature
+#define __has_feature(x) 0
+#endif
+
+#if __has_feature(address_sanitizer)
 	return 1;
 #else
 	return 0;

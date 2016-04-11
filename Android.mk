@@ -205,6 +205,8 @@ LOCAL_MODULE := drop_privs
 LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
+# Don't build with ASan, but leave commented out for easy local debugging.
+# LOCAL_SANITIZE := address
 LOCAL_SRC_FILES := \
 	examples/drop_privs.cpp
 
