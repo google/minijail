@@ -33,6 +33,13 @@ INCLUDES='
 #include <sys/stat.h>
 #include <sys/types.h>'
 
+# Generate a dependency file which helps the build tool to see when it
+# should regenerate ${OUTFILE}.
+echo "${INCLUDES}" | ${CC} - -E -M -MF ${OUTFILE}.d.tmp
+# Correct the output filename.
+(echo "${OUTFILE}: \\" ; sed 's/^-\.o://' ${OUTFILE}.d.tmp) > ${OUTFILE}.d
+rm ${OUTFILE}.d.tmp
+
 # sed expression which extracts constants and converts them from:
 #   #define AT_FDWCD foo
 # to:
