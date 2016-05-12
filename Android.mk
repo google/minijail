@@ -53,6 +53,7 @@ $(my_gen): PRIVATE_CC := $(my_cc)
 $(my_gen): PRIVATE_CUSTOM_TOOL = $< $(PRIVATE_CC) $@
 $(my_gen): $(LOCAL_PATH)/gen_syscalls.sh
 	$(transform-generated-source)
+$(call include-depfile,$(my_gen).d,$(my_gen))
 LOCAL_GENERATED_SOURCES_$(TARGET_ARCH) += $(my_gen)
 
 my_gen := $(generated_sources_dir)/$(TARGET_ARCH)/libconstants.c
@@ -60,6 +61,7 @@ $(my_gen): PRIVATE_CC := $(my_cc)
 $(my_gen): PRIVATE_CUSTOM_TOOL = $< $(PRIVATE_CC) $@
 $(my_gen): $(LOCAL_PATH)/gen_constants.sh
 	$(transform-generated-source)
+$(call include-depfile,$(my_gen).d,$(my_gen))
 LOCAL_GENERATED_SOURCES_$(TARGET_ARCH) += $(my_gen)
 
 # For processes running in 32-bit compat mode on 64-bit processors.
