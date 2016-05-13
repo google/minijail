@@ -26,10 +26,11 @@ OUTFILE="$1"
 
 # Generate a dependency file which helps the build tool to see when it
 # should regenerate ${OUTFILE}.
-echo '#include <asm/unistd.h>' | ${CC} - -E -M -MF ${OUTFILE}.d.tmp
+echo '#include <asm/unistd.h>' | ${CC} - -E -M -MF "${OUTFILE}.d.tmp"
 # Correct the output filename.
-(echo "${OUTFILE}: \\" ; sed 's/^-\.o://' ${OUTFILE}.d.tmp) > ${OUTFILE}.d
-rm ${OUTFILE}.d.tmp
+(echo "${OUTFILE}: \\" ; sed -e 's/^-\.o://' -e 's/^-://' "${OUTFILE}.d.tmp") \
+  > "${OUTFILE}.d"
+rm "${OUTFILE}.d.tmp"
 
 # sed expression which extracts system calls that are
 # defined via asm/unistd.h.  It converts them from:
