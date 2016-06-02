@@ -1136,13 +1136,13 @@ int enter_pivot_root(const struct minijail *j)
 		pdie("failed to fchdir to old /");
 
 	/*
-	 * If j->flags.skip_remount_private was enabled for minijail_enter(), there
-	 * could be a shared mount point under |oldroot|. In that case, mounts
-	 * under this shared mount point will be unmounted below, and this
-	 * unmounting will propagate to the original mount namespace (because the
-	 * mount point is shared). To prevent this unexpected unmounting, remove
-	 * these mounts from their peer groups by recursively remounting them as
-	 * MS_PRIVATE.
+	 * If j->flags.skip_remount_private was enabled for minijail_enter(),
+	 * there could be a shared mount point under |oldroot|. In that case,
+	 * mounts under this shared mount point will be unmounted below, and
+	 * this unmounting will propagate to the original mount namespace
+	 * (because the mount point is shared). To prevent this unexpected
+	 * unmounting, remove these mounts from their peer groups by recursively
+	 * remounting them as MS_PRIVATE.
 	 */
 	if (mount(NULL, ".", NULL, MS_REC | MS_PRIVATE, NULL))
 		pdie("failed to mount(/, private) before umount(/)");
@@ -1178,12 +1178,21 @@ int remount_proc_readonly(const struct minijail *j)
 	 * Right now, we're holding a reference to our parent's old mount of
 	 * /proc in our namespace, which means using MS_REMOUNT here would
 	 * mutate our parent's mount as well, even though we're in a VFS
-	 * namespace (!). Instead, remove their mount from our namespace
-	 * and make our own. However, if we are in a new user namespace, /proc
-	 * is not seen as mounted, so don't return error if umount() fails.
+	 * namespace (!). Instead, remove their mount from our namespace lazily
+	 * (MNT_DETACH) and make our own.
 	 */
-	if (umount2(kProcPath, MNT_DETACH) && !j->flags.userns)
-		return -errno;
+	if (umount2(kProcPath, MNT_DETACH)) {
+		/*
+		 * If we are in a new user namespace, umount(2) will fail.
+		 * See http://man7.org/linux/man-pages/man7/user_namespaces.7.html
+		 */
+		if (j->flags.userns) {
+			info("umount(/proc, MNT_DETACH) failed, "
+			     "this is expected when using user namespaces");
+		} else {
+			return -errno;
+		}
+	}
 	if (mount("", kProcPath, "proc", kSafeFlags | MS_RDONLY, ""))
 		return -errno;
 	return 0;
