@@ -133,6 +133,7 @@ static void usage(const char *progn)
 	       "              Same arguments as newgidmap(1), multiple mappings should be separated by ',' (comma).\n"
 	       "              Not compatible with -b without the 'writable' option.\n"
 	       "  -n:         Set no_new_privs.\n"
+	       "  -N:         Enter a new cgroup namespace.\n"
 	       "  -p:         Enter new pid namespace (implies -vr).\n"
 	       "  -P <dir>:   pivot_root(2) to <dir> (implies -v).\n"
 	       "              Not compatible with -C.\n"
@@ -173,7 +174,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	if (argc > 1 && argv[1][0] != '-')
 		return 1;
 	while ((opt = getopt(argc, argv,
-			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::T:vrGhHinplLtIUK"))
+			     "u:g:sS:c:C:P:b:V:f:m:M:k:a:e::T:vrGhHinNplLtIUK"))
 	       != -1) {
 		switch (opt) {
 		case 'u':
@@ -270,6 +271,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		case 'G':
 			minijail_inherit_usergroups(j);
+			break;
+		case 'N':
+			minijail_namespace_cgroups(j);
 			break;
 		case 'p':
 			minijail_namespace_pids(j);
