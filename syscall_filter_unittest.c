@@ -59,7 +59,7 @@ do {	\
 #define EXPECT_KILL(_block) \
 do {	\
 	EXPECT_EQ((_block)->len, 1U);				\
-	EXPECT_EQ_STMT(_block->instrs,				\
+	EXPECT_EQ_STMT((_block)->instrs,			\
 			BPF_RET+BPF_K, SECCOMP_RET_KILL);	\
 } while (0)
 
