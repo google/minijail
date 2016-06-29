@@ -202,7 +202,7 @@
 #define _TEST(test_name) \
   static void test_name(struct __test_metadata *_metadata); \
   static struct __test_metadata _##test_name##_object = \
-    { .name= "global." #test_name, .fn= &test_name }; \
+    { .name= "global." #test_name, .fn= &(test_name) }; \
   static void __attribute__((constructor)) _register_##test_name(void) { \
     __register_test(&_##test_name##_object); \
   } \
@@ -344,10 +344,11 @@
   } \
 } while (0); OPTIONAL_HANDLER(_assert)
 
+/* NOLINT: clang-tidy adds wrong parentheses around _t. */
 #define __EXPECT_STR(_expected, _seen, _t, _assert) do { \
   const char *__exp = (_expected); \
   const char *__seen = (_seen); \
-  if (!(strcmp(__exp, __seen) _t 0))  { \
+  if (!(strcmp(__exp, __seen) _t 0))  { /* NOLINT */ \
     __TH_LOG("Expected '%s' %s '%s'.", __exp, #_t, __seen); \
     _metadata->passed = 0; \
     _metadata->trigger = 1; \
