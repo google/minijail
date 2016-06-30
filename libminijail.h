@@ -127,6 +127,23 @@ char *minijail_get_original_path(struct minijail *j, const char *chroot_path);
 void minijail_mount_tmp(struct minijail *j);
 
 /*
+ * minijail_mount_with_data: when entering minijail @j,
+ *   mounts @src at @dst with @flags and @data.
+ * @j         minijail to bind inside
+ * @src       source to bind
+ * @dest      location to bind (inside chroot)
+ * @type      type of filesystem
+ * @flags     flags passed to mount
+ * @data      data arguments passed to mount(2), e.g. "mode=755"
+ *
+ * This may be called multiple times; all mounts will be applied in the order
+ * of minijail_mount() calls.
+ */
+int minijail_mount_with_data(struct minijail *j, const char *src,
+			     const char *dest, const char *type,
+			     unsigned long flags, const char *data);
+
+/*
  * minijail_mount: when entering minijail @j, mounts @src at @dst with @flags
  * @j         minijail to bind inside
  * @src       source to bind
@@ -134,7 +151,7 @@ void minijail_mount_tmp(struct minijail *j);
  * @type      type of filesystem
  * @flags     flags passed to mount
  *
- * This may be called multiple times; all bindings will be applied in the order
+ * This may be called multiple times; all mounts will be applied in the order
  * of minijail_mount() calls.
  */
 int minijail_mount(struct minijail *j, const char *src, const char *dest,

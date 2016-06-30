@@ -78,12 +78,13 @@ static void add_mount(struct minijail *j, char *arg)
 	char *dest = strtok(NULL, ",");
 	char *type = strtok(NULL, ",");
 	char *flags = strtok(NULL, ",");
+	char *data = strtok(NULL, ",");
 	if (!src || !dest || !type) {
 		fprintf(stderr, "Bad mount: %s %s %s\n", src, dest, type);
 		exit(1);
 	}
-	if (minijail_mount(j, src, dest, type,
-			   flags ? strtoul(flags, NULL, 16) : 0)) {
+	if (minijail_mount_with_data(j, src, dest, type,
+			   flags ? strtoul(flags, NULL, 16) : 0, data)) {
 		fprintf(stderr, "minijail_mount failed.\n");
 		exit(1);
 	}
@@ -96,7 +97,7 @@ static void usage(const char *progn)
 	printf("Usage: %s [-GhiIlnprstUv]\n"
 	       "  [-b <src>,<dest>[,<writeable>]] [-f <file>]"
 	       " [-c <caps>] [-C <dir>] [-g <group>] [-u <user>]\n"
-	       "  [-S <file>] [-k <src>,<dest>,<type>[,<flags>]] [-T <type>]\n"
+	       "  [-S <file>] [-k <src>,<dest>,<type>[,<flags>][,<data>]] [-T <type>]\n"
 	       "  [-m \"<uid> <loweruid> <count>[,<uid> <loweruid> <count>]\"]\n"
 	       "  [-M \"<gid> <lowergid> <count>[,<uid> <loweruid> <count>]\"]\n"
 	       "  <program> [args...]\n"
@@ -104,7 +105,8 @@ static void usage(const char *progn)
 	       "  -b:         Bind <src> to <dest> in chroot.\n"
 	       "              Multiple instances allowed.\n"
 	       "  -k:         Mount <src> at <dest> in chroot.\n"
-	       "              Multiple instances allowed, flags are passed to mount(2).\n"
+	       "              <flags> and <data> can be specified as in mount(2).\n"
+	       "              Multiple instances allowed.\n"
 	       "  -c <caps>:  Restrict caps to <caps>.\n"
 	       "  -C <dir>:   chroot(2) to <dir>.\n"
 	       "              Not compatible with -P.\n"
