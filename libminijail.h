@@ -171,9 +171,10 @@ int minijail_bind(struct minijail *j, const char *src, const char *dest,
 		  int writeable);
 
 /*
- * Lock this process into the given minijail. Note that this procedure cannot fail,
- * since there is no way to undo privilege-dropping; therefore, if any part of
- * the privilege-drop fails, minijail_enter() will abort the entire process.
+ * Lock this process into the given minijail. Note that this procedure cannot
+ * fail, since there is no way to undo privilege-dropping; therefore, if any
+ * part of the privilege-drop fails, minijail_enter() will abort the entire
+ * process.
  *
  * Some restrictions cannot be enabled this way (pid namespaces) and attempting
  * to do so will cause an abort.
@@ -246,14 +247,14 @@ int minijail_run_pid_pipes_no_preload(struct minijail *j, const char *filename,
 int minijail_kill(struct minijail *j);
 
 /*
- * Wait for all processed in the specified minijail to exit. Returns the exit
+ * Wait for all processes in the specified minijail to exit. Returns the exit
  * status of the _first_ process spawned in the jail.
  */
 int minijail_wait(struct minijail *j);
 
 /*
- * Frees the given minijail. It does not matter if the process is inside the minijail or
- * not.
+ * Frees the given minijail. It does not matter if the process is inside the
+ * minijail or not.
  */
 void minijail_destroy(struct minijail *j);
 
