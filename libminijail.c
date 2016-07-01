@@ -1087,6 +1087,38 @@ static void enter_user_namespace(const struct minijail *j)
 }
 
 /*
+ * Make sure the mount target exists. Create it if needed and possible.
+ */
+static int setup_mount_destination(const char *source, const char *dest,
+				   uid_t uid, uid_t gid)
+{
+	int rc;
+	struct stat st_buf;
+
+	rc = stat(dest, &st_buf);
+	if (rc == 0) /* destination exists */
+		return 0;
+
+	/*
+	 * Try to create the destination.
+	 * Either make a directory or touch a file depending on the source type.
+	 * If the source doesn't exist, assume it is a filesystem type such as
+	 * "tmpfs" and create a directory to mount it on.
+	 */
+	rc = stat(source, &st_buf);
+	if (rc || S_ISDIR(st_buf.st_mode) || S_ISBLK(st_buf.st_mode)) {
+		if (mkdir(dest, 0700))
+			return -errno;
+	} else {
+		int fd = open(dest, O_RDWR | O_CREAT, 0700);
+		if (fd < 0)
+			return -errno;
+		close(fd);
+	}
+	return chown(dest, uid, gid);
+}
+
+/*
  * mount_one: Applies mounts from @m for @j, recursing as needed.
  * @j Minijail these mounts are for
  * @m Head of list of mounts
@@ -1102,6 +1134,9 @@ static int mount_one(const struct minijail *j, struct mountpoint *m)
 	/* |dest| has a leading "/". */
 	if (asprintf(&dest, "%s%s", j->chrootdir, m->dest) < 0)
 		return -ENOMEM;
+
+	if (setup_mount_destination(m->src, dest, j->uid, j->gid))
+		pdie("creating mount target '%s' failed", dest);
 
 	/*
 	 * R/O bind mounts have to be remounted since 'bind' and 'ro'
