@@ -83,6 +83,11 @@ Set the gid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
 Set the process's \fIno_new_privs\fR bit. See \fBprctl(2)\fR and the kernel
 source file \fIDocumentation/prctl/no_new_privs.txt\fR for more info.
 .TP
+\fB-N\fR
+Run inside a new cgroup namespace. This option runs the program with a cgroup
+view showing the program's cgroup as the root. This is only available on v4.6+
+of the Linux kernel.
+.TP
 \fB-p\fR
 Run inside a new PID namespace. This option will make it impossible for the
 program to see or affect processes that are not its descendants. This implies
