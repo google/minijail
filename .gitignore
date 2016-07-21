@@ -1,0 +1,12 @@
+*.d
+*.depends
+*.gen.c
+*.o
+
+# Shared libraries when compiling in-tree.
+*.so
+
+# Executables when compiling in-tree.
+libminijail_unittest
+minijail0
+syscall_filter_unittest
