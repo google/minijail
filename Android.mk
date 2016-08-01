@@ -24,6 +24,10 @@ libminijailSrcFiles := \
 	syscall_filter.c \
 	util.c
 
+hostUnittestSrcFiles := \
+	linux-x86/libconstants.gen.c \
+	linux-x86/libsyscalls.gen.c
+
 minijailCommonCFlags := -DHAVE_SECUREBITS_H -Wall -Werror
 minijailCommonLibraries := libcap
 
@@ -160,6 +164,28 @@ LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
 
 
+# libminijail native unit tests for the host. Run with:
+# out/host/linux-x86/nativetest(64)/libminijail_unittest/libminijail_unittest
+# =========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := libminijail_unittest
+LOCAL_MODULE_HOST_OS := linux
+
+LOCAL_CFLAGS := $(minijailCommonCFlags) -DPRELOADPATH=\"/invalid\"
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	bpf.c \
+	libminijail.c \
+	libminijail_unittest.c \
+	signal_handler.c \
+	syscall_filter.c \
+	util.c \
+	$(hostUnittestSrcFiles)
+
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
+include $(BUILD_HOST_NATIVE_TEST)
+
+
 # Syscall filtering native unit tests. Run with:
 # adb shell /data/nativetest/syscall_filter_unittest/syscall_filter_unittest
 # =========================================================
@@ -177,6 +203,26 @@ LOCAL_SRC_FILES := \
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
+
+
+# Syscall filtering native unit tests for the host. Run with:
+# out/host/linux-x86/nativetest(64)/syscall_filter_unittest/syscall_filter_unittest
+# =========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := syscall_filter_unittest
+LOCAL_MODULE_HOST_OS := linux
+
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	bpf.c \
+	syscall_filter.c \
+	syscall_filter_unittest.c \
+	util.c \
+	$(hostUnittestSrcFiles)
+
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
+include $(BUILD_HOST_NATIVE_TEST)
 
 
 # libminijail_test executable for brillo_Minijail test.
