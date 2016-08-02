@@ -1854,9 +1854,8 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	}
 
 	if (!use_preload) {
-		if (j->flags.use_caps)
-			die("capabilities are not supported without "
-			    "LD_PRELOAD");
+		if (j->flags.use_caps && j->caps != 0)
+			die("non-empty capabilities are not supported without LD_PRELOAD");
 	}
 
 	/*
@@ -2042,6 +2041,7 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 
 		return 0;
 	}
+	/* Child process. */
 	free(oldenv_copy);
 
 	if (j->flags.reset_signal_mask) {
@@ -2096,9 +2096,14 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 		/* Strip out flags that cannot be inherited across execve(2). */
 		minijail_preexec(j);
 	} else {
+		/*
+		 * If not using LD_PRELOAD, do all jailing before execve(2).
+		 * Note that PID namespaces can only be entered on fork(2),
+		 * so that flag is still cleared.
+		 */
 		j->flags.pids = 0;
 	}
-	/* Jail this process, then execve() the target. */
+	/* Jail this process, then execve(2) the target. */
 	minijail_enter(j);
 
 	if (pid_namespace && do_init) {
@@ -2128,7 +2133,11 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	 *   -> init()-ing process
 	 *      -> execve()-ing process
 	 */
-	_exit(execve(filename, argv, environ));
+	ret = execve(filename, argv, environ);
+	if (ret == -1) {
+		pwarn("execve(%s) failed", filename);
+	}
+	_exit(ret);
 }
 
 int API minijail_kill(struct minijail *j)
