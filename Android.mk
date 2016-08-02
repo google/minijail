@@ -144,9 +144,6 @@ include $(BUILD_STATIC_LIBRARY)
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail_unittest
-ifdef BRILLO
-  LOCAL_MODULE_TAGS := eng
-endif
 
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
@@ -168,9 +165,6 @@ include $(BUILD_NATIVE_TEST)
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := syscall_filter_unittest
-ifdef BRILLO
-  LOCAL_MODULE_TAGS := eng
-endif
 
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
@@ -189,9 +183,6 @@ include $(BUILD_NATIVE_TEST)
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail_test
-ifdef BRILLO
-  LOCAL_MODULE_TAGS := eng
-endif
 
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
