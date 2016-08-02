@@ -23,6 +23,9 @@
 #define warn(_msg, ...) \
 	syslog(LOG_WARNING, "libminijail: " _msg, ## __VA_ARGS__)
 
+#define pwarn(_msg, ...) \
+	warn(_msg ": %m", ## __VA_ARGS__)
+
 #define info(_msg, ...) \
 	syslog(LOG_INFO, "libminijail: " _msg, ## __VA_ARGS__)
 
