@@ -1,6 +1,6 @@
 *.d
 *.depends
-*.gen.c
+/*.gen.c
 *.o
 
 # Shared libraries when compiling in-tree.
