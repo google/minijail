@@ -7,8 +7,8 @@
 #include <sys/types.h>
 
 struct syscall_entry {
-  const char *name;
-  int nr;
+	const char *name;
+	int nr;
 };
 
 extern const struct syscall_entry syscall_table[];
