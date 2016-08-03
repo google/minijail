@@ -1636,7 +1636,7 @@ void API minijail_enter(const struct minijail *j)
 	}
 }
 
-/* TODO(wad) will visibility affect this variable? */
+/* TODO(wad): will visibility affect this variable? */
 static int init_exitstatus = 0;
 
 void init_term(int __attribute__ ((unused)) sig)
@@ -1648,9 +1648,9 @@ int init(pid_t rootpid)
 {
 	pid_t pid;
 	int status;
-	/* so that we exit with the right status */
+	/* So that we exit with the right status. */
 	signal(SIGTERM, init_term);
-	/* TODO(wad) self jail with seccomp_filters here. */
+	/* TODO(wad): self jail with seccomp filters here. */
 	while ((pid = wait(&status)) > 0) {
 		/*
 		 * This loop will only end when either there are no processes

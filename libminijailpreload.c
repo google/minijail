@@ -49,13 +49,15 @@ static int fake_main(int argc, char **argv, char **envp)
 	char *fd_name = getenv(kFdEnvVar);
 	int fd = -1;
 	struct minijail *j;
-	if (geteuid() != getuid() || getegid() != getgid())
-		/* If we didn't do this check, an attacker could set kFdEnvVar
+	if (geteuid() != getuid() || getegid() != getgid()) {
+		/*
+		 * If we didn't do this check, an attacker could set kFdEnvVar
 		 * for any setuid program that uses libminijail to cause it to
 		 * get capabilities or a uid it did not expect.
 		 */
-		/* TODO(wad) why would libminijail interact here? */
+		/* TODO(wad): why would libminijail interact here? */
 		return MINIJAIL_ERR_PRELOAD;
+	}
 	if (!fd_name)
 		return MINIJAIL_ERR_PRELOAD;
 	fd = atoi(fd_name);
@@ -96,33 +98,34 @@ static int fake_main(int argc, char **argv, char **envp)
  *  so we can't rely on things like malloc() being available yet.
  */
 
-int API __libc_start_main(int (*main) (int, char **, char **),
-		      int argc, char **ubp_av, void (*init) (void),
-		      void (*fini) (void), void (*rtld_fini) (void),
-		      void (*stack_end))
+int API __libc_start_main(int (*main)(int, char **, char **), int argc,
+			  char **ubp_av, void (*init)(void), void (*fini)(void),
+			  void (*rtld_fini)(void), void(*stack_end))
 {
 	void *sym;
-	/* This hack is unfortunately required by C99 - casting directly from
+	/*
+	 * This hack is unfortunately required by C99 - casting directly from
 	 * void* to function pointers is left undefined. See POSIX.1-2003, the
 	 * Rationale for the specification of dlsym(), and dlsym(3). This
 	 * deliberately violates strict-aliasing rules, but gcc can't tell.
 	 */
 	union {
-		int (*fn) (int (*main) (int, char **, char **), int argc,
-			   char **ubp_av, void (*init) (void),
-			   void (*fini) (void), void (*rtld_fini) (void),
-			   void (*stack_end));
+		int (*fn)(int (*main)(int, char **, char **), int argc,
+			  char **ubp_av, void (*init)(void), void (*fini)(void),
+			  void (*rtld_fini)(void), void(*stack_end));
 		void *symval;
 	} real_libc_start_main;
 
-	/* We hold this handle for the duration of the real __libc_start_main()
+	/*
+	 * We hold this handle for the duration of the real __libc_start_main()
 	 * and drop it just before calling the real main().
 	 */
 	libc_handle = dlopen("libc.so.6", RTLD_NOW);
 
 	if (!libc_handle) {
 		syslog(LOG_ERR, "can't dlopen() libc");
-		/* We dare not use abort() here because it will run atexit()
+		/*
+		 * We dare not use abort() here because it will run atexit()
 		 * handlers and try to flush stdio.
 		 */
 		_exit(1);
@@ -135,7 +138,8 @@ int API __libc_start_main(int (*main) (int, char **, char **),
 	real_libc_start_main.symval = sym;
 	real_main = main;
 
-	/* Note that we swap fake_main in for main - fake_main knows that it
+	/*
+	 * Note that we swap fake_main in for main - fake_main knows that it
 	 * should call real_main after it's done.
 	 */
 	return real_libc_start_main.fn(fake_main, argc, ubp_av, init, fini,
