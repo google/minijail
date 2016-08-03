@@ -6,8 +6,8 @@
 #define MINIJAIL_LIBCONSTANTS_H_
 
 struct constant_entry {
-  const char *name;
-  unsigned long value;
+	const char *name;
+	unsigned long value;
 };
 
 extern const struct constant_entry constant_table[];
