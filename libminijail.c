@@ -863,6 +863,9 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 	length -= sizeof(*j);
 
 	/* Potentially stale pointers not used as signals. */
+	j->pid_file_path = NULL;
+	j->uidmap = NULL;
+	j->gidmap = NULL;
 	j->mounts_head = NULL;
 	j->mounts_tail = NULL;
 	j->filter_prog = NULL;
@@ -2210,6 +2213,12 @@ void API minijail_destroy(struct minijail *j)
 		free(j->suppl_gid_list);
 	if (j->chrootdir)
 		free(j->chrootdir);
+	if (j->pid_file_path)
+		free(j->pid_file_path);
+	if (j->uidmap)
+		free(j->uidmap);
+	if (j->gidmap)
+		free(j->gidmap);
 	if (j->alt_syscall_table)
 		free(j->alt_syscall_table);
 	for (i = 0; i < j->cgroup_count; ++i)
