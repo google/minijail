@@ -54,8 +54,33 @@ static inline int running_with_asan() {
 
 int lookup_syscall(const char *name);
 const char *lookup_syscall_name(int nr);
+
 long int parse_constant(char *constant_str, char **endptr);
+
 char *strip(char *s);
 char *tokenize(char **stringp, const char *delim);
+
+int kernel_lessthan_3_8();
+
+char *path_join(const char *external_path, const char *internal_path);
+
+/*
+ * consumebytes: consumes @length bytes from a buffer @buf of length @buflength
+ * @length    Number of bytes to consume
+ * @buf       Buffer to consume from
+ * @buflength Size of @buf
+ *
+ * Returns a pointer to the base of the bytes, or NULL for errors.
+ */
+void *consumebytes(size_t length, char **buf, size_t *buflength);
+
+/*
+ * consumestr: consumes a C string from a buffer @buf of length @length
+ * @buf    Buffer to consume
+ * @length Length of buffer
+ *
+ * Returns a pointer to the base of the string, or NULL for errors.
+ */
+char *consumestr(char **buf, size_t *buflength);
 
 #endif /* _UTIL_H_ */

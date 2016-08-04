@@ -34,4 +34,9 @@ int flatten_block_list(struct filter_block *head, struct sock_filter *filter,
 		size_t index, size_t cap);
 void free_block_list(struct filter_block *head);
 
+/*
+ * Seccomp can soft-fail on Android devices with kernel version < 3.8.
+ */
+int seccomp_can_softfail();
+
 #endif /* SYSCALL_FILTER_H */
