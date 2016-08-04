@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/utsname.h>
 
 #include "util.h"
 
@@ -61,8 +62,6 @@ const char *log_syscalls[] = {"connect", "send"};
 
 const size_t log_syscalls_len = sizeof(log_syscalls)/sizeof(log_syscalls[0]);
 
-long int parse_single_constant(char *constant_str, char **endptr);
-
 int lookup_syscall(const char *name)
 {
 	const struct syscall_entry *entry = syscall_table;
@@ -79,6 +78,21 @@ const char *lookup_syscall_name(int nr)
 		if (entry->nr == nr)
 			return entry->name;
 	return NULL;
+}
+
+long int parse_single_constant(char *constant_str, char **endptr)
+{
+	const struct constant_entry *entry = constant_table;
+	for (; entry->name; ++entry) {
+		if (!strcmp(entry->name, constant_str)) {
+			if (endptr)
+				*endptr = constant_str + strlen(constant_str);
+
+			return entry->value;
+		}
+	}
+
+	return strtol(constant_str, endptr, 0);
 }
 
 long int parse_constant(char *constant_str, char **endptr)
@@ -109,21 +123,6 @@ long int parse_constant(char *constant_str, char **endptr)
 	if (endptr)
 		*endptr = lastpos;
 	return value;
-}
-
-long int parse_single_constant(char *constant_str, char **endptr)
-{
-	const struct constant_entry *entry = constant_table;
-	for (; entry->name; ++entry) {
-		if (!strcmp(entry->name, constant_str)) {
-			if (endptr)
-				*endptr = constant_str + strlen(constant_str);
-
-			return entry->value;
-		}
-	}
-
-	return strtol(constant_str, endptr, 0);
 }
 
 char *strip(char *s)
@@ -186,4 +185,45 @@ char *tokenize(char **stringp, const char *delim)
 	}
 
 	return ret;
+}
+
+int kernel_lessthan_3_8()
+{
+	int major, minor;
+	struct utsname uts;
+	return (uname(&uts) != -1 &&
+			sscanf(uts.release, "%d.%d", &major, &minor) == 2 &&
+			((major < 3) || ((major == 3) && (minor < 8))));
+}
+
+char *path_join(const char *external_path, const char *internal_path)
+{
+	char *path;
+	size_t pathlen;
+
+	/* One extra char for '/' and one for '\0', hence + 2. */
+	pathlen = strlen(external_path) + strlen(internal_path) + 2;
+	path = malloc(pathlen);
+	snprintf(path, pathlen, "%s/%s", external_path, internal_path);
+
+	return path;
+}
+
+void *consumebytes(size_t length, char **buf, size_t *buflength)
+{
+	char *p = *buf;
+	if (length > *buflength)
+		return NULL;
+	*buf += length;
+	*buflength -= length;
+	return p;
+}
+
+char *consumestr(char **buf, size_t *buflength)
+{
+	size_t len = strnlen(*buf, *buflength);
+	if (len == *buflength)
+		/* There's no null-terminator. */
+		return NULL;
+	return consumebytes(len + 1, buf, buflength);
 }

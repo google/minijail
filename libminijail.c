@@ -32,7 +32,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/user.h>
-#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -207,32 +206,6 @@ void minijail_preexec(struct minijail *j)
 	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
 	/* Note, |pids| will already have been used before this call. */
-}
-
-/* Returns true if the kernel version is less than 3.8. */
-int seccomp_kernel_support_not_required()
-{
-	int major, minor;
-	struct utsname uts;
-	return (uname(&uts) != -1 &&
-			sscanf(uts.release, "%d.%d", &major, &minor) == 2 &&
-			((major < 3) || ((major == 3) && (minor < 8))));
-}
-
-/* Allow seccomp soft-fail on Android devices with kernel version < 3.8. */
-int can_softfail()
-{
-#if SECCOMP_SOFTFAIL
-	if (is_android()) {
-		if (seccomp_kernel_support_not_required())
-			return 1;
-		else
-			return 0;
-	} else {
-		return 1;
-	}
-#endif
-	return 0;
 }
 
 /* Minijail API. */
@@ -538,20 +511,6 @@ int API minijail_enter_pivot_root(struct minijail *j, const char *dir)
 	return 0;
 }
 
-static char *append_external_path(const char *external_path,
-				  const char *path_inside_chroot)
-{
-	char *path;
-	size_t pathlen;
-
-	/* One extra char for '/' and one for '\0', hence + 2. */
-	pathlen = strlen(path_inside_chroot) + strlen(external_path) + 2;
-	path = malloc(pathlen);
-	snprintf(path, pathlen, "%s/%s", external_path, path_inside_chroot);
-
-	return path;
-}
-
 char API *minijail_get_original_path(struct minijail *j,
 				     const char *path_inside_chroot)
 {
@@ -581,14 +540,14 @@ char API *minijail_get_original_path(struct minijail *j,
 		if (!strncmp(b->dest, path_inside_chroot, strlen(b->dest))) {
 			const char *relative_path =
 				path_inside_chroot + strlen(b->dest);
-			return append_external_path(b->src, relative_path);
+			return path_join(b->src, relative_path);
 		}
 		b = b->next;
 	}
 
 	/* If there is a chroot path, append |path_inside_chroot| to that. */
 	if (j->chrootdir)
-		return append_external_path(j->chrootdir, path_inside_chroot);
+		return path_join(j->chrootdir, path_inside_chroot);
 
 	/* No chroot, so the path outside is the same as it is inside. */
 	return strdup(path_inside_chroot);
@@ -693,7 +652,7 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
 	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL)) {
-		if ((errno == EINVAL) && can_softfail()) {
+		if ((errno == EINVAL) && seccomp_can_softfail()) {
 			warn("not loading seccomp filter,"
 			     " seccomp not supported");
 			j->flags.seccomp_filter = 0;
@@ -757,8 +716,7 @@ void marshal_append(struct marshal_state *state, void *src, size_t length)
 	state->total += length;
 }
 
-static void minijail_marshal_mount(struct marshal_state *state,
-				   const struct mountpoint *m)
+void marshal_mount(struct marshal_state *state, const struct mountpoint *m)
 {
 	marshal_append(state, m->src, strlen(m->src) + 1);
 	marshal_append(state, m->dest, strlen(m->dest) + 1);
@@ -794,7 +752,7 @@ void minijail_marshal_helper(struct marshal_state *state,
 			       fp->len * sizeof(struct sock_filter));
 	}
 	for (m = j->mounts_head; m; m = m->next) {
-		minijail_marshal_mount(state, m);
+		marshal_mount(state, m);
 	}
 	for (i = 0; i < j->cgroup_count; ++i)
 		marshal_append(state, j->cgroups[i], strlen(j->cgroups[i]) + 1);
@@ -814,40 +772,6 @@ int minijail_marshal(const struct minijail *j, char *buf, size_t available)
 	marshal_state_init(&state, buf, available);
 	minijail_marshal_helper(&state, j);
 	return (state.total > available);
-}
-
-/*
- * consumebytes: consumes @length bytes from a buffer @buf of length @buflength
- * @length    Number of bytes to consume
- * @buf       Buffer to consume from
- * @buflength Size of @buf
- *
- * Returns a pointer to the base of the bytes, or NULL for errors.
- */
-void *consumebytes(size_t length, char **buf, size_t *buflength)
-{
-	char *p = *buf;
-	if (length > *buflength)
-		return NULL;
-	*buf += length;
-	*buflength -= length;
-	return p;
-}
-
-/*
- * consumestr: consumes a C string from a buffer @buf of length @length
- * @buf    Buffer to consume
- * @length Length of buffer
- *
- * Returns a pointer to the base of the string, or NULL for errors.
- */
-char *consumestr(char **buf, size_t *buflength)
-{
-	size_t len = strnlen(*buf, *buflength);
-	if (len == *buflength)
-		/* There's no null-terminator. */
-		return NULL;
-	return consumebytes(len + 1, buf, buflength);
 }
 
 int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
@@ -1087,10 +1011,11 @@ static void enter_user_namespace(const struct minijail *j)
 }
 
 /*
- * Make sure the mount target exists. Create it if needed and possible.
+ * setup_mount_destination: Ensures the mount target exists.
+ * Creates it if needed and possible.
  */
-static int setup_mount_destination(const char *source, const char *dest,
-				   uid_t uid, uid_t gid)
+int setup_mount_destination(const char *source, const char *dest, uid_t uid,
+			    uid_t gid)
 {
 	int rc;
 	struct stat st_buf;
@@ -1478,7 +1403,7 @@ void set_seccomp_filter(const struct minijail *j)
 	if (j->flags.seccomp_filter) {
 		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER,
 			  j->filter_prog)) {
-			if ((errno == EINVAL) && can_softfail()) {
+			if ((errno == EINVAL) && seccomp_can_softfail()) {
 				warn("seccomp not supported");
 				return;
 			}
@@ -1628,7 +1553,7 @@ void API minijail_enter(const struct minijail *j)
 	 * privilege-dropping syscalls :)
 	 */
 	if (j->flags.seccomp && prctl(PR_SET_SECCOMP, 1)) {
-		if ((errno == EINVAL) && can_softfail()) {
+		if ((errno == EINVAL) && seccomp_can_softfail()) {
 			warn("seccomp not supported");
 			return;
 		}
