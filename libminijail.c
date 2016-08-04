@@ -944,36 +944,41 @@ out:
 	return ret;
 }
 
-static void write_ugid_mappings(const struct minijail *j)
+static void write_proc_file(pid_t pid, const char *content,
+			    const char *basename)
 {
-	int fd, ret, len;
-	size_t sz;
-	char fname[32];
+	int fd, ret;
+	size_t sz, len;
+	ssize_t written;
+	char filename[32];
 
-	sz = sizeof(fname);
+	sz = sizeof(filename);
+	ret = snprintf(filename, sz, "/proc/%d/%s", pid, basename);
+	if (ret < 0 || (size_t)ret >= sz)
+		die("failed to generate %s filename", basename);
+
+	fd = open(filename, O_WRONLY | O_CLOEXEC);
+	if (fd < 0)
+		pdie("failed to open '%s'", filename);
+
+	len = strlen(content);
+	written = write(fd, content, len);
+	if (written < 0)
+		pdie("failed to write '%s'", filename);
+
+	if ((size_t)written < len)
+		die("failed to write %zu bytes to '%s'", len, filename);
+
+	close(fd);
+}
+
+static void write_ugid_maps(const struct minijail *j)
+{
 	if (j->uidmap) {
-		ret = snprintf(fname, sz, "/proc/%d/uid_map", j->initpid);
-		if (ret < 0 || (size_t)ret >= sz)
-			die("failed to write file name of uid_map");
-		fd = open(fname, O_WRONLY | O_CLOEXEC);
-		if (fd < 0)
-			pdie("failed to open '%s'", fname);
-		len = strlen(j->uidmap);
-		if (write(fd, j->uidmap, len) < len)
-			die("failed to set uid_map");
-		close(fd);
+		write_proc_file(j->initpid, j->uidmap, "uid_map");
 	}
 	if (j->gidmap) {
-		ret = snprintf(fname, sz, "/proc/%d/gid_map", j->initpid);
-		if (ret < 0 || (size_t)ret >= sz)
-			die("failed to write file name of gid_map");
-		fd = open(fname, O_WRONLY | O_CLOEXEC);
-		if (fd < 0)
-			pdie("failed to open '%s'", fname);
-		len = strlen(j->gidmap);
-		if (write(fd, j->gidmap, len) < len)
-			die("failed to set gid_map");
-		close(fd);
+		write_proc_file(j->initpid, j->gidmap, "gid_map");
 	}
 }
 
@@ -1830,7 +1835,7 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	}
 
 	/*
-	 * If we want to set up a new uid/gid mapping in the user namespace,
+	 * If we want to set up a new uid/gid map in the user namespace,
 	 * or if we need to add the child process to cgroups, create the pipe(2)
 	 * to sync between parent and child.
 	 */
@@ -1918,7 +1923,7 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 			add_to_cgroups(j);
 
 		if (j->flags.userns)
-			write_ugid_mappings(j);
+			write_ugid_maps(j);
 
 		if (sync_child)
 			parent_setup_complete(child_sync_pipe_fds);
