@@ -11,7 +11,7 @@
 
 #include "util.h"
 
-#define MAX_LINE_LENGTH		1024
+#define MAX_LINE_LENGTH 	1024
 #define MAX_POLICY_LINE_LENGTH	1024
 
 #define ONE_INSTR	1
@@ -19,7 +19,10 @@
 
 int seccomp_can_softfail()
 {
-#if SECCOMP_SOFTFAIL
+#if defined(USE_SECCOMP_SOFTFAIL)
+	/*
+	 * On Android devices seccomp is allowed to soft-fail on kernels < 3.8.
+	 */
 	if (is_android()) {
 		if (kernel_lessthan_3_8())
 			return 1;
@@ -66,8 +69,8 @@ struct filter_block *new_filter_block()
 	return block;
 }
 
-void append_filter_block(struct filter_block *head,
-		struct sock_filter *instrs, size_t len)
+void append_filter_block(struct filter_block *head, struct sock_filter *instrs,
+			 size_t len)
 {
 	struct filter_block *new_last;
 
@@ -94,7 +97,7 @@ void append_filter_block(struct filter_block *head,
 }
 
 void extend_filter_block_list(struct filter_block *list,
-		struct filter_block *another)
+			      struct filter_block *another)
 {
 	if (list->last != NULL) {
 		list->last->next = another;
@@ -169,7 +172,7 @@ unsigned int success_lbl(struct bpf_labels *labels, int nr)
 }
 
 int compile_atom(struct filter_block *head, char *atom,
-		struct bpf_labels *labels, int nr, int group_idx)
+		 struct bpf_labels *labels, int nr, int group_idx)
 {
 	/* Splits the atom. */
 	char *atom_ptr;
@@ -252,7 +255,8 @@ int compile_errno(struct filter_block *head, char *ret_errno)
 }
 
 struct filter_block *compile_section(int nr, const char *policy_line,
-		unsigned int entry_lbl_id, struct bpf_labels *labels)
+				     unsigned int entry_lbl_id,
+				     struct bpf_labels *labels)
 {
 	/*
 	 * |policy_line| should be an expression of the form:
@@ -382,8 +386,7 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	return head;
 }
 
-int compile_filter(FILE *policy_file, struct sock_fprog *prog,
-		int log_failures)
+int compile_filter(FILE *policy_file, struct sock_fprog *prog, int log_failures)
 {
 	char line[MAX_LINE_LENGTH];
 	int line_count = 0;
@@ -471,13 +474,13 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog,
 			 */
 			unsigned int id = bpf_label_id(&labels, syscall_name);
 			struct sock_filter *nr_comp =
-					new_instr_buf(ALLOW_SYSCALL_LEN);
+			    new_instr_buf(ALLOW_SYSCALL_LEN);
 			bpf_allow_syscall_args(nr_comp, nr, id);
 			append_filter_block(head, nr_comp, ALLOW_SYSCALL_LEN);
 
 			/* Build the arg filter block. */
 			struct filter_block *block =
-				compile_section(nr, policy_line, id, &labels);
+			    compile_section(nr, policy_line, id, &labels);
 
 			if (!block)
 				return -1;
@@ -500,19 +503,19 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog,
 		append_ret_trap(head);
 
 	/* Allocate the final buffer, now that we know its size. */
-	size_t final_filter_len = head->total_len +
-		(arg_blocks? arg_blocks->total_len : 0);
+	size_t final_filter_len =
+	    head->total_len + (arg_blocks ? arg_blocks->total_len : 0);
 	if (final_filter_len > BPF_MAXINSNS)
 		return -1;
 
 	struct sock_filter *final_filter =
-			calloc(final_filter_len, sizeof(struct sock_filter));
+	    calloc(final_filter_len, sizeof(struct sock_filter));
 
 	if (flatten_block_list(head, final_filter, 0, final_filter_len) < 0)
 		return -1;
 
-	if (flatten_block_list(arg_blocks, final_filter,
-			head->total_len, final_filter_len) < 0)
+	if (flatten_block_list(arg_blocks, final_filter, head->total_len,
+			       final_filter_len) < 0)
 		return -1;
 
 	free_block_list(head);
@@ -528,7 +531,7 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog,
 }
 
 int flatten_block_list(struct filter_block *head, struct sock_filter *filter,
-		size_t index, size_t cap)
+		       size_t index, size_t cap)
 {
 	size_t _index = index;
 
