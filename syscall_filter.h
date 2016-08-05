@@ -26,17 +26,15 @@ struct filter_block {
 struct bpf_labels;
 
 struct filter_block *compile_section(int nr, const char *policy_line,
-		unsigned int label_id, struct bpf_labels *labels);
+				     unsigned int label_id,
+				     struct bpf_labels *labels);
 int compile_filter(FILE *policy_file, struct sock_fprog *prog,
-		int log_failures);
+		   int log_failures);
 
 int flatten_block_list(struct filter_block *head, struct sock_filter *filter,
-		size_t index, size_t cap);
+		       size_t index, size_t cap);
 void free_block_list(struct filter_block *head);
 
-/*
- * Seccomp can soft-fail on Android devices with kernel version < 3.8.
- */
 int seccomp_can_softfail();
 
 #endif /* SYSCALL_FILTER_H */
