@@ -81,12 +81,6 @@ _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 # define SECCOMP_MODE_FILTER 2 /* uses user-supplied filter. */
 #endif
 
-#ifdef USE_SECCOMP_SOFTFAIL
-# define SECCOMP_SOFTFAIL 1
-#else
-# define SECCOMP_SOFTFAIL 0
-#endif
-
 /* New cgroup namespace might not be in linux-headers yet. */
 #ifndef CLONE_NEWCGROUP
 # define CLONE_NEWCGROUP 0x02000000
