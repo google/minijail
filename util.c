@@ -4,9 +4,13 @@
  */
 
 #include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/utsname.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "util.h"
 
@@ -207,6 +211,62 @@ char *path_join(const char *external_path, const char *internal_path)
 	snprintf(path, pathlen, "%s/%s", external_path, internal_path);
 
 	return path;
+}
+
+int write_proc_file(pid_t pid, const char *content, const char *basename)
+{
+	int fd, ret;
+	size_t sz, len;
+	ssize_t written;
+	char filename[32];
+
+	sz = sizeof(filename);
+	ret = snprintf(filename, sz, "/proc/%d/%s", pid, basename);
+	if (ret < 0 || (size_t)ret >= sz) {
+		warn("failed to generate %s filename", basename);
+		return -1;
+	}
+
+	fd = open(filename, O_WRONLY | O_CLOEXEC);
+	if (fd < 0) {
+		pwarn("failed to open '%s'", filename);
+		return -errno;
+	}
+
+	len = strlen(content);
+	written = write(fd, content, len);
+	if (written < 0) {
+		pwarn("failed to write '%s'", filename);
+		return -1;
+	}
+
+	if ((size_t)written < len) {
+		warn("failed to write %zu bytes to '%s'", len, filename);
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+
+int write_pid_to_path(pid_t pid, const char *path)
+{
+	FILE *fp = fopen(path, "w");
+
+	if (!fp) {
+		pwarn("failed to open '%s'", path);
+		return -errno;
+	}
+	if (fprintf(fp, "%d\n", (int)pid) < 0) {
+		/* fprintf(3) does not set errno on failure. */
+		warn("fprintf(%s) failed", path);
+		return -1;
+	}
+	if (fclose(fp)) {
+		pwarn("fclose(%s) failed", path);
+		return -errno;
+	}
+
+	return 0;
 }
 
 void *consumebytes(size_t length, char **buf, size_t *buflength)
