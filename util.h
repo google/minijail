@@ -10,10 +10,12 @@
 #define _UTIL_H_
 
 #include <stdlib.h>
+#include <sys/types.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #define die(_msg, ...) do { \
-	syslog(LOG_ERR, "libminijail: " _msg, ## __VA_ARGS__); \
+	syslog(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__); \
 	abort(); \
 } while (0)
 
@@ -21,13 +23,13 @@
 	die(_msg ": %m", ## __VA_ARGS__)
 
 #define warn(_msg, ...) \
-	syslog(LOG_WARNING, "libminijail: " _msg, ## __VA_ARGS__)
+	syslog(LOG_WARNING, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
 
 #define pwarn(_msg, ...) \
 	warn(_msg ": %m", ## __VA_ARGS__)
 
 #define info(_msg, ...) \
-	syslog(LOG_INFO, "libminijail: " _msg, ## __VA_ARGS__)
+	syslog(LOG_INFO, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
 
 extern const char *log_syscalls[];
 extern const size_t log_syscalls_len;
@@ -63,6 +65,8 @@ char *tokenize(char **stringp, const char *delim);
 int kernel_lessthan_3_8();
 
 char *path_join(const char *external_path, const char *internal_path);
+int write_proc_file(pid_t pid, const char *content, const char *basename);
+int write_pid_to_path(pid_t pid, const char *path);
 
 /*
  * consumebytes: consumes @length bytes from a buffer @buf of length @buflength
