@@ -1538,7 +1538,7 @@ void init_term(int __attribute__ ((unused)) sig)
 	_exit(init_exitstatus);
 }
 
-int init(pid_t rootpid)
+void init(pid_t rootpid)
 {
 	pid_t pid;
 	int status;
@@ -2012,10 +2012,13 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 		 * WARNING above.
 		 */
 		child_pid = fork();
-		if (child_pid < 0)
+		if (child_pid < 0) {
 			_exit(child_pid);
-		else if (child_pid > 0)
-			init(child_pid);	/* never returns */
+		} else if (child_pid > 0) {
+			/* Best effort. Don't bother checking the return value. */
+			prctl(PR_SET_NAME, "minijail-init");
+			init(child_pid);	/* Never returns. */
+		}
 	}
 
 	/*
