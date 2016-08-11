@@ -1148,7 +1148,7 @@ static void kill_child_and_die(const struct minijail *j, const char *msg)
 
 static void write_pid_file_or_die(const struct minijail *j)
 {
-	if (!write_pid_to_path(j->initpid, j->pid_file_path))
+	if (write_pid_to_path(j->initpid, j->pid_file_path))
 		kill_child_and_die(j, "failed to write pid file");
 }
 
@@ -1157,7 +1157,7 @@ static void add_to_cgroups_or_die(const struct minijail *j)
 	size_t i;
 
 	for (i = 0; i < j->cgroup_count; ++i) {
-		if (!write_pid_to_path(j->initpid, j->cgroups[i]))
+		if (write_pid_to_path(j->initpid, j->cgroups[i]))
 			kill_child_and_die(j, "failed to add to cgroups");
 	}
 }
