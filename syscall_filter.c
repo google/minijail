@@ -229,7 +229,8 @@ int compile_atom(struct filter_block *head, char *atom,
 	return 0;
 }
 
-int compile_errno(struct filter_block *head, char *ret_errno)
+int compile_errno(struct filter_block *head, char *ret_errno,
+		  int log_failures)
 {
 	char *errno_ptr;
 
@@ -249,14 +250,18 @@ int compile_errno(struct filter_block *head, char *ret_errno)
 
 		append_ret_errno(head, errno_val);
 	} else {
-		append_ret_kill(head);
+		if (!log_failures)
+			append_ret_kill(head);
+		else
+			append_ret_trap(head);
 	}
 	return 0;
 }
 
 struct filter_block *compile_section(int nr, const char *policy_line,
 				     unsigned int entry_lbl_id,
-				     struct bpf_labels *labels)
+				     struct bpf_labels *labels,
+				     int log_failures)
 {
 	/*
 	 * |policy_line| should be an expression of the form:
@@ -318,7 +323,7 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 
 	/* Checks whether we're unconditionally blocking this syscall. */
 	if (strncmp(line, "return", strlen("return")) == 0) {
-		if (compile_errno(head, line) < 0)
+		if (compile_errno(head, line, log_failures) < 0)
 			return NULL;
 		free(line);
 		return head;
@@ -366,10 +371,13 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	 * otherwise just kill the task.
 	 */
 	if (ret_errno) {
-		if (compile_errno(head, ret_errno) < 0)
+		if (compile_errno(head, ret_errno, log_failures) < 0)
 			return NULL;
 	} else {
-		append_ret_kill(head);
+		if (!log_failures)
+			append_ret_kill(head);
+		else
+			append_ret_trap(head);
 	}
 
 	/*
@@ -480,7 +488,8 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog, int log_failures)
 
 			/* Build the arg filter block. */
 			struct filter_block *block =
-			    compile_section(nr, policy_line, id, &labels);
+			    compile_section(nr, policy_line, id, &labels,
+					    log_failures);
 
 			if (!block)
 				return -1;
