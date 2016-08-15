@@ -63,6 +63,13 @@ do {	\
 			BPF_RET+BPF_K, SECCOMP_RET_KILL);	\
 } while (0)
 
+#define EXPECT_TRAP(_block) \
+do {	\
+	EXPECT_EQ((_block)->len, 1U);				\
+	EXPECT_EQ_STMT((_block)->instrs,			\
+			BPF_RET+BPF_K, SECCOMP_RET_TRAP);	\
+} while (0)
+
 #define EXPECT_ALLOW(_block) \
 do {	\
 	EXPECT_EQ((_block)->len, 2U);				\
@@ -252,7 +259,7 @@ TEST_F(arg_filter, arg0_equals) {
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels);
+		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -294,7 +301,7 @@ TEST_F(arg_filter, arg0_mask) {
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels);
+		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -336,7 +343,7 @@ TEST_F(arg_filter, arg0_eq_mask) {
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels);
+		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -381,7 +388,7 @@ TEST_F(arg_filter, and_or) {
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels);
+		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + 3 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
 	EXPECT_EQ(block->total_len, exp_total_len);
@@ -439,7 +446,7 @@ TEST_F(arg_filter, ret_errno) {
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels);
+		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + 2 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
 	EXPECT_EQ(block->total_len, exp_total_len);
@@ -495,7 +502,7 @@ TEST_F(arg_filter, unconditional_errno) {
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels);
+		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 2;
 	EXPECT_EQ(block->total_len, exp_total_len);
@@ -526,12 +533,144 @@ TEST_F(arg_filter, invalid) {
 	unsigned int id = 0;
 
 	struct filter_block *block =
-			compile_section(nr, fragment, id, &self->labels);
+			compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_EQ(block, NULL);
 
 	fragment = "arg0 == 0 && arg1 == 1; return errno";
-	block = compile_section(nr, fragment, id, &self->labels);
+	block = compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_EQ(block, NULL);
+}
+
+TEST_F(arg_filter, log_no_ret_error) {
+	const char *fragment = "arg0 == 0";
+	int nr = 1;
+	unsigned int id = 0;
+	struct filter_block *block =
+		compile_section(nr, fragment, id, &self->labels, USE_LOGGING);
+
+	ASSERT_NE(block, NULL);
+	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+	EXPECT_EQ(block->total_len, exp_total_len);
+
+	/* First block is a label. */
+	struct filter_block *curr_block = block;
+	ASSERT_NE(curr_block, NULL);
+	EXPECT_EQ(block->len, 1U);
+	EXPECT_LBL(curr_block->instrs);
+
+	/* Second block is a comparison. */
+	curr_block = block->next;
+	EXPECT_COMP(curr_block);
+
+	/* Third block is a jump and a label (end of AND group). */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_GROUP_END(curr_block);
+
+	/* Fourth block is SECCOMP_RET_TRAP, with no errno. */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_TRAP(curr_block);
+
+	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_ALLOW(curr_block);
+
+	EXPECT_EQ(curr_block->next, NULL);
+
+	free_block_list(block);
+	free_label_strings(&self->labels);
+}
+
+TEST_F(arg_filter, log_bad_ret_error) {
+	const char *fragment = "arg0 == 0; return";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_NE(block, NULL);
+	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+	EXPECT_EQ(block->total_len, exp_total_len);
+
+	/* First block is a label. */
+	struct filter_block *curr_block = block;
+	ASSERT_NE(curr_block, NULL);
+	EXPECT_EQ(block->len, 1U);
+	EXPECT_LBL(curr_block->instrs);
+
+	/* Second block is a comparison ("arg0 == 0"). */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_COMP(curr_block);
+
+	/* Third block is a jump and a label (end of AND group). */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_GROUP_END(curr_block);
+
+	/*
+	 * Sixth block is NOT SECCOMP_RET_ERRNO, it should be SECCOMP_RET_KILL.
+	 */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_KILL(curr_block);
+
+	/* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_ALLOW(curr_block);
+
+	EXPECT_EQ(curr_block->next, NULL);
+
+	free_block_list(block);
+	free_label_strings(&self->labels);
+}
+
+TEST_F(arg_filter, no_log_bad_ret_error) {
+	const char *fragment = "arg0 == 0; return";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+		compile_section(nr, fragment, id, &self->labels, USE_LOGGING);
+	ASSERT_NE(block, NULL);
+	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+	EXPECT_EQ(block->total_len, exp_total_len);
+
+	/* First block is a label. */
+	struct filter_block *curr_block = block;
+	ASSERT_NE(curr_block, NULL);
+	EXPECT_EQ(block->len, 1U);
+	EXPECT_LBL(curr_block->instrs);
+
+	/* Second block is a comparison ("arg0 == 0"). */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_COMP(curr_block);
+
+	/* Third block is a jump and a label (end of AND group). */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_GROUP_END(curr_block);
+
+	/*
+	 * Sixth block is NOT SECCOMP_RET_ERRNO, it should be SECCOMP_RET_TRAP.
+	 */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_TRAP(curr_block);
+
+	/* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
+	curr_block = curr_block->next;
+	EXPECT_NE(curr_block, NULL);
+	EXPECT_ALLOW(curr_block);
+
+	EXPECT_EQ(curr_block->next, NULL);
+
+	free_block_list(block);
+	free_label_strings(&self->labels);
 }
 
 FIXTURE(filter) {};
