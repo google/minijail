@@ -14,6 +14,10 @@
 #define NO_LOGGING  0
 #define USE_LOGGING 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct filter_block {
 	struct sock_filter *instrs;
 	size_t len;
@@ -36,5 +40,9 @@ int flatten_block_list(struct filter_block *head, struct sock_filter *filter,
 void free_block_list(struct filter_block *head);
 
 int seccomp_can_softfail();
+
+#ifdef __cplusplus
+}; /* extern "C" */
+#endif
 
 #endif /* SYSCALL_FILTER_H */

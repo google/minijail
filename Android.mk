@@ -164,6 +164,27 @@ LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
 
 
+# libminijail native unit tests using gtest. Run with:
+# adb shell /data/nativetest/libminijail_unittest_gtest/libminijail_unittest_gtest
+# =========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := libminijail_unittest_gtest
+
+LOCAL_CFLAGS := $(minijailCommonCFlags) -Wno-writable-strings
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	bpf.c \
+	libminijail.c \
+	signal_handler.c \
+	syscall_filter.c \
+	util.c \
+	libminijail_unittest.cpp \
+
+LOCAL_STATIC_LIBRARIES := libminijail_generated
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
+include $(BUILD_NATIVE_TEST)
+
+
 # libminijail native unit tests for the host. Run with:
 # out/host/linux-x86/nativetest(64)/libminijail_unittest/libminijail_unittest
 # =========================================================
