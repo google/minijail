@@ -16,6 +16,10 @@
 #include <stddef.h>
 #include <sys/user.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "arch.h"
 
 #if __BITS_PER_LONG == 32 || defined(__ILP32__)
@@ -26,7 +30,7 @@
 
 /* Constants for comparison operators. */
 #define MIN_OPERATOR 128
-enum operator {
+enum {
 	EQ = MIN_OPERATOR,
 	NE,
 	LT,
@@ -121,8 +125,8 @@ struct bpf_labels {
 
 /* BPF instruction manipulation functions and macros. */
 static inline size_t set_bpf_instr(struct sock_filter *instr,
-	unsigned short code, unsigned int k,
-	unsigned char jt, unsigned char jf)
+				   unsigned short code, unsigned int k,
+				   unsigned char jt, unsigned char jf)
 {
 	instr->code = code;
 	instr->k = k;
@@ -188,5 +192,9 @@ size_t bpf_allow_syscall_args(struct sock_filter *filter,
 /* Debug functions. */
 void dump_bpf_prog(struct sock_fprog *fprog);
 void dump_bpf_filter(struct sock_filter *filter, unsigned short len);
+
+#ifdef __cplusplus
+}; /* extern "C" */
+#endif
 
 #endif /* BPF_H */

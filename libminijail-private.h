@@ -10,6 +10,10 @@
 #ifndef LIBMINIJAIL_PRIVATE_H
 #define LIBMINIJAIL_PRIVATE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Explicitly declare exported functions so that -fvisibility tricks
  * can be used for testing and minimal symbol leakage occurs.
  */
@@ -82,5 +86,9 @@ extern void minijail_preexec(struct minijail *j);
  * @j jail to strip
  */
 extern void minijail_preenter(struct minijail *j);
+
+#ifdef __cplusplus
+}; /* extern "C" */
+#endif
 
 #endif /* !LIBMINIJAIL_PRIVATE_H */
