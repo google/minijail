@@ -268,4 +268,6 @@ void free_label_strings(struct bpf_labels *labels)
 		if (begin->label)
 			free((void*)(begin->label));
 	}
+
+	labels->count = 0;
 }
