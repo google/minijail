@@ -14,6 +14,10 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define die(_msg, ...) do { \
 	syslog(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__); \
 	abort(); \
@@ -86,5 +90,9 @@ void *consumebytes(size_t length, char **buf, size_t *buflength);
  * Returns a pointer to the base of the string, or NULL for errors.
  */
 char *consumestr(char **buf, size_t *buflength);
+
+#ifdef __cplusplus
+}; /* extern "C" */
+#endif
 
 #endif /* _UTIL_H_ */
