@@ -643,33 +643,78 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 	return minijail_mount(j, src, dest, "", flags);
 }
 
-void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
+static int seccomp_should_parse_filters(struct minijail *j)
 {
 	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL)) {
+		/*
+		 * |errno| will be set to EINVAL when seccomp has not been
+		 * compiled into the kernel. On certain platforms and kernel
+		 * versions this is not a fatal failure. In that case, and only
+		 * in that case, disable seccomp and skip loading the filters.
+		 */
 		if ((errno == EINVAL) && seccomp_can_softfail()) {
-			warn("not loading seccomp filter,"
+			warn("not loading seccomp filters,"
 			     " seccomp not supported");
 			j->flags.seccomp_filter = 0;
 			j->flags.log_seccomp_filter = 0;
 			j->filter_len = 0;
 			j->filter_prog = NULL;
 			j->flags.no_new_privs = 0;
+			return 0;
 		}
+		/*
+		 * If |errno| != EINVAL or seccomp_can_softfail() is false,
+		 * we can proceed. Worst case scenario minijail_enter() will
+		 * abort() if seccomp fails.
+		 */
 	}
+	return 1;
+}
+
+static int parse_seccomp_filters(struct minijail *j, FILE *policy_file)
+{
+	struct sock_fprog *fprog = malloc(sizeof(struct sock_fprog));
+	if (compile_filter(policy_file, fprog, j->flags.log_seccomp_filter)) {
+		free(fprog);
+		return -1;
+	}
+
+	j->filter_len = fprog->len;
+	j->filter_prog = fprog;
+	return 0;
+}
+
+void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
+{
+	if (!seccomp_should_parse_filters(j))
+		return;
+
 	FILE *file = fopen(path, "r");
 	if (!file) {
 		pdie("failed to open seccomp filter file '%s'", path);
 	}
 
-	struct sock_fprog *fprog = malloc(sizeof(struct sock_fprog));
-	if (compile_filter(file, fprog, j->flags.log_seccomp_filter)) {
+	if (parse_seccomp_filters(j, file) != 0) {
 		die("failed to compile seccomp filter BPF program in '%s'",
 		    path);
 	}
+	fclose(file);
+}
 
-	j->filter_len = fprog->len;
-	j->filter_prog = fprog;
+void API minijail_parse_seccomp_filters_from_fd(struct minijail *j, int fd)
+{
+	if (!seccomp_should_parse_filters(j))
+		return;
 
+	FILE *file = fdopen(fd, "r");
+	if (!file) {
+		pdie("failed to associate stream with fd %d", fd);
+	}
+
+	if (parse_seccomp_filters(j, file) != 0) {
+		die("failed to compile seccomp filter BPF program from fd %d",
+		    fd);
+	}
 	fclose(file);
 }
 
