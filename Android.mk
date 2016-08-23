@@ -226,6 +226,25 @@ LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
 
 
+# Syscall filtering native unit tests using gtest. Run with:
+# adb shell /data/nativetest/syscall_filter_unittest_gtest/syscall_filter_unittest_gtest
+# =========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := syscall_filter_unittest_gtest
+
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	bpf.c \
+	syscall_filter.c \
+	util.c \
+	syscall_filter_unittest.cpp \
+
+LOCAL_STATIC_LIBRARIES := libminijail_generated
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
+include $(BUILD_NATIVE_TEST)
+
+
 # Syscall filtering native unit tests for the host. Run with:
 # out/host/linux-x86/nativetest(64)/syscall_filter_unittest/syscall_filter_unittest
 # =========================================================

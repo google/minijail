@@ -8,7 +8,7 @@
 
 #include <asm/unistd.h>
 #include <errno.h>
-#include <fcntl.h>	/* For O_WRONLY */
+#include <fcntl.h>	/* For O_WRONLY. */
 
 #include "test_harness.h"
 
@@ -17,91 +17,7 @@
 
 #include "util.h"
 
-/* BPF testing macros. */
-#define EXPECT_EQ_BLOCK(_block, _code, _k, _jt, _jf)	\
-do {	\
-	EXPECT_EQ((_block)->code, _code);		\
-	EXPECT_EQ((_block)->k, (unsigned int)(_k));	\
-	EXPECT_EQ((_block)->jt, _jt);			\
-	EXPECT_EQ((_block)->jf, _jf);			\
-} while (0)
-
-#define EXPECT_EQ_STMT(_block, _code, _k) \
-	EXPECT_EQ_BLOCK(_block, _code, _k, 0, 0)
-
-#define EXPECT_COMP(_block) \
-do {	\
-	EXPECT_EQ((_block)->len, BPF_ARG_COMP_LEN + 1);			\
-	EXPECT_EQ((_block)->instrs->code, BPF_LD+BPF_W+BPF_ABS);	\
-} while (0)
-
-#define EXPECT_LBL(_block) \
-	do {	\
-	EXPECT_EQ((_block)->code, BPF_JMP+BPF_JA);	\
-	EXPECT_EQ((_block)->jt, LABEL_JT);		\
-	EXPECT_EQ((_block)->jf, LABEL_JF);		\
-} while (0)
-
-#define EXPECT_JUMP_LBL(_block) \
-do {	\
-	EXPECT_EQ((_block)->code, BPF_JMP+BPF_JA);	\
-	EXPECT_EQ((_block)->jt, JUMP_JT);		\
-	EXPECT_EQ((_block)->jf, JUMP_JF);		\
-} while (0)
-
-#define EXPECT_GROUP_END(_block) \
-do {	\
-	EXPECT_EQ((_block)->len, 2U);			\
-	EXPECT_JUMP_LBL(&(_block)->instrs[0]);		\
-	EXPECT_LBL(&(_block)->instrs[1]);		\
-} while (0)
-
-#define EXPECT_KILL(_block) \
-do {	\
-	EXPECT_EQ((_block)->len, 1U);				\
-	EXPECT_EQ_STMT((_block)->instrs,			\
-			BPF_RET+BPF_K, SECCOMP_RET_KILL);	\
-} while (0)
-
-#define EXPECT_TRAP(_block) \
-do {	\
-	EXPECT_EQ((_block)->len, 1U);				\
-	EXPECT_EQ_STMT((_block)->instrs,			\
-			BPF_RET+BPF_K, SECCOMP_RET_TRAP);	\
-} while (0)
-
-#define EXPECT_ALLOW(_block) \
-do {	\
-	EXPECT_EQ((_block)->len, 2U);				\
-	EXPECT_LBL(&(_block)->instrs[0]);			\
-	EXPECT_EQ_STMT(&(_block)->instrs[1],			\
-			BPF_RET+BPF_K, SECCOMP_RET_ALLOW);	\
-} while (0)
-
-#define EXPECT_ARCH_VALIDATION(_filter) \
-do {	\
-	EXPECT_EQ_STMT(&(_filter)[0], BPF_LD+BPF_W+BPF_ABS, arch_nr);	\
-	EXPECT_EQ_BLOCK(&(_filter)[1],					\
-			BPF_JMP+BPF_JEQ+BPF_K, ARCH_NR, SKIP, NEXT);	\
-	EXPECT_EQ_STMT(&(_filter)[2], BPF_RET+BPF_K, SECCOMP_RET_KILL);	\
-} while (0)
-
-#define EXPECT_ALLOW_SYSCALL(_filter, _nr) \
-do {	\
-	EXPECT_EQ_BLOCK(&(_filter)[0],					\
-			BPF_JMP+BPF_JEQ+BPF_K, (_nr), NEXT, SKIP);	\
-	EXPECT_EQ_STMT(&(_filter)[1],					\
-			BPF_RET+BPF_K, SECCOMP_RET_ALLOW);		\
-} while (0)
-
-#define EXPECT_ALLOW_SYSCALL_ARGS(_filter, _nr, _id, _jt, _jf) \
-do {	\
-	EXPECT_EQ_BLOCK(&(_filter)[0],					\
-			BPF_JMP+BPF_JEQ+BPF_K, (_nr), NEXT, SKIP);	\
-	EXPECT_EQ_BLOCK(&(_filter)[1],					\
-			BPF_JMP+BPF_JA, (_id), (_jt), (_jf));		\
-} while (0)
-
+#include "syscall_filter_unittest_macros.h"
 
 FIXTURE(bpf) {};
 
@@ -252,7 +168,9 @@ FIXTURE(arg_filter) {
 };
 
 FIXTURE_SETUP(arg_filter) {}
-FIXTURE_TEARDOWN(arg_filter) {}
+FIXTURE_TEARDOWN(arg_filter) {
+	free_label_strings(&self->labels);
+}
 
 TEST_F(arg_filter, arg0_equals) {
 	const char *fragment = "arg0 == 0";
@@ -273,27 +191,27 @@ TEST_F(arg_filter, arg0_equals) {
 
 	/* Second block is a comparison. */
 	curr_block = block->next;
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Third block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
-	/* Fourth block is SECCOMP_RET_KILL */
+	/* Fourth block is SECCOMP_RET_KILL. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_KILL(curr_block);
 
-	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW */
+	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_ALLOW(curr_block);
 
 	EXPECT_EQ(curr_block->next, NULL);
 
 	free_block_list(block);
-	free_label_strings(&self->labels);
 }
 
 TEST_F(arg_filter, arg0_mask) {
@@ -315,27 +233,27 @@ TEST_F(arg_filter, arg0_mask) {
 
 	/* Second block is a comparison. */
 	curr_block = block->next;
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Third block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
-	/* Fourth block is SECCOMP_RET_KILL */
+	/* Fourth block is SECCOMP_RET_KILL. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_KILL(curr_block);
 
-	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW */
+	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_ALLOW(curr_block);
 
 	EXPECT_EQ(curr_block->next, NULL);
 
 	free_block_list(block);
-	free_label_strings(&self->labels);
 }
 
 TEST_F(arg_filter, arg0_eq_mask) {
@@ -357,29 +275,29 @@ TEST_F(arg_filter, arg0_eq_mask) {
 
 	/* Second block is a comparison. */
 	curr_block = block->next;
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 	EXPECT_EQ(curr_block->instrs[BPF_ARG_COMP_LEN  - 1].k,
 		(unsigned int)(O_WRONLY | O_CREAT));
 
 	/* Third block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
-	/* Fourth block is SECCOMP_RET_KILL */
+	/* Fourth block is SECCOMP_RET_KILL. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_KILL(curr_block);
 
-	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW */
+	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_ALLOW(curr_block);
 
 	EXPECT_EQ(curr_block->next, NULL);
 
 	free_block_list(block);
-	free_label_strings(&self->labels);
 }
 
 TEST_F(arg_filter, and_or) {
@@ -401,37 +319,37 @@ TEST_F(arg_filter, and_or) {
 
 	/* Second block is a comparison ("arg0 == 0"). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Third block is a comparison ("arg1 == 0"). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Fourth block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
 	/* Fifth block is a comparison ("arg0 == 1"). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Sixth block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
-	/* Seventh block is SECCOMP_RET_KILL */
+	/* Seventh block is SECCOMP_RET_KILL. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_KILL(curr_block);
 
-	/* Eigth block is "SUCCESS" label and SECCOMP_RET_ALLOW */
+	/* Eigth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_ALLOW(curr_block);
 
 	EXPECT_EQ(curr_block->next, NULL);
@@ -459,35 +377,35 @@ TEST_F(arg_filter, ret_errno) {
 
 	/* Second block is a comparison ("arg0 == 0"). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Third block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
 	/* Fourth block is a comparison ("arg0 == 1"). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Fifth block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
-	/* Sixth block is SECCOMP_RET_ERRNO */
+	/* Sixth block is SECCOMP_RET_ERRNO. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_EQ(curr_block->len, 1U);
 	EXPECT_EQ_STMT(curr_block->instrs,
 			BPF_RET+BPF_K,
 			SECCOMP_RET_ERRNO | (1 & SECCOMP_RET_DATA));
 
-	/* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW */
+	/* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_ALLOW(curr_block);
 
 	EXPECT_EQ(curr_block->next, NULL);
@@ -513,9 +431,9 @@ TEST_F(arg_filter, unconditional_errno) {
 	EXPECT_EQ(block->len, 1U);
 	EXPECT_LBL(curr_block->instrs);
 
-	/* Second block is SECCOMP_RET_ERRNO */
+	/* Second block is SECCOMP_RET_ERRNO. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_EQ(curr_block->len, 1U);
 	EXPECT_EQ_STMT(curr_block->instrs,
 			BPF_RET+BPF_K,
@@ -560,21 +478,22 @@ TEST_F(arg_filter, log_no_ret_error) {
 
 	/* Second block is a comparison. */
 	curr_block = block->next;
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Third block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
 	/* Fourth block is SECCOMP_RET_TRAP, with no errno. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_TRAP(curr_block);
 
 	/* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_ALLOW(curr_block);
 
 	EXPECT_EQ(curr_block->next, NULL);
@@ -602,24 +521,24 @@ TEST_F(arg_filter, log_bad_ret_error) {
 
 	/* Second block is a comparison ("arg0 == 0"). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Third block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
 	/*
 	 * Sixth block is NOT SECCOMP_RET_ERRNO, it should be SECCOMP_RET_KILL.
 	 */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_KILL(curr_block);
 
 	/* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_ALLOW(curr_block);
 
 	EXPECT_EQ(curr_block->next, NULL);
@@ -647,24 +566,24 @@ TEST_F(arg_filter, no_log_bad_ret_error) {
 
 	/* Second block is a comparison ("arg0 == 0"). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
 
 	/* Third block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_GROUP_END(curr_block);
 
 	/*
 	 * Sixth block is NOT SECCOMP_RET_ERRNO, it should be SECCOMP_RET_TRAP.
 	 */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_TRAP(curr_block);
 
 	/* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
-	EXPECT_NE(curr_block, NULL);
+	ASSERT_NE(curr_block, NULL);
 	EXPECT_ALLOW(curr_block);
 
 	EXPECT_EQ(curr_block->next, NULL);
