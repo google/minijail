@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/utsname.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -189,15 +188,6 @@ char *tokenize(char **stringp, const char *delim)
 	}
 
 	return ret;
-}
-
-int kernel_lessthan_3_8()
-{
-	int major, minor;
-	struct utsname uts;
-	return (uname(&uts) != -1 &&
-			sscanf(uts.release, "%d.%d", &major, &minor) == 2 &&
-			((major < 3) || ((major == 3) && (minor < 8))));
 }
 
 char *path_join(const char *external_path, const char *internal_path)

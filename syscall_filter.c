@@ -20,17 +20,7 @@
 int seccomp_can_softfail()
 {
 #if defined(USE_SECCOMP_SOFTFAIL)
-	/*
-	 * On Android devices seccomp is allowed to soft-fail on kernels < 3.8.
-	 */
-	if (is_android()) {
-		if (kernel_lessthan_3_8())
-			return 1;
-		else
-			return 0;
-	} else {
-		return 1;
-	}
+	return 1;
 #endif
 	return 0;
 }
