@@ -66,8 +66,6 @@ long int parse_constant(char *constant_str, char **endptr);
 char *strip(char *s);
 char *tokenize(char **stringp, const char *delim);
 
-int kernel_lessthan_3_8();
-
 char *path_join(const char *external_path, const char *internal_path);
 int write_proc_file(pid_t pid, const char *content, const char *basename);
 int write_pid_to_path(pid_t pid, const char *path);
