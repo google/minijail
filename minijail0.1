@@ -3,7 +3,7 @@
 minijail0 \- sandbox a process
 .SH SYNOPSIS
 .B minijail0
-[\fIOPTION\fR]... <\fIprogram\fR> [\fIargs\fR]...
+[\fIOPTION\fR]... <\fIPROGRAM\fR> [\fIargs\fR]...
 .SH DESCRIPTION
 .PP
 Runs PROGRAM inside a sandbox.
@@ -134,6 +134,9 @@ independent of the rest of the system's.
 .TP
 \fB-V <file>\fR
 Enter the VFS namespace specified by \fIfile\fR.
+.TP
+\fB-Y\fR
+Synchronize seccomp filters across thread group.
 .SH IMPLEMENTATION
 This program is broken up into two parts: \fBminijail0\fR (the frontend) and a helper
 library called \fBlibminijailpreload\fR. Some jailings can only be achieved from

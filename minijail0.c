@@ -110,7 +110,7 @@ static void usage(const char *progn)
 {
 	size_t i;
 
-	printf("Usage: %s [-GhHiIKlLnNprstUv]\n"
+	printf("Usage: %s [-GhHiIKlLnNprstUvY]\n"
 	       "  [-a <table>]\n"
 	       "  [-b <src>,<dest>[,<writeable>]] [-k <src>,<dest>,<type>[,<flags>][,<data>]]\n"
 	       "  [-c <caps>] [-C <dir>] [-P <dir>] [-e[file]] [-f <file>] [-g <group>]\n"
@@ -166,7 +166,8 @@ static void usage(const char *progn)
 	       "  -u <user>:  Change uid to <user>.\n"
 	       "  -U:         Enter new user namespace (implies -p).\n"
 	       "  -v:         Enter new mount namespace.\n"
-	       "  -V <file>:  Enter specified mount namespace.\n");
+	       "  -V <file>:  Enter specified mount namespace.\n"
+	       "  -Y:         Synchronize seccomp filters across thread group.\n");
 }
 
 static void seccomp_filter_usage(const char *progn)
@@ -194,7 +195,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		return 1;
 
 	const char *optstring =
-	    "u:g:sS:c:C:P:b:V:f:m::M:k:a:e::T:vrGhHinNplLtIUK";
+	    "u:g:sS:c:C:P:b:V:f:m::M:k:a:e::T:vrGhHinNplLtIUKY";
 	while ((opt = getopt(argc, argv, optstring)) != -1) {
 		switch (opt) {
 		case 'u':
@@ -362,6 +363,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 						"'dynamic'.\n");
 				exit(1);
 			}
+			break;
+		case 'Y':
+			minijail_set_seccomp_filter_tsync(j);
 			break;
 		default:
 			usage(argv[0]);
