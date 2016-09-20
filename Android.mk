@@ -22,6 +22,7 @@ libminijailSrcFiles := \
 	libminijail.c \
 	signal_handler.c \
 	syscall_filter.c \
+	syscall_wrapper.c \
 	util.c
 
 hostUnittestSrcFiles := \
@@ -144,12 +145,8 @@ LOCAL_MODULE := libminijail_unittest
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
-	bpf.c \
-	libminijail.c \
+	$(libminijailSrcFiles) \
 	libminijail_unittest.c \
-	signal_handler.c \
-	syscall_filter.c \
-	util.c \
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
@@ -165,11 +162,7 @@ LOCAL_MODULE := libminijail_unittest_gtest
 LOCAL_CFLAGS := $(minijailCommonCFlags) -Wno-writable-strings
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
-	bpf.c \
-	libminijail.c \
-	signal_handler.c \
-	syscall_filter.c \
-	util.c \
+	$(libminijailSrcFiles) \
 	libminijail_unittest.cpp \
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
@@ -179,24 +172,21 @@ include $(BUILD_NATIVE_TEST)
 
 # libminijail native unit tests for the host. Run with:
 # out/host/linux-x86/nativetest(64)/libminijail_unittest/libminijail_unittest
+# TODO(b/31395668): Re-enable once the seccomp(2) syscall becomes available.
 # =========================================================
-include $(CLEAR_VARS)
-LOCAL_MODULE := libminijail_unittest
-LOCAL_MODULE_HOST_OS := linux
+# include $(CLEAR_VARS)
+# LOCAL_MODULE := libminijail_unittest
+# LOCAL_MODULE_HOST_OS := linux
 
-LOCAL_CFLAGS := $(minijailCommonCFlags) -DPRELOADPATH=\"/invalid\"
-LOCAL_CLANG := true
-LOCAL_SRC_FILES := \
-	bpf.c \
-	libminijail.c \
-	libminijail_unittest.c \
-	signal_handler.c \
-	syscall_filter.c \
-	util.c \
-	$(hostUnittestSrcFiles)
+# LOCAL_CFLAGS := $(minijailCommonCFlags) -DPRELOADPATH=\"/invalid\"
+# LOCAL_CLANG := true
+# LOCAL_SRC_FILES := \
+# 	$(libminijailSrcFiles) \
+# 	libminijail_unittest.c \
+# 	$(hostUnittestSrcFiles)
 
-LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
-include $(BUILD_HOST_NATIVE_TEST)
+# LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
+# include $(BUILD_HOST_NATIVE_TEST)
 
 
 # Syscall filtering native unit tests. Run with:

@@ -40,6 +40,7 @@
 
 #include "signal_handler.h"
 #include "syscall_filter.h"
+#include "syscall_wrapper.h"
 #include "util.h"
 
 #ifdef HAVE_SECUREBITS_H
@@ -73,13 +74,26 @@ _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 # define PR_ALT_SYSCALL 0x43724f53
 #endif
 
-/* For seccomp_filter using BPF. */
+/* Seccomp filter related flags. */
 #ifndef PR_SET_NO_NEW_PRIVS
 # define PR_SET_NO_NEW_PRIVS 38
 #endif
+
 #ifndef SECCOMP_MODE_FILTER
 # define SECCOMP_MODE_FILTER 2 /* uses user-supplied filter. */
 #endif
+
+#ifndef SECCOMP_SET_MODE_STRICT
+# define SECCOMP_SET_MODE_STRICT 0
+#endif
+#ifndef SECCOMP_SET_MODE_FILTER
+# define SECCOMP_SET_MODE_FILTER 1
+#endif
+
+#ifndef SECCOMP_FILTER_FLAG_TSYNC
+# define SECCOMP_FILTER_FLAG_TSYNC 1
+#endif
+/* End seccomp filter related flags. */
 
 /* New cgroup namespace might not be in linux-headers yet. */
 #ifndef CLONE_NEWCGROUP
@@ -123,6 +137,7 @@ struct minijail {
 		int remount_proc_ro:1;
 		int no_new_privs:1;
 		int seccomp_filter:1;
+		int seccomp_filter_tsync:1;
 		int log_seccomp_filter:1;
 		int chroot:1;
 		int pivot_root:1;
@@ -331,6 +346,11 @@ void API minijail_no_new_privs(struct minijail *j)
 void API minijail_use_seccomp_filter(struct minijail *j)
 {
 	j->flags.seccomp_filter = 1;
+}
+
+void API minijail_set_seccomp_filter_tsync(struct minijail *j)
+{
+	j->flags.seccomp_filter_tsync = 1;
 }
 
 void API minijail_log_seccomp_filter_failures(struct minijail *j)
@@ -643,9 +663,19 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 	return minijail_mount(j, src, dest, "", flags);
 }
 
+static void clear_seccomp_options(struct minijail *j)
+{
+	j->flags.seccomp_filter = 0;
+	j->flags.seccomp_filter_tsync = 0;
+	j->flags.log_seccomp_filter = 0;
+	j->filter_len = 0;
+	j->filter_prog = NULL;
+	j->flags.no_new_privs = 0;
+}
+
 static int seccomp_should_parse_filters(struct minijail *j)
 {
-	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL)) {
+	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL) == -1) {
 		/*
 		 * |errno| will be set to EINVAL when seccomp has not been
 		 * compiled into the kernel. On certain platforms and kernel
@@ -653,13 +683,9 @@ static int seccomp_should_parse_filters(struct minijail *j)
 		 * in that case, disable seccomp and skip loading the filters.
 		 */
 		if ((errno == EINVAL) && seccomp_can_softfail()) {
-			warn("not loading seccomp filters,"
-			     " seccomp not supported");
-			j->flags.seccomp_filter = 0;
-			j->flags.log_seccomp_filter = 0;
-			j->filter_len = 0;
-			j->filter_prog = NULL;
-			j->flags.no_new_privs = 0;
+			warn("not loading seccomp filters, seccomp filter not "
+			     "supported");
+			clear_seccomp_options(j);
 			return 0;
 		}
 		/*
@@ -667,6 +693,32 @@ static int seccomp_should_parse_filters(struct minijail *j)
 		 * we can proceed. Worst case scenario minijail_enter() will
 		 * abort() if seccomp fails.
 		 */
+	}
+	if (j->flags.seccomp_filter_tsync) {
+		/* Are the seccomp(2) syscall and the TSYNC option supported? */
+		if (sys_seccomp(SECCOMP_SET_MODE_FILTER,
+				SECCOMP_FILTER_FLAG_TSYNC, NULL) == -1) {
+			int saved_errno = errno;
+			if (seccomp_can_softfail()) {
+				if (saved_errno == ENOSYS) {
+					warn(
+					    "seccomp(2) syscall not supported");
+					clear_seccomp_options(j);
+				}
+				if (saved_errno == EINVAL) {
+					warn("seccomp filter thread sync not "
+					     "supported");
+					clear_seccomp_options(j);
+				}
+				return 0;
+			}
+			/*
+			 * Similar logic here. If seccomp_can_softfail() is
+			 * false, or |errno| != ENOSYS, or |errno| != EINVAL,
+			 * we can proceed. Worst case scenario minijail_enter()
+			 * will abort() if seccomp or TSYNC fail.
+			 */
+		}
 	}
 	return 1;
 }
@@ -1415,13 +1467,17 @@ static void set_seccomp_filter(const struct minijail *j)
 	 * Install the syscall filter.
 	 */
 	if (j->flags.seccomp_filter) {
-		if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER,
-			  j->filter_prog)) {
-			if ((errno == EINVAL) && seccomp_can_softfail()) {
-				warn("seccomp not supported");
-				return;
+		if (j->flags.seccomp_filter_tsync) {
+			if (sys_seccomp(SECCOMP_SET_MODE_FILTER,
+					SECCOMP_FILTER_FLAG_TSYNC,
+					j->filter_prog)) {
+				pdie("seccomp(tsync) failed");
 			}
-			pdie("prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER)");
+		} else {
+			if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER,
+				  j->filter_prog)) {
+				pdie("prctl(seccomp_filter) failed");
+			}
 		}
 	}
 }
@@ -2060,7 +2116,9 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 		if (child_pid < 0) {
 			_exit(child_pid);
 		} else if (child_pid > 0) {
-			/* Best effort. Don't bother checking the return value. */
+			/*
+			 * Best effort. Don't bother checking the return value.
+			 */
 			prctl(PR_SET_NAME, "minijail-init");
 			init(child_pid);	/* Never returns. */
 		}
