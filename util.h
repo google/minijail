@@ -46,16 +46,10 @@ static inline int is_android() {
 #endif
 }
 
-static inline int running_with_asan() {
-#ifndef __has_feature
-#define __has_feature(x) 0
-#endif
+void __asan_init(void) __attribute__((weak));
 
-#if __has_feature(address_sanitizer)
-	return 1;
-#else
-	return 0;
-#endif
+static inline int running_with_asan() {
+	return &__asan_init != 0;
 }
 
 int lookup_syscall(const char *name);
