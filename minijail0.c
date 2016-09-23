@@ -195,7 +195,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		return 1;
 
 	const char *optstring =
-	    "u:g:sS:c:C:P:b:V:f:m::M:k:a:e::T:vrGhHinNplLtIUKY";
+	    "u:g:sS:c:C:P:b:V:f:m::M::k:a:e::T:vrGhHinNplLtIUKY";
 	while ((opt = getopt(argc, argv, optstring)) != -1) {
 		switch (opt) {
 		case 'u':
@@ -341,10 +341,27 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'M':
 			minijail_namespace_user(j);
 			minijail_namespace_pids(j);
-			if (0 != minijail_gidmap(j, optarg)) {
+
+			if (optarg) {
+				map = strdup(optarg);
+			} else {
+				/*
+				 * If no map is passed, map the current gid to
+				 * root.
+				 * This means that we're likely *not* running as
+				 * root, so we also have to disable
+				 * setgroups(2) to be able to set the gid map.
+				 * See http://man7.org/linux/man-pages/man7/user_namespaces.7.html
+				 */
+				minijail_namespace_user_disable_setgroups(j);
+
+				map = build_idmap(0, getgid());
+			}
+			if (0 != minijail_gidmap(j, map)) {
 				fprintf(stderr, "Could not set gid map.\n");
 				exit(1);
 			}
+			free(map);
 			break;
 		case 'a':
 			if (0 != minijail_use_alt_syscall(j, optarg)) {
