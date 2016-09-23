@@ -75,6 +75,7 @@ void minijail_namespace_cgroups(struct minijail *j);
  */
 void minijail_namespace_pids(struct minijail *j);
 void minijail_namespace_user(struct minijail *j);
+void minijail_namespace_user_disable_setgroups(struct minijail *j);
 int minijail_uidmap(struct minijail *j, const char *uidmap);
 int minijail_gidmap(struct minijail *j, const char *gidmap);
 void minijail_remount_proc_readonly(struct minijail *j);
