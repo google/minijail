@@ -133,6 +133,7 @@ struct minijail {
 		int enter_net:1;
 		int ns_cgroups:1;
 		int userns:1;
+		int disable_setgroups:1;
 		int seccomp:1;
 		int remount_proc_ro:1;
 		int no_new_privs:1;
@@ -461,6 +462,11 @@ void API minijail_remount_proc_readonly(struct minijail *j)
 void API minijail_namespace_user(struct minijail *j)
 {
 	j->flags.userns = 1;
+}
+
+void API minijail_namespace_user_disable_setgroups(struct minijail *j)
+{
+	j->flags.disable_setgroups = 1;
 }
 
 int API minijail_uidmap(struct minijail *j, const char *uidmap)
@@ -1263,6 +1269,9 @@ static void write_ugid_maps_or_die(const struct minijail *j)
 {
 	if (j->uidmap && write_proc_file(j->initpid, j->uidmap, "uid_map") != 0)
 		kill_child_and_die(j, "failed to write uid_map");
+	if (j->gidmap && j->flags.disable_setgroups &&
+	    write_proc_file(j->initpid, "deny", "setgroups") != 0)
+		kill_child_and_die(j, "failed to disable setgroups(2)");
 	if (j->gidmap && write_proc_file(j->initpid, j->gidmap, "gid_map") != 0)
 		kill_child_and_die(j, "failed to write gid_map");
 }
