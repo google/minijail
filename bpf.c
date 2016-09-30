@@ -172,8 +172,8 @@ void dump_bpf_filter(struct sock_filter *filter, unsigned short len)
 	printf("len == %d\n", len);
 	printf("filter:\n");
 	for (i = 0; i < len; i++) {
-		printf("%d: \t{ code=%#x, jt=%u, jf=%u, k=%#x \t}\n",
-			i, filter[i].code, filter[i].jt, filter[i].jf, filter[i].k);
+		printf("%d: \t{ code=%#x, jt=%u, jf=%u, k=%#x \t}\n", i,
+		       filter[i].code, filter[i].jt, filter[i].jf, filter[i].k);
 	}
 }
 
@@ -184,41 +184,48 @@ void dump_bpf_prog(struct sock_fprog *fprog)
 	dump_bpf_filter(filter, len);
 }
 
-int bpf_resolve_jumps(struct bpf_labels *labels,
-		struct sock_filter *filter, size_t count)
+int bpf_resolve_jumps(struct bpf_labels *labels, struct sock_filter *filter,
+		      size_t len)
 {
+	size_t insn;
 	struct sock_filter *begin = filter;
-	__u8 insn = count - 1;
 
-	if (count < 1)
+	/* This needs at least two instructions: one jump and one label. */
+	if (len < 2)
 		return -1;
+
+	if (len > BPF_MAXINSNS)
+		return -1;
+
+	insn = len - 1;
+
 	/*
 	 * Walk it once, backwards, to build the label table and do fixups.
 	 * Since backward jumps are disallowed by BPF, this is easy.
 	 */
 	for (filter += insn; filter >= begin; --insn, --filter) {
-		if (filter->code != (BPF_JMP+BPF_JA))
+		if (filter->code != (BPF_JMP + BPF_JA))
 			continue;
-		switch ((filter->jt<<8)|filter->jf) {
-		case (JUMP_JT<<8)|JUMP_JF:
+		switch ((filter->jt << 8) | filter->jf) {
+		case (JUMP_JT << 8) | JUMP_JF:
 			if (labels->labels[filter->k].location == 0xffffffff) {
 				fprintf(stderr, "Unresolved label: '%s'\n",
 					labels->labels[filter->k].label);
 				return 1;
 			}
-			filter->k = labels->labels[filter->k].location -
-					(insn + 1);
+			filter->k =
+			    labels->labels[filter->k].location - (insn + 1);
 			filter->jt = 0;
 			filter->jf = 0;
 			continue;
-		case (LABEL_JT<<8)|LABEL_JF:
+		case (LABEL_JT << 8) | LABEL_JF:
 			if (labels->labels[filter->k].location != 0xffffffff) {
 				fprintf(stderr, "Duplicate label use: '%s'\n",
 					labels->labels[filter->k].label);
 				return 1;
 			}
 			labels->labels[filter->k].location = insn;
-			filter->k = 0; /* fall through */
+			filter->k = 0; /* Fall through. */
 			filter->jt = 0;
 			filter->jf = 0;
 			continue;
@@ -245,6 +252,11 @@ int bpf_label_id(struct bpf_labels *labels, const char *label)
 	for (id = 0; begin < end; ++begin, ++id) {
 		if (!strcmp(label, begin->label))
 			return id;
+	}
+
+	/* The label wasn't found. Insert it only if there's space. */
+	if (labels->count == BPF_LABELS_MAX) {
+		return -1;
 	}
 	begin->label = strndup(label, MAX_BPF_LABEL_LEN);
 	if (!begin->label) {
