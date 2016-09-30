@@ -19,6 +19,8 @@ endif
 all: CC_BINARY(minijail0) CC_LIBRARY(libminijail.so) \
 		CC_LIBRARY(libminijailpreload.so)
 
+parse_seccomp_policy: CXX_BINARY(parse_seccomp_policy)
+
 # TODO(jorgelo): convert to TEST().
 tests: CC_BINARY(libminijail_unittest) CC_BINARY(syscall_filter_unittest)
 
@@ -30,24 +32,29 @@ clean: CLEAN(minijail0)
 
 CC_LIBRARY(libminijail.so): LDLIBS += -lcap
 CC_LIBRARY(libminijail.so): libminijail.o syscall_filter.o signal_handler.o \
-    bpf.o util.o syscall_wrapper.o libconstants.gen.o libsyscalls.gen.o
+		bpf.o util.o syscall_wrapper.o libconstants.gen.o \
+		libsyscalls.gen.o
 clean: CLEAN(libminijail.so)
 
 CC_BINARY(libminijail_unittest): LDLIBS += -lcap
 CC_BINARY(libminijail_unittest): libminijail_unittest.o libminijail.o \
-		syscall_filter.o signal_handler.o bpf.o util.o syscall_wrapper.o \
-		libconstants.gen.o libsyscalls.gen.o
+		syscall_filter.o signal_handler.o bpf.o util.o \
+		syscall_wrapper.o libconstants.gen.o libsyscalls.gen.o
 clean: CLEAN(libminijail_unittest)
 
 CC_LIBRARY(libminijailpreload.so): LDLIBS += -lcap -ldl
 CC_LIBRARY(libminijailpreload.so): libminijailpreload.o libminijail.o \
-		libconstants.gen.o libsyscalls.gen.o syscall_filter.o signal_handler.o \
-		bpf.o util.o syscall_wrapper.o
+		libconstants.gen.o libsyscalls.gen.o syscall_filter.o \
+		signal_handler.o bpf.o util.o syscall_wrapper.o
 clean: CLEAN(libminijailpreload.so)
 
 CC_BINARY(syscall_filter_unittest): syscall_filter_unittest.o syscall_filter.o \
 		bpf.o util.o libconstants.gen.o libsyscalls.gen.o
 clean: CLEAN(syscall_filter_unittest)
+
+CXX_BINARY(parse_seccomp_policy): parse_seccomp_policy.o syscall_filter.o \
+		bpf.o util.o libconstants.gen.o libsyscalls.gen.o
+clean: CLEAN(parse_policy)
 
 libsyscalls.gen.o: CPPFLAGS += -I$(SRC)
 
