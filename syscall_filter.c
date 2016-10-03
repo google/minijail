@@ -130,7 +130,7 @@ void append_allow_syscall(struct filter_block *head, int nr)
 	append_filter_block(head, filter, len);
 }
 
-void allow_log_syscalls(struct filter_block *head)
+void allow_logging_syscalls(struct filter_block *head)
 {
 	unsigned int i;
 	for (i = 0; i < log_syscalls_len; i++) {
@@ -219,8 +219,7 @@ int compile_atom(struct filter_block *head, char *atom,
 	return 0;
 }
 
-int compile_errno(struct filter_block *head, char *ret_errno,
-		  int log_failures)
+int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
 {
 	char *errno_ptr;
 
@@ -240,7 +239,7 @@ int compile_errno(struct filter_block *head, char *ret_errno,
 
 		append_ret_errno(head, errno_val);
 	} else {
-		if (!log_failures)
+		if (!use_ret_trap)
 			append_ret_kill(head);
 		else
 			append_ret_trap(head);
@@ -251,7 +250,7 @@ int compile_errno(struct filter_block *head, char *ret_errno,
 struct filter_block *compile_section(int nr, const char *policy_line,
 				     unsigned int entry_lbl_id,
 				     struct bpf_labels *labels,
-				     int log_failures)
+				     int use_ret_trap)
 {
 	/*
 	 * |policy_line| should be an expression of the form:
@@ -313,7 +312,7 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 
 	/* Checks whether we're unconditionally blocking this syscall. */
 	if (strncmp(line, "return", strlen("return")) == 0) {
-		if (compile_errno(head, line, log_failures) < 0)
+		if (compile_errno(head, line, use_ret_trap) < 0)
 			return NULL;
 		free(line);
 		return head;
@@ -361,10 +360,10 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	 * otherwise just kill the task.
 	 */
 	if (ret_errno) {
-		if (compile_errno(head, ret_errno, log_failures) < 0)
+		if (compile_errno(head, ret_errno, use_ret_trap) < 0)
 			return NULL;
 	} else {
-		if (!log_failures)
+		if (!use_ret_trap)
 			append_ret_kill(head);
 		else
 			append_ret_trap(head);
@@ -384,7 +383,8 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	return head;
 }
 
-int compile_filter(FILE *policy_file, struct sock_fprog *prog, int log_failures)
+int compile_filter(FILE *policy_file, struct sock_fprog *prog, int use_ret_trap,
+		   int allow_logging)
 {
 	char line[MAX_LINE_LENGTH];
 	int line_count = 0;
@@ -408,9 +408,9 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog, int log_failures)
 	len = bpf_load_syscall_nr(load_nr);
 	append_filter_block(head, load_nr, len);
 
-	/* If we're logging failures, allow the necessary syscalls first. */
-	if (log_failures)
-		allow_log_syscalls(head);
+	/* If logging failures, allow the necessary syscalls first. */
+	if (allow_logging)
+		allow_logging_syscalls(head);
 
 	/*
 	 * Loop through all the lines in the policy file.
@@ -439,7 +439,7 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog, int log_failures)
 		if (nr < 0) {
 			warn("compile_filter: nonexistent syscall '%s'",
 			     syscall_name);
-			if (log_failures) {
+			if (allow_logging) {
 				/*
 				 * If we're logging failures, assume we're in a
 				 * debugging case and continue.
@@ -479,7 +479,7 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog, int log_failures)
 			/* Build the arg filter block. */
 			struct filter_block *block =
 			    compile_section(nr, policy_line, id, &labels,
-					    log_failures);
+					    use_ret_trap);
 
 			if (!block)
 				return -1;
@@ -493,10 +493,10 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog, int log_failures)
 	}
 
 	/*
-	 * If none of the syscalls match, either fall back to KILL,
+	 * If none of the syscalls match, either fall through to KILL,
 	 * or return TRAP.
 	 */
-	if (!log_failures)
+	if (!use_ret_trap)
 		append_ret_kill(head);
 	else
 		append_ret_trap(head);
