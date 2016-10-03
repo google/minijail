@@ -114,9 +114,9 @@ struct seccomp_data {
 
 #define MAX_BPF_LABEL_LEN 32
 
-#define BPF_LABELS_MAX 512	/* Each syscall could have an argument block. */
+#define BPF_LABELS_MAX 512U	/* Each syscall could have an argument block. */
 struct bpf_labels {
-	int count;
+	size_t count;
 	struct __bpf_label {
 		const char *label;
 		unsigned int location;
