@@ -11,9 +11,6 @@
 
 #include "bpf.h"
 
-#define NO_LOGGING  0
-#define USE_LOGGING 1
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,8 +29,9 @@ struct bpf_labels;
 struct filter_block *compile_section(int nr, const char *policy_line,
 				     unsigned int label_id,
 				     struct bpf_labels *labels,
-				     int log_failures);
-int compile_filter(FILE *policy_file, struct sock_fprog *prog, int log_failures);
+				     int do_ret_trap);
+int compile_filter(FILE *policy_file, struct sock_fprog *prog, int do_ret_trap,
+		   int add_logging_syscalls);
 
 int flatten_block_list(struct filter_block *head, struct sock_filter *filter,
 		       size_t index, size_t cap);
