@@ -139,7 +139,7 @@ struct minijail {
 		int no_new_privs:1;
 		int seccomp_filter:1;
 		int seccomp_filter_tsync:1;
-		int log_seccomp_filter:1;
+		int seccomp_filter_logging:1;
 		int chroot:1;
 		int pivot_root:1;
 		int mount_tmp:1;
@@ -351,12 +351,20 @@ void API minijail_use_seccomp_filter(struct minijail *j)
 
 void API minijail_set_seccomp_filter_tsync(struct minijail *j)
 {
+	if (j->filter_len > 0 && j->filter_prog != NULL) {
+		die("minijail_set_seccomp_filter_tsync() must be called "
+		    "before minijail_parse_seccomp_filters()");
+	}
 	j->flags.seccomp_filter_tsync = 1;
 }
 
 void API minijail_log_seccomp_filter_failures(struct minijail *j)
 {
-	j->flags.log_seccomp_filter = 1;
+	if (j->filter_len > 0 && j->filter_prog != NULL) {
+		die("minijail_log_seccomp_filter_failures() must be called "
+		    "before minijail_parse_seccomp_filters()");
+	}
+	j->flags.seccomp_filter_logging = 1;
 }
 
 void API minijail_use_caps(struct minijail *j, uint64_t capmask)
@@ -673,7 +681,7 @@ static void clear_seccomp_options(struct minijail *j)
 {
 	j->flags.seccomp_filter = 0;
 	j->flags.seccomp_filter_tsync = 0;
-	j->flags.log_seccomp_filter = 0;
+	j->flags.seccomp_filter_logging = 0;
 	j->filter_len = 0;
 	j->filter_prog = NULL;
 	j->flags.no_new_privs = 0;
@@ -705,17 +713,15 @@ static int seccomp_should_parse_filters(struct minijail *j)
 		if (sys_seccomp(SECCOMP_SET_MODE_FILTER,
 				SECCOMP_FILTER_FLAG_TSYNC, NULL) == -1) {
 			int saved_errno = errno;
-			if (seccomp_can_softfail()) {
-				if (saved_errno == ENOSYS) {
-					warn(
-					    "seccomp(2) syscall not supported");
-					clear_seccomp_options(j);
-				}
-				if (saved_errno == EINVAL) {
-					warn("seccomp filter thread sync not "
-					     "supported");
-					clear_seccomp_options(j);
-				}
+			if (saved_errno == ENOSYS && seccomp_can_softfail()) {
+				warn("seccomp(2) syscall not supported");
+				clear_seccomp_options(j);
+				return 0;
+			} else if (saved_errno == EINVAL &&
+				   seccomp_can_softfail()) {
+				warn(
+				    "seccomp filter thread sync not supported");
+				clear_seccomp_options(j);
 				return 0;
 			}
 			/*
@@ -732,7 +738,11 @@ static int seccomp_should_parse_filters(struct minijail *j)
 static int parse_seccomp_filters(struct minijail *j, FILE *policy_file)
 {
 	struct sock_fprog *fprog = malloc(sizeof(struct sock_fprog));
-	if (compile_filter(policy_file, fprog, j->flags.log_seccomp_filter)) {
+	int use_ret_trap =
+	    j->flags.seccomp_filter_tsync || j->flags.seccomp_filter_logging;
+	int allow_logging = j->flags.seccomp_filter_logging;
+
+	if (compile_filter(policy_file, fprog, use_ret_trap, allow_logging)) {
 		free(fprog);
 		return -1;
 	}
@@ -1462,14 +1472,25 @@ static void set_seccomp_filter(const struct minijail *j)
 		return;
 	}
 
-	/*
-	 * If we're logging seccomp filter failures,
-	 * install the SIGSYS handler first.
-	 */
-	if (j->flags.seccomp_filter && j->flags.log_seccomp_filter) {
-		if (install_sigsys_handler())
-			pdie("install SIGSYS handler");
-		warn("logging seccomp filter failures");
+	if (j->flags.seccomp_filter) {
+		if (j->flags.seccomp_filter_logging) {
+			/*
+			 * If logging seccomp filter failures,
+			 * install the SIGSYS handler first.
+			 */
+			if (install_sigsys_handler())
+				pdie("failed to install SIGSYS handler");
+			warn("logging seccomp filter failures");
+		} else if (j->flags.seccomp_filter_tsync) {
+			/*
+			 * If setting thread sync,
+			 * reset the SIGSYS signal handler so that
+			 * the entire thread group is killed.
+			 */
+			if (signal(SIGSYS, SIG_DFL) == SIG_ERR)
+				pdie("failed to reset SIGSYS disposition");
+			info("reset SIGSYS disposition");
+		}
 	}
 
 	/*
