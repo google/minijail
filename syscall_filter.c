@@ -520,7 +520,8 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog, int use_ret_trap,
 	free_block_list(head);
 	free_block_list(arg_blocks);
 
-	bpf_resolve_jumps(&labels, final_filter, final_filter_len);
+	if (bpf_resolve_jumps(&labels, final_filter, final_filter_len) < 0)
+		return -1;
 
 	free_label_strings(&labels);
 
