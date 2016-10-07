@@ -9,6 +9,7 @@
 
 #include <asm/unistd.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
@@ -148,6 +149,7 @@ struct minijail {
 		int cgroups:1;
 		int alt_syscall:1;
 		int reset_signal_mask:1;
+		int close_open_fds:1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -459,6 +461,11 @@ void API minijail_namespace_enter_net(struct minijail *j, const char *ns_path)
 void API minijail_namespace_cgroups(struct minijail *j)
 {
 	j->flags.ns_cgroups = 1;
+}
+
+void API minijail_close_open_fds(struct minijail *j)
+{
+	j->flags.close_open_fds = 1;
 }
 
 void API minijail_remount_proc_readonly(struct minijail *j)
@@ -1796,6 +1803,43 @@ int setup_and_dupe_pipe_end(int fds[2], size_t index, int fd)
 	return dup2(fds[index], fd);
 }
 
+int close_open_fds(int *inheritable_fds, size_t size)
+{
+	const char *kFdPath = "/proc/self/fd";
+
+	DIR *d = opendir(kFdPath);
+	struct dirent *dir_entry;
+
+	if (d == NULL)
+		return -1;
+	int dir_fd = dirfd(d);
+	while ((dir_entry = readdir(d)) != NULL) {
+		size_t i;
+		char *end;
+		bool should_close = true;
+		const int fd = strtol(dir_entry->d_name, &end, 10);
+
+		if ((*end) != '\0') {
+			continue;
+		}
+		/*
+		 * We might have set up some pipes that we want to share with
+		 * the parent process, and should not be closed.
+		 */
+		for (i = 0; i < size; ++i) {
+			if (fd == inheritable_fds[i]) {
+				should_close = false;
+				break;
+			}
+		}
+		/* Also avoid closing the directory fd. */
+		if (should_close && fd != dir_fd)
+			close(fd);
+	}
+	closedir(d);
+	return 0;
+}
+
 int minijail_run_internal(struct minijail *j, const char *filename,
 			  char *const argv[], pid_t *pchild_pid,
 			  int *pstdin_fd, int *pstdout_fd, int *pstderr_fd,
@@ -2075,6 +2119,35 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 			pdie("sigemptyset failed");
 		if (sigprocmask(SIG_SETMASK, &signal_mask, NULL) != 0)
 			pdie("sigprocmask failed");
+	}
+
+	if (j->flags.close_open_fds) {
+		const size_t kMaxInheritableFdsSize = 10;
+		int inheritable_fds[kMaxInheritableFdsSize];
+		size_t size = 0;
+		if (use_preload) {
+			inheritable_fds[size++] = pipe_fds[0];
+			inheritable_fds[size++] = pipe_fds[1];
+		}
+		if (sync_child) {
+			inheritable_fds[size++] = child_sync_pipe_fds[0];
+			inheritable_fds[size++] = child_sync_pipe_fds[1];
+		}
+		if (pstdin_fd) {
+			inheritable_fds[size++] = stdin_fds[0];
+			inheritable_fds[size++] = stdin_fds[1];
+		}
+		if (pstdout_fd) {
+			inheritable_fds[size++] = stdout_fds[0];
+			inheritable_fds[size++] = stdout_fds[1];
+		}
+		if (pstderr_fd) {
+			inheritable_fds[size++] = stderr_fds[0];
+			inheritable_fds[size++] = stderr_fds[1];
+		}
+
+		if (close_open_fds(inheritable_fds, size) < 0)
+			die("failed to close open file descriptors");
 	}
 
 	if (sync_child)
