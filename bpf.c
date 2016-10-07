@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "bpf.h"
+#include "util.h"
 
 /* Architecture validation. */
 size_t bpf_validate_arch(struct sock_filter *filter)
@@ -187,47 +188,47 @@ void dump_bpf_prog(struct sock_fprog *fprog)
 int bpf_resolve_jumps(struct bpf_labels *labels, struct sock_filter *filter,
 		      size_t len)
 {
-	size_t insn;
-	struct sock_filter *begin = filter;
-
-	/* This needs at least two instructions: one jump and one label. */
-	if (len < 2)
-		return -1;
+	struct sock_filter *instr;
+	size_t i, offset;
 
 	if (len > BPF_MAXINSNS)
 		return -1;
-
-	insn = len - 1;
 
 	/*
 	 * Walk it once, backwards, to build the label table and do fixups.
 	 * Since backward jumps are disallowed by BPF, this is easy.
 	 */
-	for (filter += insn; filter >= begin; --insn, --filter) {
-		if (filter->code != (BPF_JMP + BPF_JA))
+	for (i = 0; i < len; i++) {
+		offset = len - i - 1;
+		instr = &filter[offset];
+		if (instr->code != (BPF_JMP + BPF_JA))
 			continue;
-		switch ((filter->jt << 8) | filter->jf) {
+		switch ((instr->jt << 8) | instr->jf) {
 		case (JUMP_JT << 8) | JUMP_JF:
-			if (labels->labels[filter->k].location == 0xffffffff) {
-				fprintf(stderr, "Unresolved label: '%s'\n",
-					labels->labels[filter->k].label);
-				return 1;
+			if (instr->k >= labels->count) {
+				warn("nonexistent label id: %u", instr->k);
+				return -1;
 			}
-			filter->k =
-			    labels->labels[filter->k].location - (insn + 1);
-			filter->jt = 0;
-			filter->jf = 0;
+			if (labels->labels[instr->k].location == 0xffffffff) {
+				warn("unresolved label: '%s'",
+				     labels->labels[instr->k].label);
+				return -1;
+			}
+			instr->k =
+			    labels->labels[instr->k].location - (offset + 1);
+			instr->jt = 0;
+			instr->jf = 0;
 			continue;
 		case (LABEL_JT << 8) | LABEL_JF:
-			if (labels->labels[filter->k].location != 0xffffffff) {
-				fprintf(stderr, "Duplicate label use: '%s'\n",
-					labels->labels[filter->k].label);
-				return 1;
+			if (labels->labels[instr->k].location != 0xffffffff) {
+				warn("duplicate label: '%s'",
+				     labels->labels[instr->k].label);
+				return -1;
 			}
-			labels->labels[filter->k].location = insn;
-			filter->k = 0; /* Fall through. */
-			filter->jt = 0;
-			filter->jf = 0;
+			labels->labels[instr->k].location = offset;
+			instr->k = 0; /* Fall through. */
+			instr->jt = 0;
+			instr->jf = 0;
 			continue;
 		}
 	}

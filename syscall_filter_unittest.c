@@ -163,6 +163,104 @@ TEST_F(bpf, bpf_allow_syscall_args) {
 	EXPECT_ALLOW_SYSCALL_ARGS(allow_syscall, nr, id, JUMP_JT, JUMP_JF);
 }
 
+FIXTURE(bpf_label) {
+	struct bpf_labels labels;
+};
+
+FIXTURE_SETUP(bpf_label) {}
+FIXTURE_TEARDOWN(bpf_label) {
+	free_label_strings(&self->labels);
+}
+
+TEST_F(bpf_label, zero_length_filter) {
+	int res = bpf_resolve_jumps(&self->labels, NULL, 0);
+
+	EXPECT_EQ(res, 0);
+	EXPECT_EQ(self->labels.count, 0U);
+}
+
+TEST_F(bpf_label, single_label) {
+	struct sock_filter test_label[1];
+
+	int id = bpf_label_id(&self->labels, "test");
+	set_bpf_lbl(test_label, id);
+	int res = bpf_resolve_jumps(&self->labels, test_label, 1);
+
+	EXPECT_EQ(res, 0);
+	EXPECT_EQ(self->labels.count, 1U);
+}
+
+TEST_F(bpf_label, repeated_label) {
+	struct sock_filter test_label[2];
+
+	int id = bpf_label_id(&self->labels, "test");
+	set_bpf_lbl(&test_label[0], id);
+	set_bpf_lbl(&test_label[1], id);
+	int res = bpf_resolve_jumps(&self->labels, test_label, 2);
+
+	EXPECT_EQ(res, -1);
+}
+
+TEST_F(bpf_label, jump_with_no_label) {
+	struct sock_filter test_jump[1];
+
+	set_bpf_jump_lbl(test_jump, 14831);
+	int res = bpf_resolve_jumps(&self->labels, test_jump, 1);
+
+	EXPECT_EQ(res, -1);
+}
+
+TEST_F(bpf_label, jump_to_valid_label) {
+	struct sock_filter test_jump[2];
+
+	int id = bpf_label_id(&self->labels, "test");
+	set_bpf_jump_lbl(&test_jump[0], id);
+	set_bpf_lbl(&test_jump[1], id);
+
+	int res = bpf_resolve_jumps(&self->labels, test_jump, 2);
+	EXPECT_EQ(res, 0);
+	EXPECT_EQ(self->labels.count, 1U);
+}
+
+TEST_F(bpf_label, jump_to_invalid_label) {
+	struct sock_filter test_jump[2];
+
+	int id = bpf_label_id(&self->labels, "test");
+	set_bpf_jump_lbl(&test_jump[0], id + 1);
+	set_bpf_lbl(&test_jump[1], id);
+
+	int res = bpf_resolve_jumps(&self->labels, test_jump, 2);
+	EXPECT_EQ(res, -1);
+}
+
+TEST_F(bpf_label, jump_to_unresolved_label) {
+	struct sock_filter test_jump[2];
+
+	int id = bpf_label_id(&self->labels, "test");
+	/* Notice the order of the instructions is reversed. */
+	set_bpf_lbl(&test_jump[0], id);
+	set_bpf_jump_lbl(&test_jump[1], id);
+
+	int res = bpf_resolve_jumps(&self->labels, test_jump, 2);
+	EXPECT_EQ(res, -1);
+}
+
+TEST_F(bpf_label, too_many_labels) {
+	unsigned int i;
+	char label[20];
+
+	for (i = 0; i < BPF_LABELS_MAX; i++) {
+		snprintf(label, 20, "test%u", i);
+		(void) bpf_label_id(&self->labels, label);
+	}
+	int id = bpf_label_id(&self->labels, "test");
+
+	/* Insertion failed. */
+	EXPECT_EQ(id, -1);
+	/* Because label lookup table is full. */
+	EXPECT_EQ(self->labels.count, BPF_LABELS_MAX);
+}
+
 FIXTURE(arg_filter) {
 	struct bpf_labels labels;
 };
