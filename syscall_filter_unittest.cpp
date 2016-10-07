@@ -153,6 +153,101 @@ TEST(bpf, bpf_allow_syscall_args) {
   EXPECT_ALLOW_SYSCALL_ARGS(allow_syscall, nr, id, JUMP_JT, JUMP_JF);
 }
 
+class BpfLabelTest : public ::testing::Test {
+ protected:
+  virtual void TearDown() { free_label_strings(&labels_); }
+  struct bpf_labels labels_;
+};
+
+TEST_F(BpfLabelTest, zero_length_filter) {
+  int res = bpf_resolve_jumps(&labels_, NULL, 0);
+
+  EXPECT_EQ(res, 0);
+  EXPECT_EQ(labels_.count, 0U);
+}
+
+TEST_F(BpfLabelTest, single_label) {
+  struct sock_filter test_label[1];
+
+  int id = bpf_label_id(&labels_, "test");
+  set_bpf_lbl(test_label, id);
+  int res = bpf_resolve_jumps(&labels_, test_label, 1);
+
+  EXPECT_EQ(res, 0);
+  EXPECT_EQ(labels_.count, 1U);
+}
+
+TEST_F(BpfLabelTest, repeated_label) {
+  struct sock_filter test_label[2];
+
+  int id = bpf_label_id(&labels_, "test");
+  set_bpf_lbl(&test_label[0], id);
+  set_bpf_lbl(&test_label[1], id);
+  int res = bpf_resolve_jumps(&labels_, test_label, 2);
+
+  EXPECT_EQ(res, -1);
+}
+
+TEST_F(BpfLabelTest, jump_with_no_label) {
+  struct sock_filter test_jump[1];
+
+  set_bpf_jump_lbl(test_jump, 14831);
+  int res = bpf_resolve_jumps(&labels_, test_jump, 1);
+
+  EXPECT_EQ(res, -1);
+}
+
+TEST_F(BpfLabelTest, jump_to_valid_label) {
+  struct sock_filter test_jump[2];
+
+  int id = bpf_label_id(&labels_, "test");
+  set_bpf_jump_lbl(&test_jump[0], id);
+  set_bpf_lbl(&test_jump[1], id);
+
+  int res = bpf_resolve_jumps(&labels_, test_jump, 2);
+  EXPECT_EQ(res, 0);
+  EXPECT_EQ(labels_.count, 1U);
+}
+
+TEST_F(BpfLabelTest, jump_to_invalid_label) {
+  struct sock_filter test_jump[2];
+
+  int id = bpf_label_id(&labels_, "test");
+  set_bpf_jump_lbl(&test_jump[0], id + 1);
+  set_bpf_lbl(&test_jump[1], id);
+
+  int res = bpf_resolve_jumps(&labels_, test_jump, 2);
+  EXPECT_EQ(res, -1);
+}
+
+TEST_F(BpfLabelTest, jump_to_unresolved_label) {
+  struct sock_filter test_jump[2];
+
+  int id = bpf_label_id(&labels_, "test");
+  /* Notice the order of the instructions is reversed. */
+  set_bpf_lbl(&test_jump[0], id);
+  set_bpf_jump_lbl(&test_jump[1], id);
+
+  int res = bpf_resolve_jumps(&labels_, test_jump, 2);
+  EXPECT_EQ(res, -1);
+}
+
+TEST_F(BpfLabelTest, too_many_labels) {
+  unsigned int i;
+  char label[20];
+
+  for (i = 0; i < BPF_LABELS_MAX; i++) {
+    snprintf(label, 20, "test%u", i);
+    (void) bpf_label_id(&labels_, label);
+  }
+  int id = bpf_label_id(&labels_, "test");
+
+  /* Insertion failed... */
+  EXPECT_EQ(id, -1);
+  /* ... because the label lookup table is full. */
+  EXPECT_EQ(labels_.count, BPF_LABELS_MAX);
+}
+
 class ArgFilterTest : public ::testing::Test {
  protected:
   virtual void TearDown() { free_label_strings(&labels_); }
