@@ -37,7 +37,8 @@ enum {
 	LE,
 	GT,
 	GE,
-	SET
+	SET,
+	IN
 };
 
 /*
@@ -174,9 +175,11 @@ void free_label_strings(struct bpf_labels *labels);
 /* BPF helper functions. */
 size_t bpf_load_arg(struct sock_filter *filter, int argidx);
 size_t bpf_comp_jeq(struct sock_filter *filter, unsigned long c,
-		unsigned char jt, unsigned char jf);
+		    unsigned char jt, unsigned char jf);
 size_t bpf_comp_jset(struct sock_filter *filter, unsigned long mask,
-		unsigned char jt, unsigned char jf);
+		     unsigned char jt, unsigned char jf);
+size_t bpf_comp_jin(struct sock_filter *filter, unsigned long mask,
+		    unsigned char jt, unsigned char jf);
 
 /* Functions called by syscall_filter.c */
 #define ARCH_VALIDATION_LEN 3U
