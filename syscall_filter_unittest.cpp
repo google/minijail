@@ -77,7 +77,7 @@ TEST(bpf, bpf_comp_jeq) {
 
 TEST(bpf, bpf_comp_jset) {
   struct sock_filter comp_jset[BPF_COMP_LEN];
-  unsigned long mask = O_WRONLY;
+  unsigned long mask = (1UL << (sizeof(unsigned long) * 8 - 1)) | O_WRONLY;
   unsigned char jt = 1;
   unsigned char jf = 2;
 
@@ -88,9 +88,30 @@ TEST(bpf, bpf_comp_jset) {
 #if defined(BITS32)
   EXPECT_EQ_BLOCK(&comp_jset[0], BPF_JMP + BPF_JSET + BPF_K, mask, jt, jf);
 #elif defined(BITS64)
-  EXPECT_EQ_BLOCK(&comp_jset[0], BPF_JMP + BPF_JSET + BPF_K, 0, jt + 2, 0);
+  EXPECT_EQ_BLOCK(
+      &comp_jset[0], BPF_JMP + BPF_JSET + BPF_K, 0x80000000, jt + 2, 0);
   EXPECT_EQ_STMT(&comp_jset[1], BPF_LD + BPF_MEM, 0);
-  EXPECT_EQ_BLOCK(&comp_jset[2], BPF_JMP + BPF_JSET + BPF_K, mask, jt, jf);
+  EXPECT_EQ_BLOCK(&comp_jset[2], BPF_JMP + BPF_JSET + BPF_K, O_WRONLY, jt, jf);
+#endif
+}
+
+TEST(bpf, bpf_comp_jin) {
+  struct sock_filter comp_jin[BPF_COMP_LEN];
+  unsigned long mask = (1UL << (sizeof(unsigned long) * 8 - 1)) | O_WRONLY;
+  unsigned char jt = 10;
+  unsigned char jf = 20;
+
+  size_t len = bpf_comp_jin(comp_jin, mask, jt, jf);
+
+  EXPECT_EQ(len, BPF_COMP_LEN);
+
+#if defined(BITS32)
+  EXPECT_EQ_BLOCK(&comp_jin[0], BPF_JMP + BPF_JSET + BPF_K, ~mask, jf, jt);
+#elif defined(BITS64)
+  EXPECT_EQ_BLOCK(
+      &comp_jin[0], BPF_JMP + BPF_JSET + BPF_K, 0x7FFFFFFF, jf + 2, 0);
+  EXPECT_EQ_STMT(&comp_jin[1], BPF_LD + BPF_MEM, 0);
+  EXPECT_EQ_BLOCK(&comp_jin[2], BPF_JMP + BPF_JSET + BPF_K, ~O_WRONLY, jf, jt);
 #endif
 }
 
@@ -332,6 +353,48 @@ TEST_F(ArgFilterTest, arg0_mask) {
   EXPECT_ALLOW(curr_block);
 
   EXPECT_TRUE(curr_block->next == NULL);
+
+  free_block_list(block);
+}
+
+TEST_F(ArgFilterTest, arg0_flag_set_inclusion) {
+  const char *fragment = "arg0 in O_RDONLY|O_CREAT";
+  int nr = 1;
+  unsigned int id = 0;
+  struct filter_block *block =
+      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+
+  ASSERT_NE(block, nullptr);
+  size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+  EXPECT_EQ(block->total_len, exp_total_len);
+
+  /* First block is a label. */
+  struct filter_block *curr_block = block;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_EQ(block->len, 1U);
+  EXPECT_LBL(curr_block->instrs);
+
+  /* Second block is a comparison. */
+  curr_block = block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_COMP(curr_block);
+
+  /* Third block is a jump and a label (end of AND group). */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_GROUP_END(curr_block);
+
+  /* Fourth block is SECCOMP_RET_KILL. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_KILL(curr_block);
+
+  /* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW(curr_block);
+
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
