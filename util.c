@@ -108,7 +108,7 @@ long int parse_constant(char *constant_str, char **endptr)
 	 * Try to parse constants separated by pipes.  Note that since
 	 * |constant_str| is an atom, there can be no spaces between the
 	 * constant and the pipe.  Constants can be either a named constant
-	 * defined in libconstants.gen.c or a number parsed with strtol.
+	 * defined in libconstants.gen.c or a number parsed with strtol(3).
 	 *
 	 * If there is an error parsing any of the constants, the whole process
 	 * fails.

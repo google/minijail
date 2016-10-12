@@ -33,6 +33,8 @@ int str_to_op(const char *op_str)
 		return NE;
 	} else if (!strcmp(op_str, "&")) {
 		return SET;
+	} else if (!strcmp(op_str, "in")) {
+		return IN;
 	} else {
 		return 0;
 	}
