@@ -265,7 +265,7 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	 * Atoms are of the form "arg{DNUM} {OP} {NUM}"
 	 * where:
 	 *   - DNUM is a decimal number.
-	 *   - OP is an operator: ==, !=, or & (flags set).
+	 *   - OP is an operator: ==, !=, & (flags set), or 'in' (inclusion).
 	 *   - NUM is an octal, decimal, or hexadecimal number.
 	 *
 	 * When the syscall arguments make the expression true,
