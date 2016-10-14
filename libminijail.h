@@ -69,6 +69,8 @@ void minijail_namespace_ipc(struct minijail *j);
 void minijail_namespace_net(struct minijail *j);
 void minijail_namespace_enter_net(struct minijail *j, const char *ns_path);
 void minijail_namespace_cgroups(struct minijail *j);
+/* Closes all open file descriptors after forking. */
+void minijail_close_open_fds(struct minijail *j);
 /*
  * Implies namespace_vfs and remount_proc_readonly.
  * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
