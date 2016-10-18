@@ -586,18 +586,34 @@ TEST_F(ArgFilterTest, unconditional_errno) {
   free_block_list(block);
 }
 
-TEST_F(ArgFilterTest, invalid) {
+TEST_F(ArgFilterTest, invalid_arg_number) {
   const char *fragment = "argnn == 0";
   int nr = 1;
   unsigned int id = 0;
 
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, NO_LOGGING);
-  ASSERT_TRUE(block == NULL);
+  ASSERT_EQ(block, nullptr);
+}
 
-  fragment = "arg0 == 0 && arg1 == 1; return errno";
-  block = compile_section(nr, fragment, id, &labels_, NO_LOGGING);
-  ASSERT_TRUE(block == NULL);
+TEST_F(ArgFilterTest, invalid_constant) {
+  const char *fragment = "arg0 == INVALIDCONSTANT";
+  int nr = 1;
+  unsigned int id = 0;
+
+  struct filter_block* block =
+      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+  ASSERT_EQ(block, nullptr);
+}
+
+TEST_F(ArgFilterTest, invalid_errno) {
+  const char *fragment = "arg0 == 0 && arg1 == 1; return errno";
+  int nr = 1;
+  unsigned int id = 0;
+
+  struct filter_block *block =
+      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+  ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, log_no_ret_error) {

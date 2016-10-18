@@ -189,13 +189,17 @@ int compile_atom(struct filter_block *head, char *atom,
 	 * Checks to see if an actual argument index
 	 * was parsed.
 	 */
-	if (argidx_ptr == argidx_str + 3)
+	if (argidx_ptr == argidx_str + 3) {
+		warn("invalid argument index '%s'", argidx_ptr);
 		return -1;
+	}
 
 	char *constant_str_ptr;
 	long int c = parse_constant(constant_str, &constant_str_ptr);
-	if (constant_str_ptr == constant_str)
+	if (constant_str_ptr == constant_str) {
+		warn("invalid constant '%s'", constant_str);
 		return -1;
+	}
 
 	/*
 	 * Looks up the label for the end of the AND statement
@@ -236,8 +240,10 @@ int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
 		char *errno_val_ptr;
 		int errno_val = parse_constant(errno_val_str, &errno_val_ptr);
 		/* Checks to see if we parsed an actual errno. */
-		if (errno_val_ptr == errno_val_str || errno_val == -1)
+		if (errno_val_ptr == errno_val_str || errno_val == -1) {
+			warn("invalid errno value '%s'", errno_val_ptr);
 			return -1;
+		}
 
 		append_ret_errno(head, errno_val);
 	} else {
