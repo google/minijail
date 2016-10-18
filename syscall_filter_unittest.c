@@ -609,17 +609,33 @@ TEST_F(arg_filter, unconditional_errno) {
 	free_label_strings(&self->labels);
 }
 
-TEST_F(arg_filter, invalid) {
+TEST_F(arg_filter, invalid_arg_number) {
 	const char *fragment = "argnn == 0";
 	int nr = 1;
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_EQ(block, NULL);
+}
 
-	fragment = "arg0 == 0 && arg1 == 1; return errno";
-	block = compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+TEST_F(arg_filter, invalid_constant) {
+	const char *fragment = "arg0 == INVALIDCONSTANT";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_EQ(block, NULL);
+}
+
+TEST_F(arg_filter, invalid_errno) {
+	const char *fragment = "arg0 == 0 && arg1 == 1; return errno";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_EQ(block, NULL);
 }
 
