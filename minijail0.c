@@ -109,7 +109,7 @@ static char *build_idmap(id_t id, id_t lowerid)
 static void usage(const char *progn)
 {
 	size_t i;
-
+	/* clang-format off */
 	printf("Usage: %s [-GhHiIKlLnNprstUvY]\n"
 	       "  [-a <table>]\n"
 	       "  [-b <src>,<dest>[,<writeable>]] [-k <src>,<dest>,<type>[,<flags>][,<data>]]\n"
@@ -142,9 +142,11 @@ static void usage(const char *progn)
 	       "  -L:         Report blocked syscalls to syslog when using seccomp filter.\n"
 	       "              Forces the following syscalls to be allowed:\n"
 	       "                  ", progn);
+	/* clang-format on */
 	for (i = 0; i < log_syscalls_len; i++)
 		printf("%s ", log_syscalls[i]);
 
+	/* clang-format off */
 	printf("\n"
 	       "  -m:         Set the uid map of a user namespace (implies -pU).\n"
 	       "              Same arguments as newuidmap(1), multiple mappings should be separated by ',' (comma).\n"
@@ -168,6 +170,7 @@ static void usage(const char *progn)
 	       "  -v:         Enter new mount namespace.\n"
 	       "  -V <file>:  Enter specified mount namespace.\n"
 	       "  -Y:         Synchronize seccomp filters across thread group.\n");
+	/* clang-format on */
 }
 
 static void seccomp_filter_usage(const char *progn)

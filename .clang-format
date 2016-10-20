@@ -3,4 +3,5 @@ IndentWidth: 8
 UseTab: Always
 BreakBeforeBraces: Linux
 AllowShortIfStatementsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: false
 IndentCaseLabels: false
