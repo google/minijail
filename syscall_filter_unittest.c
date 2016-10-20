@@ -19,6 +19,74 @@
 
 #include "syscall_filter_unittest_macros.h"
 
+FIXTURE(util) {};
+
+FIXTURE_SETUP(util) {}
+FIXTURE_TEARDOWN(util) {}
+
+TEST_F(util, parse_constant_unsigned) {
+	char *end;
+	long int c = 0;
+
+#if defined(BITS32)
+	c = parse_constant("0x80000000", &end);
+	EXPECT_EQ((unsigned long int)c, 0x80000000U);
+
+#elif defined(BITS64)
+	c = parse_constant("0x8000000000000000", &end);
+	EXPECT_EQ((unsigned long int)c, 0x8000000000000000UL);
+#endif
+}
+
+TEST_F(util, parse_constant_unsigned_toobig) {
+	char *end;
+	long int c = 0;
+
+#if defined(BITS32)
+	/* Error case should return 0. */
+	c = parse_constant("0x100000000", &end);
+	EXPECT_EQ(c, 0);
+
+#elif defined(BITS64)
+	/* Error case should return 0. */
+	c = parse_constant("0x10000000000000000", &end);
+	EXPECT_EQ(c, 0);
+#endif
+}
+
+TEST_F(util, parse_constant_signed) {
+	char *end;
+	long int c = 0;
+	c = parse_constant("-1", &end);
+	EXPECT_EQ(c, -1);
+
+#if defined(BITS32)
+	c = parse_constant("-0x80000001", &end);
+	/* Error case should return 0. */
+	EXPECT_EQ(c, 0);
+#elif defined(BITS64)
+	c = parse_constant("-0x8000000000000001", &end);
+	/* Error case should return 0. */
+	EXPECT_EQ(c, 0);
+#endif
+}
+
+TEST_F(util, parse_constant_signed_toonegative) {
+	char *end;
+	long int c = 0;
+
+#if defined(BITS32)
+	c = parse_constant("-0x80000001", &end);
+	/* Error case should return 0. */
+	EXPECT_EQ(c, 0);
+
+#elif defined(BITS64)
+	c = parse_constant("-0x8000000000000001", &end);
+	/* Error case should return 0. */
+	EXPECT_EQ(c, 0);
+#endif
+}
+
 FIXTURE(bpf) {};
 
 FIXTURE_SETUP(bpf) {}

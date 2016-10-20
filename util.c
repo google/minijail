@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -86,6 +87,7 @@ const char *lookup_syscall_name(int nr)
 long int parse_single_constant(char *constant_str, char **endptr)
 {
 	const struct constant_entry *entry = constant_table;
+	long int res = 0;
 	for (; entry->name; ++entry) {
 		if (!strcmp(entry->name, constant_str)) {
 			if (endptr)
@@ -95,7 +97,34 @@ long int parse_single_constant(char *constant_str, char **endptr)
 		}
 	}
 
-	return strtol(constant_str, endptr, 0);
+	errno = 0;
+	res = strtol(constant_str, endptr, 0);
+	if (errno == ERANGE) {
+		if (res == LONG_MAX) {
+			/* See if the constant fits in an unsigned long int. */
+			errno = 0;
+			res = strtoul(constant_str, endptr, 0);
+			if (errno == ERANGE) {
+				/*
+				 * On unsigned overflow, use the same convention
+				 * as when strtol(3) finds no digits: set
+				 * |*endptr| to |constant_str| and return 0.
+				 */
+				warn("unsigned overflow: '%s'", constant_str);
+				*endptr = constant_str;
+				res = 0;
+			}
+		} else if (res == LONG_MIN) {
+			/*
+			 * Same for signed underflow: set |*endptr| to
+			 * |constant_str| and return 0.
+			 */
+			warn("signed underflow: '%s'", constant_str);
+			*endptr = constant_str;
+			res = 0;
+		}
+	}
+	return res;
 }
 
 long int parse_constant(char *constant_str, char **endptr)
