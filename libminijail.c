@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syscall.h>
 #include <sys/capability.h>
 #include <sys/mount.h>
 #include <sys/param.h>
@@ -34,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/wait.h>
+#include <syscall.h>
 #include <unistd.h>
 
 #include "libminijail.h"
@@ -119,37 +119,37 @@ struct minijail {
 	 * accounted for in minijail_pre{enter|exec}() below.
 	 */
 	struct {
-		int uid:1;
-		int gid:1;
-		int usergroups:1;
-		int suppl_gids:1;
-		int use_caps:1;
-		int capbset_drop:1;
-		int vfs:1;
-		int enter_vfs:1;
-		int skip_remount_private:1;
-		int pids:1;
-		int ipc:1;
-		int net:1;
-		int enter_net:1;
-		int ns_cgroups:1;
-		int userns:1;
-		int disable_setgroups:1;
-		int seccomp:1;
-		int remount_proc_ro:1;
-		int no_new_privs:1;
-		int seccomp_filter:1;
-		int seccomp_filter_tsync:1;
-		int seccomp_filter_logging:1;
-		int chroot:1;
-		int pivot_root:1;
-		int mount_tmp:1;
-		int do_init:1;
-		int pid_file:1;
-		int cgroups:1;
-		int alt_syscall:1;
-		int reset_signal_mask:1;
-		int close_open_fds:1;
+		int uid : 1;
+		int gid : 1;
+		int usergroups : 1;
+		int suppl_gids : 1;
+		int use_caps : 1;
+		int capbset_drop : 1;
+		int vfs : 1;
+		int enter_vfs : 1;
+		int skip_remount_private : 1;
+		int pids : 1;
+		int ipc : 1;
+		int net : 1;
+		int enter_net : 1;
+		int ns_cgroups : 1;
+		int userns : 1;
+		int disable_setgroups : 1;
+		int seccomp : 1;
+		int remount_proc_ro : 1;
+		int no_new_privs : 1;
+		int seccomp_filter : 1;
+		int seccomp_filter_tsync : 1;
+		int seccomp_filter_logging : 1;
+		int chroot : 1;
+		int pivot_root : 1;
+		int mount_tmp : 1;
+		int do_init : 1;
+		int pid_file : 1;
+		int cgroups : 1;
+		int alt_syscall : 1;
+		int reset_signal_mask : 1;
+		int close_open_fds : 1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
