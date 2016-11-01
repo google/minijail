@@ -8,7 +8,7 @@
 
 #include <asm/unistd.h>
 #include <errno.h>
-#include <fcntl.h>	/* For O_WRONLY. */
+#include <fcntl.h> /* For O_WRONLY. */
 
 #include "test_harness.h"
 
@@ -19,12 +19,17 @@
 
 #include "syscall_filter_unittest_macros.h"
 
-FIXTURE(util) {};
+FIXTURE(util){};
 
-FIXTURE_SETUP(util) {}
-FIXTURE_TEARDOWN(util) {}
+FIXTURE_SETUP(util)
+{
+}
+FIXTURE_TEARDOWN(util)
+{
+}
 
-TEST_F(util, parse_constant_unsigned) {
+TEST_F(util, parse_constant_unsigned)
+{
 	char *end;
 	long int c = 0;
 
@@ -38,7 +43,8 @@ TEST_F(util, parse_constant_unsigned) {
 #endif
 }
 
-TEST_F(util, parse_constant_unsigned_toobig) {
+TEST_F(util, parse_constant_unsigned_toobig)
+{
 	char *end;
 	long int c = 0;
 
@@ -54,7 +60,8 @@ TEST_F(util, parse_constant_unsigned_toobig) {
 #endif
 }
 
-TEST_F(util, parse_constant_signed) {
+TEST_F(util, parse_constant_signed)
+{
 	char *end;
 	long int c = 0;
 	c = parse_constant("-1", &end);
@@ -71,7 +78,8 @@ TEST_F(util, parse_constant_signed) {
 #endif
 }
 
-TEST_F(util, parse_constant_signed_toonegative) {
+TEST_F(util, parse_constant_signed_toonegative)
+{
 	char *end;
 	long int c = 0;
 
@@ -87,15 +95,20 @@ TEST_F(util, parse_constant_signed_toonegative) {
 #endif
 }
 
-FIXTURE(bpf) {};
+FIXTURE(bpf){};
 
-FIXTURE_SETUP(bpf) {}
-FIXTURE_TEARDOWN(bpf) {}
+FIXTURE_SETUP(bpf)
+{
+}
+FIXTURE_TEARDOWN(bpf)
+{
+}
 
 /* Test that setting one BPF instruction works. */
-TEST_F(bpf, set_bpf_instr) {
+TEST_F(bpf, set_bpf_instr)
+{
 	struct sock_filter instr;
-	unsigned char code = BPF_LD+BPF_W+BPF_ABS;
+	unsigned char code = BPF_LD + BPF_W + BPF_ABS;
 	unsigned int k = 4;
 	unsigned char jt = 1, jf = 2;
 
@@ -105,7 +118,8 @@ TEST_F(bpf, set_bpf_instr) {
 	EXPECT_EQ_BLOCK(&instr, code, k, jt, jf);
 }
 
-TEST_F(bpf, bpf_load_arg) {
+TEST_F(bpf, bpf_load_arg)
+{
 	struct sock_filter load_arg[BPF_LOAD_ARG_LEN];
 	int argidx = 1;
 	size_t len = bpf_load_arg(load_arg, argidx);
@@ -113,16 +127,17 @@ TEST_F(bpf, bpf_load_arg) {
 	EXPECT_EQ(len, BPF_LOAD_ARG_LEN);
 
 #if defined(BITS32)
-	EXPECT_EQ_STMT(&load_arg[0], BPF_LD+BPF_W+BPF_ABS, LO_ARG(argidx));
+	EXPECT_EQ_STMT(&load_arg[0], BPF_LD + BPF_W + BPF_ABS, LO_ARG(argidx));
 #elif defined(BITS64)
-	EXPECT_EQ_STMT(&load_arg[0], BPF_LD+BPF_W+BPF_ABS, LO_ARG(argidx));
+	EXPECT_EQ_STMT(&load_arg[0], BPF_LD + BPF_W + BPF_ABS, LO_ARG(argidx));
 	EXPECT_EQ_STMT(&load_arg[1], BPF_ST, 0);
-	EXPECT_EQ_STMT(&load_arg[2], BPF_LD+BPF_W+BPF_ABS, HI_ARG(argidx));
+	EXPECT_EQ_STMT(&load_arg[2], BPF_LD + BPF_W + BPF_ABS, HI_ARG(argidx));
 	EXPECT_EQ_STMT(&load_arg[3], BPF_ST, 1);
 #endif
 }
 
-TEST_F(bpf, bpf_comp_jeq) {
+TEST_F(bpf, bpf_comp_jeq)
+{
 	struct sock_filter comp_jeq[BPF_COMP_LEN];
 	unsigned long c = 1;
 	unsigned char jt = 1;
@@ -133,18 +148,16 @@ TEST_F(bpf, bpf_comp_jeq) {
 	EXPECT_EQ(len, BPF_COMP_LEN);
 
 #if defined(BITS32)
-	EXPECT_EQ_BLOCK(&comp_jeq[0],
-			BPF_JMP+BPF_JEQ+BPF_K, c, jt, jf);
+	EXPECT_EQ_BLOCK(&comp_jeq[0], BPF_JMP + BPF_JEQ + BPF_K, c, jt, jf);
 #elif defined(BITS64)
-	EXPECT_EQ_BLOCK(&comp_jeq[0],
-			BPF_JMP+BPF_JEQ+BPF_K, 0, 0, jf + 2);
-	EXPECT_EQ_STMT(&comp_jeq[1], BPF_LD+BPF_MEM, 0);
-	EXPECT_EQ_BLOCK(&comp_jeq[2],
-			BPF_JMP+BPF_JEQ+BPF_K, c, jt, jf);
+	EXPECT_EQ_BLOCK(&comp_jeq[0], BPF_JMP + BPF_JEQ + BPF_K, 0, 0, jf + 2);
+	EXPECT_EQ_STMT(&comp_jeq[1], BPF_LD + BPF_MEM, 0);
+	EXPECT_EQ_BLOCK(&comp_jeq[2], BPF_JMP + BPF_JEQ + BPF_K, c, jt, jf);
 #endif
 }
 
-TEST_F(bpf, bpf_comp_jset) {
+TEST_F(bpf, bpf_comp_jset)
+{
 	struct sock_filter comp_jset[BPF_COMP_LEN];
 	unsigned long mask =
 	    (1UL << (sizeof(unsigned long) * 8 - 1)) | O_WRONLY;
@@ -156,18 +169,19 @@ TEST_F(bpf, bpf_comp_jset) {
 	EXPECT_EQ(len, BPF_COMP_LEN);
 
 #if defined(BITS32)
-	EXPECT_EQ_BLOCK(&comp_jset[0],
-			BPF_JMP+BPF_JSET+BPF_K, mask, jt, jf);
+	EXPECT_EQ_BLOCK(&comp_jset[0], BPF_JMP + BPF_JSET + BPF_K, mask, jt,
+			jf);
 #elif defined(BITS64)
-	EXPECT_EQ_BLOCK(&comp_jset[0],
-			BPF_JMP+BPF_JSET+BPF_K, 0x80000000, jt + 2, 0);
-	EXPECT_EQ_STMT(&comp_jset[1], BPF_LD+BPF_MEM, 0);
-	EXPECT_EQ_BLOCK(&comp_jset[2],
-			BPF_JMP+BPF_JSET+BPF_K, O_WRONLY, jt, jf);
+	EXPECT_EQ_BLOCK(&comp_jset[0], BPF_JMP + BPF_JSET + BPF_K, 0x80000000,
+			jt + 2, 0);
+	EXPECT_EQ_STMT(&comp_jset[1], BPF_LD + BPF_MEM, 0);
+	EXPECT_EQ_BLOCK(&comp_jset[2], BPF_JMP + BPF_JSET + BPF_K, O_WRONLY, jt,
+			jf);
 #endif
 }
 
-TEST_F(bpf, bpf_comp_jin) {
+TEST_F(bpf, bpf_comp_jin)
+{
 	struct sock_filter comp_jin[BPF_COMP_LEN];
 	unsigned long mask =
 	    (1UL << (sizeof(unsigned long) * 8 - 1)) | O_WRONLY;
@@ -179,18 +193,19 @@ TEST_F(bpf, bpf_comp_jin) {
 	EXPECT_EQ(len, BPF_COMP_LEN);
 
 #if defined(BITS32)
-	EXPECT_EQ_BLOCK(&comp_jin[0],
-			BPF_JMP+BPF_JSET+BPF_K, ~mask, jf, jt);
+	EXPECT_EQ_BLOCK(&comp_jin[0], BPF_JMP + BPF_JSET + BPF_K, ~mask, jf,
+			jt);
 #elif defined(BITS64)
-	EXPECT_EQ_BLOCK(&comp_jin[0],
-			BPF_JMP+BPF_JSET+BPF_K, 0x7FFFFFFF, jf + 2, 0);
-	EXPECT_EQ_STMT(&comp_jin[1], BPF_LD+BPF_MEM, 0);
-	EXPECT_EQ_BLOCK(&comp_jin[2],
-			BPF_JMP+BPF_JSET+BPF_K, ~O_WRONLY, jf, jt);
+	EXPECT_EQ_BLOCK(&comp_jin[0], BPF_JMP + BPF_JSET + BPF_K, 0x7FFFFFFF,
+			jf + 2, 0);
+	EXPECT_EQ_STMT(&comp_jin[1], BPF_LD + BPF_MEM, 0);
+	EXPECT_EQ_BLOCK(&comp_jin[2], BPF_JMP + BPF_JSET + BPF_K, ~O_WRONLY, jf,
+			jt);
 #endif
 }
 
-TEST_F(bpf, bpf_arg_comp) {
+TEST_F(bpf, bpf_arg_comp)
+{
 	struct sock_filter *arg_comp;
 	int op = EQ;
 	int argidx = 1;
@@ -202,30 +217,25 @@ TEST_F(bpf, bpf_arg_comp) {
 	EXPECT_EQ(len, BPF_ARG_COMP_LEN + 1);
 
 #if defined(BITS32)
-	EXPECT_EQ_STMT(&arg_comp[0],
-			BPF_LD+BPF_W+BPF_ABS, LO_ARG(argidx));
-	EXPECT_EQ_BLOCK(&arg_comp[1],
-			BPF_JMP+BPF_JEQ+BPF_K, c, 1, 0);
+	EXPECT_EQ_STMT(&arg_comp[0], BPF_LD + BPF_W + BPF_ABS, LO_ARG(argidx));
+	EXPECT_EQ_BLOCK(&arg_comp[1], BPF_JMP + BPF_JEQ + BPF_K, c, 1, 0);
 	EXPECT_JUMP_LBL(&arg_comp[2]);
 #elif defined(BITS64)
-	EXPECT_EQ_STMT(&arg_comp[0],
-			BPF_LD+BPF_W+BPF_ABS, LO_ARG(argidx));
+	EXPECT_EQ_STMT(&arg_comp[0], BPF_LD + BPF_W + BPF_ABS, LO_ARG(argidx));
 	EXPECT_EQ_STMT(&arg_comp[1], BPF_ST, 0);
-	EXPECT_EQ_STMT(&arg_comp[2],
-			BPF_LD+BPF_W+BPF_ABS, HI_ARG(argidx));
+	EXPECT_EQ_STMT(&arg_comp[2], BPF_LD + BPF_W + BPF_ABS, HI_ARG(argidx));
 	EXPECT_EQ_STMT(&arg_comp[3], BPF_ST, 1);
 
-	EXPECT_EQ_BLOCK(&arg_comp[4],
-			BPF_JMP+BPF_JEQ+BPF_K, 0, 0, 2);
-	EXPECT_EQ_STMT(&arg_comp[5], BPF_LD+BPF_MEM, 0);
-	EXPECT_EQ_BLOCK(&arg_comp[6],
-			BPF_JMP+BPF_JEQ+BPF_K, c, 1, 0);
+	EXPECT_EQ_BLOCK(&arg_comp[4], BPF_JMP + BPF_JEQ + BPF_K, 0, 0, 2);
+	EXPECT_EQ_STMT(&arg_comp[5], BPF_LD + BPF_MEM, 0);
+	EXPECT_EQ_BLOCK(&arg_comp[6], BPF_JMP + BPF_JEQ + BPF_K, c, 1, 0);
 	EXPECT_JUMP_LBL(&arg_comp[7]);
 #endif
 	free(arg_comp);
 }
 
-TEST_F(bpf, bpf_validate_arch) {
+TEST_F(bpf, bpf_validate_arch)
+{
 	struct sock_filter validate_arch[ARCH_VALIDATION_LEN];
 
 	size_t len = bpf_validate_arch(validate_arch);
@@ -234,7 +244,8 @@ TEST_F(bpf, bpf_validate_arch) {
 	EXPECT_ARCH_VALIDATION(validate_arch);
 }
 
-TEST_F(bpf, bpf_allow_syscall) {
+TEST_F(bpf, bpf_allow_syscall)
+{
 	struct sock_filter allow_syscall[ALLOW_SYSCALL_LEN];
 	int nr = 1;
 
@@ -244,7 +255,8 @@ TEST_F(bpf, bpf_allow_syscall) {
 	EXPECT_ALLOW_SYSCALL(allow_syscall, nr);
 }
 
-TEST_F(bpf, bpf_allow_syscall_args) {
+TEST_F(bpf, bpf_allow_syscall_args)
+{
 	struct sock_filter allow_syscall[ALLOW_SYSCALL_LEN];
 	int nr = 1;
 	unsigned int id = 1024;
@@ -255,23 +267,29 @@ TEST_F(bpf, bpf_allow_syscall_args) {
 	EXPECT_ALLOW_SYSCALL_ARGS(allow_syscall, nr, id, JUMP_JT, JUMP_JF);
 }
 
-FIXTURE(bpf_label) {
+FIXTURE(bpf_label)
+{
 	struct bpf_labels labels;
 };
 
-FIXTURE_SETUP(bpf_label) {}
-FIXTURE_TEARDOWN(bpf_label) {
+FIXTURE_SETUP(bpf_label)
+{
+}
+FIXTURE_TEARDOWN(bpf_label)
+{
 	free_label_strings(&self->labels);
 }
 
-TEST_F(bpf_label, zero_length_filter) {
+TEST_F(bpf_label, zero_length_filter)
+{
 	int res = bpf_resolve_jumps(&self->labels, NULL, 0);
 
 	EXPECT_EQ(res, 0);
 	EXPECT_EQ(self->labels.count, 0U);
 }
 
-TEST_F(bpf_label, single_label) {
+TEST_F(bpf_label, single_label)
+{
 	struct sock_filter test_label[1];
 
 	int id = bpf_label_id(&self->labels, "test");
@@ -282,7 +300,8 @@ TEST_F(bpf_label, single_label) {
 	EXPECT_EQ(self->labels.count, 1U);
 }
 
-TEST_F(bpf_label, repeated_label) {
+TEST_F(bpf_label, repeated_label)
+{
 	struct sock_filter test_label[2];
 
 	int id = bpf_label_id(&self->labels, "test");
@@ -293,7 +312,8 @@ TEST_F(bpf_label, repeated_label) {
 	EXPECT_EQ(res, -1);
 }
 
-TEST_F(bpf_label, jump_with_no_label) {
+TEST_F(bpf_label, jump_with_no_label)
+{
 	struct sock_filter test_jump[1];
 
 	set_bpf_jump_lbl(test_jump, 14831);
@@ -302,7 +322,8 @@ TEST_F(bpf_label, jump_with_no_label) {
 	EXPECT_EQ(res, -1);
 }
 
-TEST_F(bpf_label, jump_to_valid_label) {
+TEST_F(bpf_label, jump_to_valid_label)
+{
 	struct sock_filter test_jump[2];
 
 	int id = bpf_label_id(&self->labels, "test");
@@ -314,7 +335,8 @@ TEST_F(bpf_label, jump_to_valid_label) {
 	EXPECT_EQ(self->labels.count, 1U);
 }
 
-TEST_F(bpf_label, jump_to_invalid_label) {
+TEST_F(bpf_label, jump_to_invalid_label)
+{
 	struct sock_filter test_jump[2];
 
 	int id = bpf_label_id(&self->labels, "test");
@@ -325,7 +347,8 @@ TEST_F(bpf_label, jump_to_invalid_label) {
 	EXPECT_EQ(res, -1);
 }
 
-TEST_F(bpf_label, jump_to_unresolved_label) {
+TEST_F(bpf_label, jump_to_unresolved_label)
+{
 	struct sock_filter test_jump[2];
 
 	int id = bpf_label_id(&self->labels, "test");
@@ -337,13 +360,14 @@ TEST_F(bpf_label, jump_to_unresolved_label) {
 	EXPECT_EQ(res, -1);
 }
 
-TEST_F(bpf_label, too_many_labels) {
+TEST_F(bpf_label, too_many_labels)
+{
 	unsigned int i;
 	char label[20];
 
 	for (i = 0; i < BPF_LABELS_MAX; i++) {
 		snprintf(label, 20, "test%u", i);
-		(void) bpf_label_id(&self->labels, label);
+		(void)bpf_label_id(&self->labels, label);
 	}
 	int id = bpf_label_id(&self->labels, "test");
 
@@ -353,21 +377,26 @@ TEST_F(bpf_label, too_many_labels) {
 	EXPECT_EQ(self->labels.count, BPF_LABELS_MAX);
 }
 
-FIXTURE(arg_filter) {
+FIXTURE(arg_filter)
+{
 	struct bpf_labels labels;
 };
 
-FIXTURE_SETUP(arg_filter) {}
-FIXTURE_TEARDOWN(arg_filter) {
+FIXTURE_SETUP(arg_filter)
+{
+}
+FIXTURE_TEARDOWN(arg_filter)
+{
 	free_label_strings(&self->labels);
 }
 
-TEST_F(arg_filter, arg0_equals) {
+TEST_F(arg_filter, arg0_equals)
+{
 	const char *fragment = "arg0 == 0";
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -404,12 +433,13 @@ TEST_F(arg_filter, arg0_equals) {
 	free_block_list(block);
 }
 
-TEST_F(arg_filter, arg0_mask) {
+TEST_F(arg_filter, arg0_mask)
+{
 	const char *fragment = "arg1 & O_RDWR";
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -446,12 +476,13 @@ TEST_F(arg_filter, arg0_mask) {
 	free_block_list(block);
 }
 
-TEST_F(arg_filter, arg0_flag_set_inclusion) {
+TEST_F(arg_filter, arg0_flag_set_inclusion)
+{
 	const char *fragment = "arg0 in O_RDONLY|O_CREAT";
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -488,12 +519,13 @@ TEST_F(arg_filter, arg0_flag_set_inclusion) {
 	free_block_list(block);
 }
 
-TEST_F(arg_filter, arg0_eq_mask) {
+TEST_F(arg_filter, arg0_eq_mask)
+{
 	const char *fragment = "arg1 == O_WRONLY|O_CREAT";
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -509,8 +541,8 @@ TEST_F(arg_filter, arg0_eq_mask) {
 	curr_block = block->next;
 	ASSERT_NE(curr_block, NULL);
 	EXPECT_COMP(curr_block);
-	EXPECT_EQ(curr_block->instrs[BPF_ARG_COMP_LEN  - 1].k,
-		(unsigned int)(O_WRONLY | O_CREAT));
+	EXPECT_EQ(curr_block->instrs[BPF_ARG_COMP_LEN - 1].k,
+		  (unsigned int)(O_WRONLY | O_CREAT));
 
 	/* Third block is a jump and a label (end of AND group). */
 	curr_block = curr_block->next;
@@ -532,13 +564,14 @@ TEST_F(arg_filter, arg0_eq_mask) {
 	free_block_list(block);
 }
 
-TEST_F(arg_filter, and_or) {
+TEST_F(arg_filter, and_or)
+{
 	const char *fragment = "arg0 == 0 && arg1 == 0 || arg0 == 1";
 	int nr = 1;
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + 3 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
 	EXPECT_EQ(block->total_len, exp_total_len);
@@ -590,13 +623,14 @@ TEST_F(arg_filter, and_or) {
 	free_label_strings(&self->labels);
 }
 
-TEST_F(arg_filter, ret_errno) {
+TEST_F(arg_filter, ret_errno)
+{
 	const char *fragment = "arg0 == 0 || arg0 == 1; return 1";
 	int nr = 1;
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + 2 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
 	EXPECT_EQ(block->total_len, exp_total_len);
@@ -631,9 +665,8 @@ TEST_F(arg_filter, ret_errno) {
 	curr_block = curr_block->next;
 	ASSERT_NE(curr_block, NULL);
 	EXPECT_EQ(curr_block->len, 1U);
-	EXPECT_EQ_STMT(curr_block->instrs,
-			BPF_RET+BPF_K,
-			SECCOMP_RET_ERRNO | (1 & SECCOMP_RET_DATA));
+	EXPECT_EQ_STMT(curr_block->instrs, BPF_RET + BPF_K,
+		       SECCOMP_RET_ERRNO | (1 & SECCOMP_RET_DATA));
 
 	/* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
 	curr_block = curr_block->next;
@@ -646,13 +679,14 @@ TEST_F(arg_filter, ret_errno) {
 	free_label_strings(&self->labels);
 }
 
-TEST_F(arg_filter, unconditional_errno) {
+TEST_F(arg_filter, unconditional_errno)
+{
 	const char *fragment = "return 1";
 	int nr = 1;
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 2;
 	EXPECT_EQ(block->total_len, exp_total_len);
@@ -667,9 +701,8 @@ TEST_F(arg_filter, unconditional_errno) {
 	curr_block = curr_block->next;
 	ASSERT_NE(curr_block, NULL);
 	EXPECT_EQ(curr_block->len, 1U);
-	EXPECT_EQ_STMT(curr_block->instrs,
-			BPF_RET+BPF_K,
-			SECCOMP_RET_ERRNO | (1 & SECCOMP_RET_DATA));
+	EXPECT_EQ_STMT(curr_block->instrs, BPF_RET + BPF_K,
+		       SECCOMP_RET_ERRNO | (1 & SECCOMP_RET_DATA));
 
 	EXPECT_EQ(curr_block->next, NULL);
 
@@ -677,7 +710,8 @@ TEST_F(arg_filter, unconditional_errno) {
 	free_label_strings(&self->labels);
 }
 
-TEST_F(arg_filter, invalid_arg_number) {
+TEST_F(arg_filter, invalid_arg_number)
+{
 	const char *fragment = "argnn == 0";
 	int nr = 1;
 	unsigned int id = 0;
@@ -687,7 +721,8 @@ TEST_F(arg_filter, invalid_arg_number) {
 	ASSERT_EQ(block, NULL);
 }
 
-TEST_F(arg_filter, invalid_constant) {
+TEST_F(arg_filter, invalid_constant)
+{
 	const char *fragment = "arg0 == INVALIDCONSTANT";
 	int nr = 1;
 	unsigned int id = 0;
@@ -697,7 +732,8 @@ TEST_F(arg_filter, invalid_constant) {
 	ASSERT_EQ(block, NULL);
 }
 
-TEST_F(arg_filter, invalid_errno) {
+TEST_F(arg_filter, invalid_errno)
+{
 	const char *fragment = "arg0 == 0 && arg1 == 1; return errno";
 	int nr = 1;
 	unsigned int id = 0;
@@ -707,12 +743,13 @@ TEST_F(arg_filter, invalid_errno) {
 	ASSERT_EQ(block, NULL);
 }
 
-TEST_F(arg_filter, log_no_ret_error) {
+TEST_F(arg_filter, log_no_ret_error)
+{
 	const char *fragment = "arg0 == 0";
 	int nr = 1;
 	unsigned int id = 0;
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, USE_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, USE_LOGGING);
 
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -750,13 +787,14 @@ TEST_F(arg_filter, log_no_ret_error) {
 	free_label_strings(&self->labels);
 }
 
-TEST_F(arg_filter, log_bad_ret_error) {
+TEST_F(arg_filter, log_bad_ret_error)
+{
 	const char *fragment = "arg0 == 0; return";
 	int nr = 1;
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
 	EXPECT_EQ(block->total_len, exp_total_len);
@@ -795,13 +833,14 @@ TEST_F(arg_filter, log_bad_ret_error) {
 	free_label_strings(&self->labels);
 }
 
-TEST_F(arg_filter, no_log_bad_ret_error) {
+TEST_F(arg_filter, no_log_bad_ret_error)
+{
 	const char *fragment = "arg0 == 0; return";
 	int nr = 1;
 	unsigned int id = 0;
 
 	struct filter_block *block =
-		compile_section(nr, fragment, id, &self->labels, USE_LOGGING);
+	    compile_section(nr, fragment, id, &self->labels, USE_LOGGING);
 	ASSERT_NE(block, NULL);
 	size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
 	EXPECT_EQ(block->total_len, exp_total_len);
@@ -840,12 +879,17 @@ TEST_F(arg_filter, no_log_bad_ret_error) {
 	free_label_strings(&self->labels);
 }
 
-FIXTURE(filter) {};
+FIXTURE(filter){};
 
-FIXTURE_SETUP(filter) {}
-FIXTURE_TEARDOWN(filter) {}
+FIXTURE_SETUP(filter)
+{
+}
+FIXTURE_TEARDOWN(filter)
+{
+}
 
-FILE *write_policy_to_pipe(const char *policy, size_t len) {
+FILE *write_policy_to_pipe(const char *policy, size_t len)
+{
 	int pipefd[2];
 	if (pipe(pipefd) == -1) {
 		pwarn("pipe(pipefd) failed");
@@ -882,13 +926,13 @@ FILE *write_policy_to_pipe(const char *policy, size_t len) {
 	return fdopen(pipefd[0], "r");
 }
 
-TEST_F(filter, seccomp_mode1) {
+TEST_F(filter, seccomp_mode1)
+{
 	struct sock_fprog actual;
-	const char *policy =
-		"read: 1\n"
-		"write: 1\n"
-		"rt_sigreturn: 1\n"
-		"exit: 1\n";
+	const char *policy = "read: 1\n"
+			     "write: 1\n"
+			     "rt_sigreturn: 1\n"
+			     "exit: 1\n";
 
 	FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
 	ASSERT_NE(policy_file, NULL);
@@ -906,28 +950,28 @@ TEST_F(filter, seccomp_mode1) {
 	EXPECT_EQ(actual.len, 13);
 	EXPECT_ARCH_VALIDATION(actual.filter);
 	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
-			BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+		       BPF_LD + BPF_W + BPF_ABS, syscall_nr);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 1,
-			__NR_read);
+			     __NR_read);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 3,
-			__NR_write);
+			     __NR_write);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 5,
-			__NR_rt_sigreturn);
+			     __NR_rt_sigreturn);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
-			__NR_exit);
-	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET+BPF_K,
-			SECCOMP_RET_KILL);
+			     __NR_exit);
+	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET + BPF_K,
+		       SECCOMP_RET_KILL);
 
 	free(actual.filter);
 }
 
-TEST_F(filter, seccomp_mode1_trap) {
+TEST_F(filter, seccomp_mode1_trap)
+{
 	struct sock_fprog actual;
-	const char *policy =
-		"read: 1\n"
-		"write: 1\n"
-		"rt_sigreturn: 1\n"
-		"exit: 1\n";
+	const char *policy = "read: 1\n"
+			     "write: 1\n"
+			     "rt_sigreturn: 1\n"
+			     "exit: 1\n";
 
 	FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
 	ASSERT_NE(policy_file, NULL);
@@ -945,28 +989,28 @@ TEST_F(filter, seccomp_mode1_trap) {
 	EXPECT_EQ(actual.len, 13);
 	EXPECT_ARCH_VALIDATION(actual.filter);
 	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
-			BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+		       BPF_LD + BPF_W + BPF_ABS, syscall_nr);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 1,
-			__NR_read);
+			     __NR_read);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 3,
-			__NR_write);
+			     __NR_write);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 5,
-			__NR_rt_sigreturn);
+			     __NR_rt_sigreturn);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
-			__NR_exit);
-	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET+BPF_K,
-			SECCOMP_RET_TRAP);
+			     __NR_exit);
+	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET + BPF_K,
+		       SECCOMP_RET_TRAP);
 
 	free(actual.filter);
 }
 
-TEST_F(filter, seccomp_read_write) {
+TEST_F(filter, seccomp_read_write)
+{
 	struct sock_fprog actual;
-	const char *policy =
-		"read: arg0 == 0\n"
-		"write: arg0 == 1 || arg0 == 2\n"
-		"rt_sigreturn: 1\n"
-		"exit: 1\n";
+	const char *policy = "read: arg0 == 0\n"
+			     "write: arg0 == 1 || arg0 == 2\n"
+			     "rt_sigreturn: 1\n"
+			     "exit: 1\n";
 
 	FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
 	ASSERT_NE(policy_file, NULL);
@@ -987,22 +1031,23 @@ TEST_F(filter, seccomp_read_write) {
 
 	EXPECT_ARCH_VALIDATION(actual.filter);
 	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
-			BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+		       BPF_LD + BPF_W + BPF_ABS, syscall_nr);
 	EXPECT_ALLOW_SYSCALL_ARGS(actual.filter + ARCH_VALIDATION_LEN + 1,
-			__NR_read, 7, 0, 0);
+				  __NR_read, 7, 0, 0);
 	EXPECT_ALLOW_SYSCALL_ARGS(actual.filter + ARCH_VALIDATION_LEN + 3,
-			__NR_write, 12 + BPF_ARG_COMP_LEN, 0, 0);
+				  __NR_write, 12 + BPF_ARG_COMP_LEN, 0, 0);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 5,
-			__NR_rt_sigreturn);
+			     __NR_rt_sigreturn);
 	EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
-			__NR_exit);
-	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET+BPF_K,
-			SECCOMP_RET_KILL);
+			     __NR_exit);
+	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET + BPF_K,
+		       SECCOMP_RET_KILL);
 
 	free(actual.filter);
 }
 
-TEST_F(filter, invalid_name) {
+TEST_F(filter, invalid_name)
+{
 	struct sock_fprog actual;
 	const char *policy = "notasyscall: 1\n";
 
@@ -1014,7 +1059,8 @@ TEST_F(filter, invalid_name) {
 	ASSERT_NE(res, 0);
 }
 
-TEST_F(filter, invalid_arg) {
+TEST_F(filter, invalid_arg)
+{
 	struct sock_fprog actual;
 	const char *policy = "open: argnn ==\n";
 
@@ -1026,19 +1072,20 @@ TEST_F(filter, invalid_arg) {
 	ASSERT_NE(res, 0);
 }
 
-TEST_F(filter, nonexistent) {
+TEST_F(filter, nonexistent)
+{
 	struct sock_fprog actual;
 	int res = compile_filter(NULL, &actual, 0, NO_LOGGING);
 	ASSERT_NE(res, 0);
 }
 
-TEST_F(filter, log) {
+TEST_F(filter, log)
+{
 	struct sock_fprog actual;
-	const char *policy =
-		"read: 1\n"
-		"write: 1\n"
-		"rt_sigreturn: 1\n"
-		"exit: 1\n";
+	const char *policy = "read: 1\n"
+			     "write: 1\n"
+			     "rt_sigreturn: 1\n"
+			     "exit: 1\n";
 
 	FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
 	ASSERT_NE(policy_file, NULL);
@@ -1060,7 +1107,7 @@ TEST_F(filter, log) {
 	EXPECT_EQ(actual.len, 13 + 2 * log_syscalls_len);
 	EXPECT_ARCH_VALIDATION(actual.filter);
 	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
-			BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+		       BPF_LD + BPF_W + BPF_ABS, syscall_nr);
 
 	index = ARCH_VALIDATION_LEN + 1;
 	for (i = 0; i < log_syscalls_len; i++)
@@ -1073,19 +1120,19 @@ TEST_F(filter, log) {
 	EXPECT_ALLOW_SYSCALL(actual.filter + index + 2, __NR_write);
 	EXPECT_ALLOW_SYSCALL(actual.filter + index + 4, __NR_rt_sigreturn);
 	EXPECT_ALLOW_SYSCALL(actual.filter + index + 6, __NR_exit);
-	EXPECT_EQ_STMT(actual.filter + index + 8, BPF_RET+BPF_K,
-			SECCOMP_RET_TRAP);
+	EXPECT_EQ_STMT(actual.filter + index + 8, BPF_RET + BPF_K,
+		       SECCOMP_RET_TRAP);
 
 	free(actual.filter);
 }
 
-TEST_F(filter, allow_log_but_kill) {
+TEST_F(filter, allow_log_but_kill)
+{
 	struct sock_fprog actual;
-	const char *policy =
-		"read: 1\n"
-		"write: 1\n"
-		"rt_sigreturn: 1\n"
-		"exit: 1\n";
+	const char *policy = "read: 1\n"
+			     "write: 1\n"
+			     "rt_sigreturn: 1\n"
+			     "exit: 1\n";
 
 	FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
 	ASSERT_NE(policy_file, NULL);
@@ -1107,7 +1154,7 @@ TEST_F(filter, allow_log_but_kill) {
 	EXPECT_EQ(actual.len, 13 + 2 * log_syscalls_len);
 	EXPECT_ARCH_VALIDATION(actual.filter);
 	EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
-			BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+		       BPF_LD + BPF_W + BPF_ABS, syscall_nr);
 
 	index = ARCH_VALIDATION_LEN + 1;
 	for (i = 0; i < log_syscalls_len; i++)
@@ -1120,8 +1167,8 @@ TEST_F(filter, allow_log_but_kill) {
 	EXPECT_ALLOW_SYSCALL(actual.filter + index + 2, __NR_write);
 	EXPECT_ALLOW_SYSCALL(actual.filter + index + 4, __NR_rt_sigreturn);
 	EXPECT_ALLOW_SYSCALL(actual.filter + index + 6, __NR_exit);
-	EXPECT_EQ_STMT(actual.filter + index + 8, BPF_RET+BPF_K,
-			SECCOMP_RET_KILL);
+	EXPECT_EQ_STMT(actual.filter + index + 8, BPF_RET + BPF_K,
+		       SECCOMP_RET_KILL);
 
 	free(actual.filter);
 }
