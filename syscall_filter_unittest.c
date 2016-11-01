@@ -390,6 +390,39 @@ FIXTURE_TEARDOWN(arg_filter)
 	free_label_strings(&self->labels);
 }
 
+TEST_F(arg_filter, empty_atom)
+{
+	const char *fragment = "";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_EQ(block, NULL);
+}
+
+TEST_F(arg_filter, no_comparison)
+{
+	const char *fragment = "arg0";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_EQ(block, NULL);
+}
+
+TEST_F(arg_filter, no_constant)
+{
+	const char *fragment = "arg0 ==";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_EQ(block, NULL);
+}
+
 TEST_F(arg_filter, arg0_equals)
 {
 	const char *fragment = "arg0 == 0";
@@ -710,6 +743,17 @@ TEST_F(arg_filter, unconditional_errno)
 	free_label_strings(&self->labels);
 }
 
+TEST_F(arg_filter, invalid_arg_token)
+{
+	const char *fragment = "org0 == 0";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_EQ(block, NULL);
+}
+
 TEST_F(arg_filter, invalid_arg_number)
 {
 	const char *fragment = "argnn == 0";
@@ -721,9 +765,42 @@ TEST_F(arg_filter, invalid_arg_number)
 	ASSERT_EQ(block, NULL);
 }
 
+TEST_F(arg_filter, extra_chars_in_arg_token)
+{
+	const char *fragment = "arg0n == 0";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_EQ(block, NULL);
+}
+
+TEST_F(arg_filter, invalid_operator)
+{
+	const char *fragment = "arg0 invalidop 0";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_EQ(block, NULL);
+}
+
 TEST_F(arg_filter, invalid_constant)
 {
 	const char *fragment = "arg0 == INVALIDCONSTANT";
+	int nr = 1;
+	unsigned int id = 0;
+
+	struct filter_block *block =
+	    compile_section(nr, fragment, id, &self->labels, NO_LOGGING);
+	ASSERT_EQ(block, NULL);
+}
+
+TEST_F(arg_filter, extra_tokens)
+{
+	const char *fragment = "arg0 == 0 EXTRATOKEN";
 	int nr = 1;
 	unsigned int id = 0;
 
@@ -1044,6 +1121,19 @@ TEST_F(filter, seccomp_read_write)
 		       SECCOMP_RET_KILL);
 
 	free(actual.filter);
+}
+
+TEST_F(filter, missing_atom)
+{
+	struct sock_fprog actual;
+	const char *policy = "open:\n";
+
+	FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
+	ASSERT_NE(policy_file, NULL);
+
+	int res = compile_filter(policy_file, &actual, 0, NO_LOGGING);
+	fclose(policy_file);
+	ASSERT_NE(res, 0);
 }
 
 TEST_F(filter, invalid_name)
