@@ -11,11 +11,13 @@
 
 #include "util.h"
 
+/* clang-format off */
 #define MAX_LINE_LENGTH 	1024
 #define MAX_POLICY_LINE_LENGTH	1024
 
 #define ONE_INSTR	1
 #define TWO_INSTRS	2
+/* clang-format on */
 
 int seccomp_can_softfail()
 {
@@ -485,9 +487,8 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog, int use_ret_trap,
 			append_filter_block(head, nr_comp, ALLOW_SYSCALL_LEN);
 
 			/* Build the arg filter block. */
-			struct filter_block *block =
-			    compile_section(nr, policy_line, id, &labels,
-					    use_ret_trap);
+			struct filter_block *block = compile_section(
+			    nr, policy_line, id, &labels, use_ret_trap);
 
 			if (!block)
 				return -1;
