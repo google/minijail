@@ -376,13 +376,13 @@ TEST_F(ArgFilterTest, arg0_equals) {
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, NO_LOGGING);
 
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
@@ -392,20 +392,20 @@ TEST_F(ArgFilterTest, arg0_equals) {
 
   /* Third block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /* Fourth block is SECCOMP_RET_KILL. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_KILL(curr_block);
 
   /* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_ALLOW(curr_block);
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -417,13 +417,13 @@ TEST_F(ArgFilterTest, arg0_mask) {
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, NO_LOGGING);
 
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
@@ -433,20 +433,20 @@ TEST_F(ArgFilterTest, arg0_mask) {
 
   /* Third block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /* Fourth block is SECCOMP_RET_KILL. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_KILL(curr_block);
 
   /* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_ALLOW(curr_block);
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -501,39 +501,39 @@ TEST_F(ArgFilterTest, arg0_eq_mask) {
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, NO_LOGGING);
 
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison. */
   curr_block = block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
   EXPECT_EQ(curr_block->instrs[BPF_ARG_COMP_LEN - 1].k,
             (unsigned int)(O_WRONLY | O_CREAT));
 
   /* Third block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /* Fourth block is SECCOMP_RET_KILL. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_KILL(curr_block);
 
   /* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_ALLOW(curr_block);
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -545,52 +545,52 @@ TEST_F(ArgFilterTest, and_or) {
 
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, NO_LOGGING);
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + 3 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison ("arg0 == 0"). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
   /* Third block is a comparison ("arg1 == 0"). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
   /* Fourth block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /* Fifth block is a comparison ("arg0 == 1"). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
   /* Sixth block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /* Seventh block is SECCOMP_RET_KILL. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_KILL(curr_block);
 
   /* Eigth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_ALLOW(curr_block);
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -602,39 +602,39 @@ TEST_F(ArgFilterTest, ret_errno) {
 
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, NO_LOGGING);
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + 2 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison ("arg0 == 0"). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
   /* Third block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /* Fourth block is a comparison ("arg0 == 1"). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
   /* Fifth block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /* Sixth block is SECCOMP_RET_ERRNO. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(curr_block->len, 1U);
   EXPECT_EQ_STMT(curr_block->instrs,
                  BPF_RET + BPF_K,
@@ -642,10 +642,10 @@ TEST_F(ArgFilterTest, ret_errno) {
 
   /* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_ALLOW(curr_block);
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -657,25 +657,25 @@ TEST_F(ArgFilterTest, unconditional_errno) {
 
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, NO_LOGGING);
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is SECCOMP_RET_ERRNO. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(curr_block->len, 1U);
   EXPECT_EQ_STMT(curr_block->instrs,
                  BPF_RET + BPF_K,
                  SECCOMP_RET_ERRNO | (1 & SECCOMP_RET_DATA));
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -757,37 +757,37 @@ TEST_F(ArgFilterTest, log_no_ret_error) {
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, USE_LOGGING);
 
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison. */
   curr_block = block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
   /* Third block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /* Fourth block is SECCOMP_RET_TRAP, with no errno. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_TRAP(curr_block);
 
   /* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_ALLOW(curr_block);
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -799,39 +799,39 @@ TEST_F(ArgFilterTest, log_bad_ret_error) {
 
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, NO_LOGGING);
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison ("arg0 == 0"). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
   /* Third block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /*
    * Sixth block is NOT SECCOMP_RET_ERRNO, it should be SECCOMP_RET_KILL.
    */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_KILL(curr_block);
 
   /* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_ALLOW(curr_block);
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -843,24 +843,24 @@ TEST_F(ArgFilterTest, no_log_bad_ret_error) {
 
   struct filter_block *block =
       compile_section(nr, fragment, id, &labels_, USE_LOGGING);
-  ASSERT_TRUE(block != NULL);
+  ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
 
   /* First block is a label. */
   struct filter_block *curr_block = block;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_EQ(block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison ("arg0 == 0"). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
   /* Third block is a jump and a label (end of AND group). */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_GROUP_END(curr_block);
 
   /*
@@ -868,15 +868,15 @@ TEST_F(ArgFilterTest, no_log_bad_ret_error) {
    * SECCOMP_RET_TRAP.
    */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_TRAP(curr_block);
 
   /* Seventh block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
   curr_block = curr_block->next;
-  ASSERT_TRUE(curr_block != NULL);
+  ASSERT_NE(curr_block, nullptr);
   EXPECT_ALLOW(curr_block);
 
-  EXPECT_TRUE(curr_block->next == NULL);
+  EXPECT_EQ(curr_block->next, nullptr);
 
   free_block_list(block);
 }
@@ -927,7 +927,7 @@ TEST(FilterTest, seccomp_mode1) {
       "exit: 1\n";
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
-  ASSERT_TRUE(policy_file != NULL);
+  ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
@@ -964,7 +964,7 @@ TEST(FilterTest, seccomp_mode1_trap) {
     "exit: 1\n";
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
-  ASSERT_TRUE(policy_file != NULL);
+  ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, USE_RET_TRAP, NO_LOGGING);
   fclose(policy_file);
@@ -1002,7 +1002,7 @@ TEST(FilterTest, seccomp_read_write) {
       "exit: 1\n";
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
-  ASSERT_TRUE(policy_file != NULL);
+  ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
@@ -1055,7 +1055,7 @@ TEST(FilterTest, invalid_name) {
   const char *policy = "notasyscall: 1\n";
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
-  ASSERT_TRUE(policy_file != NULL);
+  ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, 0, NO_LOGGING);
   fclose(policy_file);
@@ -1067,7 +1067,7 @@ TEST(FilterTest, invalid_arg) {
   const char *policy = "open: argnn ==\n";
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
-  ASSERT_TRUE(policy_file != NULL);
+  ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, 0, NO_LOGGING);
   fclose(policy_file);
@@ -1089,7 +1089,7 @@ TEST(FilterTest, log) {
       "exit: 1\n";
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
-  ASSERT_TRUE(policy_file != NULL);
+  ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, USE_RET_TRAP, USE_LOGGING);
   fclose(policy_file);
@@ -1135,7 +1135,7 @@ TEST(FilterTest, allow_log_but_kill) {
     "exit: 1\n";
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
-  ASSERT_TRUE(policy_file != NULL);
+  ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, USE_RET_KILL, USE_LOGGING);
   fclose(policy_file);

@@ -17,7 +17,9 @@
 
 #include <errno.h>
 
+#include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <gtest/gtest.h>
@@ -25,6 +27,12 @@
 #include "libminijail.h"
 #include "libminijail-private.h"
 #include "util.h"
+
+#if defined(__ANDROID__)
+const char *kShellPath = "/system/bin/sh";
+#else
+const char *kShellPath = "/bin/sh";
+#endif
 
 /* Prototypes needed only by test. */
 void *consumebytes(size_t length, char **buf, size_t *buflength);
@@ -41,7 +49,7 @@ TEST(consumebytes, zero) {
   char buf[1024];
   size_t len = sizeof(buf);
   char *pos = &buf[0];
-  EXPECT_TRUE(NULL != consumebytes(0, &pos, &len));
+  EXPECT_NE(nullptr, consumebytes(0, &pos, &len));
   EXPECT_EQ(&buf[0], pos);
   EXPECT_EQ(sizeof(buf), len);
 }
@@ -52,7 +60,7 @@ TEST(consumebytes, exact) {
   char *pos = &buf[0];
   /* One past the end since it consumes the whole buffer. */
   char *end = &buf[sizeof(buf)];
-  EXPECT_TRUE(NULL != consumebytes(len, &pos, &len));
+  EXPECT_NE(nullptr, consumebytes(len, &pos, &len));
   EXPECT_EQ((size_t)0, len);
   EXPECT_EQ(end, pos);
 }
@@ -63,7 +71,7 @@ TEST(consumebytes, half) {
   char *pos = &buf[0];
   /* One past the end since it consumes the whole buffer. */
   char *end = &buf[sizeof(buf) / 2];
-  EXPECT_TRUE(NULL != consumebytes(len / 2, &pos, &len));
+  EXPECT_NE(nullptr, consumebytes(len / 2, &pos, &len));
   EXPECT_EQ(sizeof(buf) / 2, len);
   EXPECT_EQ(end, pos);
 }
@@ -73,7 +81,7 @@ TEST(consumebytes, toolong) {
   size_t len = sizeof(buf);
   char *pos = &buf[0];
   /* One past the end since it consumes the whole buffer. */
-  EXPECT_TRUE(NULL == consumebytes(len + 1, &pos, &len));
+  EXPECT_EQ(nullptr, consumebytes(len + 1, &pos, &len));
   EXPECT_EQ(sizeof(buf), len);
   EXPECT_EQ(&buf[0], pos);
 }
@@ -83,7 +91,7 @@ TEST(consumestr, zero) {
   size_t len = 0;
   char *pos = &buf[0];
   memset(buf, 0xff, sizeof(buf));
-  EXPECT_EQ(NULL, consumestr(&pos, &len));
+  EXPECT_EQ(nullptr, consumestr(&pos, &len));
   EXPECT_EQ((size_t)0, len);
   EXPECT_EQ(&buf[0], pos);
 }
@@ -93,7 +101,7 @@ TEST(consumestr, nonul) {
   size_t len = sizeof(buf);
   char *pos = &buf[0];
   memset(buf, 0xff, sizeof(buf));
-  EXPECT_EQ(NULL, consumestr(&pos, &len));
+  EXPECT_EQ(nullptr, consumestr(&pos, &len));
   EXPECT_EQ(sizeof(buf), len);
   EXPECT_EQ(&buf[0], pos);
 }
@@ -115,7 +123,7 @@ TEST(consumestr, trailing_nul) {
   char *pos = &buf[0];
   memset(buf, 0xff, sizeof(buf));
   buf[sizeof(buf)-1] = '\0';
-  EXPECT_EQ(NULL, consumestr(&pos, &len));
+  EXPECT_EQ(nullptr, consumestr(&pos, &len));
   EXPECT_EQ(sizeof(buf) - 1, len);
   EXPECT_EQ(&buf[0], pos);
 }
@@ -189,11 +197,7 @@ TEST(Test, minijail_run_pid_pipes_no_preload) {
   ASSERT_TRUE(WIFSIGNALED(status));
   EXPECT_EQ(WTERMSIG(status), SIGTERM);
 
-#if defined(__ANDROID__)
-  argv[0] = "/system/bin/sh";
-#else
-  argv[0] = "/bin/sh";
-#endif
+  argv[0] = (char*)kShellPath;
   argv[1] = "-c";
   argv[2] = "echo test >&2";
   argv[3] = NULL;
@@ -210,4 +214,60 @@ TEST(Test, minijail_run_pid_pipes_no_preload) {
   EXPECT_EQ(WEXITSTATUS(status), 0);
 
   minijail_destroy(j);
+}
+
+TEST(Test, test_minijail_no_fd_leaks) {
+  pid_t pid;
+  int child_stdout;
+  int mj_run_ret;
+  ssize_t read_ret;
+  const size_t buf_len = 128;
+  char buf[buf_len];
+  char script[buf_len];
+  int status;
+  char *argv[4];
+
+  int dev_null = open("/dev/null", O_RDONLY);
+  ASSERT_NE(dev_null, -1);
+  snprintf(script,
+           sizeof(script),
+           "[ -e /proc/self/fd/%d ] && echo yes || echo no",
+           dev_null);
+
+  struct minijail *j = minijail_new();
+
+  argv[0] = (char*)kShellPath;
+  argv[1] = "-c";
+  argv[2] = script;
+  argv[3] = NULL;
+  mj_run_ret = minijail_run_pid_pipes_no_preload(
+      j, argv[0], argv, &pid, NULL, &child_stdout, NULL);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  read_ret = read(child_stdout, buf, buf_len);
+  EXPECT_GE(read_ret, 0);
+  buf[read_ret] = '\0';
+  EXPECT_STREQ(buf, "yes\n");
+
+  waitpid(pid, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+
+  minijail_close_open_fds(j);
+  mj_run_ret = minijail_run_pid_pipes_no_preload(
+      j, argv[0], argv, &pid, NULL, &child_stdout, NULL);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  read_ret = read(child_stdout, buf, buf_len);
+  EXPECT_GE(read_ret, 0);
+  buf[read_ret] = '\0';
+  EXPECT_STREQ(buf, "no\n");
+
+  waitpid(pid, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+
+  minijail_destroy(j);
+
+  close(dev_null);
 }
