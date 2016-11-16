@@ -16,6 +16,7 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <linux/capability.h>
+#include <net/if.h>
 #include <pwd.h>
 #include <sched.h>
 #include <signal.h>
@@ -29,6 +30,7 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/prctl.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/user.h>
@@ -1519,6 +1521,35 @@ static void set_seccomp_filter(const struct minijail *j)
 	}
 }
 
+static void net_bring_up_loopback(void)
+{
+	static const char ifname[] = "lo";
+	int sock;
+	struct ifreq ifr;
+
+	/* Make sure people don't try to add really long names. */
+	_Static_assert(sizeof(ifname) <= IFNAMSIZ, "interface name too long");
+
+	sock = socket(AF_LOCAL, SOCK_DGRAM|SOCK_CLOEXEC, 0);
+	if (sock < 0)
+		pdie("socket(AF_LOCAL) failed");
+
+	/*
+	 * Do the equiv of `ip link set up lo`.  The kernel will assign
+	 * IPv4 (127.0.0.1) & IPv6 (::1) addresses automatically!
+	 */
+	strcpy(ifr.ifr_name, ifname);
+	if (ioctl(sock, SIOCGIFFLAGS, &ifr) < 0)
+		pdie("ioctl(SIOCGIFFLAGS) failed");
+
+	/* The kernel preserves ifr.ifr_name for use. */
+	ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
+	if (ioctl(sock, SIOCSIFFLAGS, &ifr) < 0)
+		pdie("ioctl(SIOCSIFFLAGS) failed");
+
+	close(sock);
+}
+
 void API minijail_enter(const struct minijail *j)
 {
 	/*
@@ -1566,8 +1597,10 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.enter_net) {
 		if (setns(j->netns_fd, CLONE_NEWNET))
 			pdie("setns(CLONE_NEWNET)");
-	} else if (j->flags.net && unshare(CLONE_NEWNET)) {
-		pdie("unshare(net)");
+	} else if (j->flags.net) {
+		if (unshare(CLONE_NEWNET))
+			pdie("unshare(net)");
+		net_bring_up_loopback();
 	}
 
 	if (j->flags.ns_cgroups && unshare(CLONE_NEWCGROUP))
