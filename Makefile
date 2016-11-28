@@ -63,9 +63,9 @@ libsyscalls.gen.o.depends: libsyscalls.gen.c
 # Only regenerate libsyscalls.gen.c if the Makefile or header changes.
 # NOTE! This will not detect if the file is not appropriate for the target.
 libsyscalls.gen.c: $(SRC)/Makefile $(SRC)/libsyscalls.h
-	@printf "Generating target-arch specific $@... "
+	@printf "Generating target-arch specific $@...\n"
 	$(QUIET)$(SRC)/gen_syscalls.sh "$(CC)" "$@"
-	@printf "done.\n"
+	@printf "$@ done.\n"
 clean: CLEAN(libsyscalls.gen.c)
 
 $(eval $(call add_object_rules,libsyscalls.gen.o,CC,c,CFLAGS))
@@ -77,9 +77,9 @@ libconstants.gen.o.depends: libconstants.gen.c
 # Only regenerate libconstants.gen.c if the Makefile or header changes.
 # NOTE! This will not detect if the file is not appropriate for the target.
 libconstants.gen.c: $(SRC)/Makefile $(SRC)/libconstants.h
-	@printf "Generating target-arch specific $@... "
+	@printf "Generating target-arch specific $@...\n"
 	$(QUIET)$(SRC)/gen_constants.sh "$(CC)" "$@"
-	@printf "done.\n"
+	@printf "$@ done.\n"
 clean: CLEAN(libconstants.gen.c)
 
 $(eval $(call add_object_rules,libconstants.gen.o,CC,c,CFLAGS))
