@@ -1961,15 +1961,19 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	}
 
 	/*
-	 * Make the process group ID of this process equal to its PID, so that
-	 * both the Minijail process and the jailed process can be killed
-	 * together.
+	 * Make the process group ID of this process equal to its PID.
+	 * In the non-interactive case (e.g. when the parent process is started
+	 * from init) this ensures the parent process and the jailed process
+	 * can be killed together.
+	 * When the parent process is started from the console this ensures
+	 * the call to setsid(2) in the jailed process succeeds.
+	 *
 	 * Don't fail on EPERM, since setpgid(0, 0) can only EPERM when
 	 * the process is already a process group leader.
 	 */
 	if (setpgid(0 /* use calling PID */, 0 /* make PGID = PID */)) {
 		if (errno != EPERM) {
-			pdie("setpgid(0, 0)");
+			pdie("setpgid(0, 0) failed");
 		}
 	}
 
@@ -2217,6 +2221,19 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 		if (setup_and_dupe_pipe_end(stderr_fds, 1 /* write end */,
 					    STDERR_FILENO) < 0)
 			die("failed to set up stderr pipe");
+	}
+
+	/*
+	 * If any of stdin, stdout, or stderr are TTYs, create a new session.
+	 * This prevents the jailed process from using the TIOCSTI ioctl
+	 * to push characters into the parent process terminal's input buffer,
+	 * therefore escaping the jail.
+	 */
+	if (isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) ||
+	    isatty(STDERR_FILENO)) {
+		if (setsid() < 0) {
+			pdie("setsid() failed");
+		}
 	}
 
 	/* If running an init program, let it decide when/how to mount /proc. */
