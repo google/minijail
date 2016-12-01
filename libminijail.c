@@ -1344,7 +1344,7 @@ static void drop_ugid(const struct minijail *j)
 		 * Only attempt to clear supplementary groups if we are changing
 		 * users.
 		 */
-		if ((j->uid || j->gid) && setgroups(0, NULL))
+		if ((j->flags.uid || j->flags.gid) && setgroups(0, NULL))
 			pdie("setgroups");
 	}
 
