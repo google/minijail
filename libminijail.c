@@ -1334,10 +1334,10 @@ static void drop_ugid(const struct minijail *j)
 
 	if (j->flags.usergroups) {
 		if (initgroups(j->user, j->usergid))
-			pdie("initgroups");
+			pdie("initgroups(%s, %d) failed", j->user, j->usergid);
 	} else if (j->flags.suppl_gids) {
 		if (setgroups(j->suppl_gid_count, j->suppl_gid_list)) {
-			pdie("setgroups");
+			pdie("setgroups(suppl_gids) failed");
 		}
 	} else {
 		/*
@@ -1345,14 +1345,14 @@ static void drop_ugid(const struct minijail *j)
 		 * users.
 		 */
 		if ((j->flags.uid || j->flags.gid) && setgroups(0, NULL))
-			pdie("setgroups");
+			pdie("setgroups(0, NULL) failed");
 	}
 
 	if (j->flags.gid && setresgid(j->gid, j->gid, j->gid))
-		pdie("setresgid");
+		pdie("setresgid(%d, %d, %d) failed", j->gid, j->gid, j->gid);
 
 	if (j->flags.uid && setresuid(j->uid, j->uid, j->uid))
-		pdie("setresuid");
+		pdie("setresuid(%d, %d, %d) failed", j->uid, j->uid, j->uid);
 }
 
 /*
@@ -1521,7 +1521,7 @@ static void set_seccomp_filter(const struct minijail *j)
 	}
 }
 
-static void net_bring_up_loopback(void)
+static void config_net_loopback(void)
 {
 	static const char ifname[] = "lo";
 	int sock;
@@ -1573,11 +1573,11 @@ void API minijail_enter(const struct minijail *j)
 	 * entire process.
 	 */
 	if (j->flags.enter_vfs && setns(j->mountns_fd, CLONE_NEWNS))
-		pdie("setns(CLONE_NEWNS)");
+		pdie("setns(CLONE_NEWNS) failed");
 
 	if (j->flags.vfs) {
 		if (unshare(CLONE_NEWNS))
-			pdie("unshare(vfs)");
+			pdie("unshare(CLONE_NEWNS) failed");
 		/*
 		 * Unless asked not to, remount all filesystems as private.
 		 * If they are shared, new bind mounts will creep out of our
@@ -1586,25 +1586,26 @@ void API minijail_enter(const struct minijail *j)
 		 */
 		if (!j->flags.skip_remount_private) {
 			if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL))
-				pdie("mount(/, private)");
+				pdie("mount(NULL, /, NULL, MS_REC | MS_PRIVATE,"
+				     " NULL) failed");
 		}
 	}
 
 	if (j->flags.ipc && unshare(CLONE_NEWIPC)) {
-		pdie("unshare(ipc)");
+		pdie("unshare(CLONE_NEWIPC) failed");
 	}
 
 	if (j->flags.enter_net) {
 		if (setns(j->netns_fd, CLONE_NEWNET))
-			pdie("setns(CLONE_NEWNET)");
+			pdie("setns(CLONE_NEWNET) failed");
 	} else if (j->flags.net) {
 		if (unshare(CLONE_NEWNET))
-			pdie("unshare(net)");
-		net_bring_up_loopback();
+			pdie("unshare(CLONE_NEWNET) failed");
+		config_net_loopback();
 	}
 
 	if (j->flags.ns_cgroups && unshare(CLONE_NEWCGROUP))
-		pdie("unshare(cgroups)");
+		pdie("unshare(CLONE_NEWCGROUP) failed");
 
 	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");
@@ -1634,7 +1635,7 @@ void API minijail_enter(const struct minijail *j)
 		 * lock securebits.
 		 */
 		if (prctl(PR_SET_KEEPCAPS, 1))
-			pdie("prctl(PR_SET_KEEPCAPS)");
+			pdie("prctl(PR_SET_KEEPCAPS) failed");
 
 		/*
 		 * Kernels 4.3+ define a new securebit
@@ -1654,7 +1655,7 @@ void API minijail_enter(const struct minijail *j)
 			}
 		}
 		if (securebits_ret < 0)
-			pdie("prctl(PR_SET_SECUREBITS)");
+			pdie("prctl(PR_SET_SECUREBITS) failed");
 	}
 
 	if (j->flags.no_new_privs) {
@@ -1685,7 +1686,7 @@ void API minijail_enter(const struct minijail *j)
 	 */
 	if (j->flags.alt_syscall) {
 		if (prctl(PR_ALT_SYSCALL, 1, j->alt_syscall_table))
-			pdie("prctl(PR_ALT_SYSCALL)");
+			pdie("prctl(PR_ALT_SYSCALL) failed");
 	}
 
 	/*
@@ -1697,7 +1698,7 @@ void API minijail_enter(const struct minijail *j)
 			warn("seccomp not supported");
 			return;
 		}
-		pdie("prctl(PR_SET_SECCOMP)");
+		pdie("prctl(PR_SET_SECCOMP) failed");
 	}
 }
 
@@ -1957,7 +1958,8 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 
 	if (!use_preload) {
 		if (j->flags.use_caps && j->caps != 0)
-			die("non-empty capabilities are not supported without LD_PRELOAD");
+			die("non-empty capabilities are not supported without "
+			    "LD_PRELOAD");
 	}
 
 	/*
