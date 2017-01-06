@@ -123,8 +123,9 @@ struct minijail {
 	struct {
 		int uid : 1;
 		int gid : 1;
-		int usergroups : 1;
-		int suppl_gids : 1;
+		int inherit_suppl_gids : 1;
+		int set_suppl_gids : 1;
+		int keep_suppl_gids : 1;
 		int use_caps : 1;
 		int capbset_drop : 1;
 		int vfs : 1;
@@ -250,14 +251,14 @@ void API minijail_set_supplementary_gids(struct minijail *j, size_t size,
 {
 	size_t i;
 
-	if (j->flags.usergroups)
-		die("cannot inherit *and* set supplementary groups");
+	if (j->flags.inherit_suppl_gids || j->flags.keep_suppl_gids)
+		die("cannot inherit *and* set or keep supplementary groups");
 
 	if (size == 0) {
 		/* Clear supplementary groups. */
 		j->suppl_gid_list = NULL;
 		j->suppl_gid_count = 0;
-		j->flags.suppl_gids = 1;
+		j->flags.set_suppl_gids = 1;
 		return;
 	}
 
@@ -270,7 +271,11 @@ void API minijail_set_supplementary_gids(struct minijail *j, size_t size,
 		j->suppl_gid_list[i] = list[i];
 	}
 	j->suppl_gid_count = size;
-	j->flags.suppl_gids = 1;
+	j->flags.set_suppl_gids = 1;
+}
+
+void API minijail_keep_supplementary_gids(struct minijail *j) {
+	j->flags.keep_suppl_gids = 1;
 }
 
 int API minijail_change_user(struct minijail *j, const char *user)
@@ -514,7 +519,7 @@ int API minijail_gidmap(struct minijail *j, const char *gidmap)
 
 void API minijail_inherit_usergroups(struct minijail *j)
 {
-	j->flags.usergroups = 1;
+	j->flags.inherit_suppl_gids = 1;
 }
 
 void API minijail_run_as_init(struct minijail *j)
@@ -1327,22 +1332,22 @@ static void wait_for_parent_setup(int *pipe_fds)
 
 static void drop_ugid(const struct minijail *j)
 {
-	if (j->flags.usergroups && j->flags.suppl_gids) {
-		die("tried to inherit *and* set supplementary groups;"
-		    " can only do one");
+	if (j->flags.inherit_suppl_gids + j->flags.keep_suppl_gids +
+	    j->flags.set_suppl_gids > 1) {
+		die("can only either inherit, keep or set supplementary groups;"
+		    " tried to do two or more");
 	}
 
-	if (j->flags.usergroups) {
+	if (j->flags.inherit_suppl_gids) {
 		if (initgroups(j->user, j->usergid))
 			pdie("initgroups(%s, %d) failed", j->user, j->usergid);
-	} else if (j->flags.suppl_gids) {
-		if (setgroups(j->suppl_gid_count, j->suppl_gid_list)) {
+	} else if (j->flags.set_suppl_gids) {
+		if (setgroups(j->suppl_gid_count, j->suppl_gid_list))
 			pdie("setgroups(suppl_gids) failed");
-		}
-	} else {
+	} else if (!j->flags.keep_suppl_gids) {
 		/*
 		 * Only attempt to clear supplementary groups if we are changing
-		 * users.
+		 * users or groups.
 		 */
 		if ((j->flags.uid || j->flags.gid) && setgroups(0, NULL))
 			pdie("setgroups(0, NULL) failed");
@@ -1564,7 +1569,7 @@ void API minijail_enter(const struct minijail *j)
 		die("tried to enter a pid-namespaced jail;"
 		    " try minijail_run()?");
 
-	if (j->flags.usergroups && !j->user)
+	if (j->flags.inherit_suppl_gids && !j->user)
 		die("usergroup inheritance without username");
 
 	/*

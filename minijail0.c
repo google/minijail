@@ -110,7 +110,7 @@ static void usage(const char *progn)
 {
 	size_t i;
 	/* clang-format off */
-	printf("Usage: %s [-GhHiIKlLnNprstUvY]\n"
+	printf("Usage: %s [-GhHiIKlLnNprstUvyY]\n"
 	       "  [-a <table>]\n"
 	       "  [-b <src>,<dest>[,<writeable>]] [-k <src>,<dest>,<type>[,<flags>][,<data>]]\n"
 	       "  [-c <caps>] [-C <dir>] [-P <dir>] [-e[file]] [-f <file>] [-g <group>]\n"
@@ -132,6 +132,9 @@ static void usage(const char *progn)
 	       "  -f <file>:  Write the pid of the jailed process to <file>.\n"
 	       "  -g <group>: Change gid to <group>.\n"
 	       "  -G:         Inherit supplementary groups from uid.\n"
+	       "              Not compatible with -y.\n"
+	       "  -y:         Keep uid's supplementary groups.\n"
+	       "              Not compatible with -G.\n"
 	       "  -h:         Help (this message).\n"
 	       "  -H:         Seccomp filter help message.\n"
 	       "  -i:         Exit immediately after fork (do not act as init).\n"
@@ -191,6 +194,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int binding = 0;
 	int pivot_root = 0, chroot = 0;
 	int mount_ns = 0, skip_remount = 0;
+	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
 	const size_t path_max = 4096;
 	char *map;
 	const char *filter_path;
@@ -198,7 +202,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		return 1;
 
 	const char *optstring =
-	    "u:g:sS:c:C:P:b:V:f:m::M::k:a:e::T:vrGhHinNplLtIUKY";
+	    "u:g:sS:c:C:P:b:V:f:m::M::k:a:e::T:vrGhHinNplLtIUKyY";
 	while ((opt = getopt(argc, argv, optstring)) != -1) {
 		switch (opt) {
 		case 'u':
@@ -294,7 +298,22 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_remount_proc_readonly(j);
 			break;
 		case 'G':
+			if (keep_suppl_gids) {
+				fprintf(stderr,
+					"-y and -G are not compatible.\n");
+				exit(1);
+			}
 			minijail_inherit_usergroups(j);
+			inherit_suppl_gids = 1;
+			break;
+		case 'y':
+			if (inherit_suppl_gids) {
+				fprintf(stderr,
+					"-y and -G are not compatible.\n");
+				exit(1);
+			}
+			minijail_keep_supplementary_gids(j);
+			keep_suppl_gids = 1;
 			break;
 		case 'N':
 			minijail_namespace_cgroups(j);

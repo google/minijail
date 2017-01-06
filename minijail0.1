@@ -34,14 +34,14 @@ network namespace specified by \fIfile\fR which is typically of the form
 \fB-f <file>\fR
 Write the pid of the jailed process to \fIfile\fR.
 .TP
+\fB-g <group>\fR
+Change groups to \fIgroup\fR, which may be either a group name or a numeric
+group ID.
+.TP
 \fB-G\fR
 Inherit all the supplementary groups of the user specified with \fB-u\fR. It
 is an error to use this option without having specified a \fBuser name\fR to
 \fB-u\fR.
-.TP
-\fB-g <group>\fR
-Change groups to \fIgroup\fR, which may be either a group name or a numeric
-group ID.
 .TP
 \fB-h\fR
 Print a help message.
@@ -134,6 +134,9 @@ independent of the rest of the system's.
 .TP
 \fB-V <file>\fR
 Enter the VFS namespace specified by \fIfile\fR.
+.TP
+\fB-y\fR
+Keep the current user's supplementary groups.
 .TP
 \fB-Y\fR
 Synchronize seccomp filters across thread group.
