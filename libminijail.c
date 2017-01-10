@@ -1293,9 +1293,17 @@ static void write_ugid_maps_or_die(const struct minijail *j)
 {
 	if (j->uidmap && write_proc_file(j->initpid, j->uidmap, "uid_map") != 0)
 		kill_child_and_die(j, "failed to write uid_map");
-	if (j->gidmap && j->flags.disable_setgroups &&
-	    write_proc_file(j->initpid, "deny", "setgroups") != 0)
-		kill_child_and_die(j, "failed to disable setgroups(2)");
+	if (j->gidmap && j->flags.disable_setgroups) {
+		/* Older kernels might not have the /proc/<pid>/setgroups files. */
+		int ret = write_proc_file(j->initpid, "deny", "setgroups");
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				/* See http://man7.org/linux/man-pages/man7/user_namespaces.7.html. */
+				warn("could not disable setgroups(2)");
+			} else
+				kill_child_and_die(j, "failed to disable setgroups(2)");
+		}
+	}
 	if (j->gidmap && write_proc_file(j->initpid, j->gidmap, "gid_map") != 0)
 		kill_child_and_die(j, "failed to write gid_map");
 }
