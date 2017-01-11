@@ -251,8 +251,10 @@ void API minijail_set_supplementary_gids(struct minijail *j, size_t size,
 {
 	size_t i;
 
-	if (j->flags.inherit_suppl_gids || j->flags.keep_suppl_gids)
-		die("cannot inherit *and* set or keep supplementary groups");
+	if (j->flags.inherit_suppl_gids)
+		die("cannot inherit *and* set supplementary groups");
+	if (j->flags.keep_suppl_gids)
+		die("cannot keep *and* set supplementary groups");
 
 	if (size == 0) {
 		/* Clear supplementary groups. */
@@ -1342,8 +1344,8 @@ static void drop_ugid(const struct minijail *j)
 {
 	if (j->flags.inherit_suppl_gids + j->flags.keep_suppl_gids +
 	    j->flags.set_suppl_gids > 1) {
-		die("can only either inherit, keep or set supplementary groups;"
-		    " tried to do two or more");
+		die("can only do one of inherit, keep, or set supplementary "
+		    "groups");
 	}
 
 	if (j->flags.inherit_suppl_gids) {
@@ -1578,7 +1580,8 @@ void API minijail_enter(const struct minijail *j)
 		    " try minijail_run()?");
 
 	if (j->flags.inherit_suppl_gids && !j->user)
-		die("usergroup inheritance without username");
+		die("cannot inherit supplementary groups without setting a "
+		    "username");
 
 	/*
 	 * We can't recover from failures if we've dropped privileges partially,
