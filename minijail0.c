@@ -165,7 +165,7 @@ static void usage(const char *progn)
 	       "  -S <file>:  Set seccomp filter using <file>.\n"
 	       "              E.g., '-S /usr/share/filters/<prog>.$(uname -m)'.\n"
 	       "              Requires -n when not running as root.\n"
-	       "  -t:         Mount tmpfs at /tmp inside chroot.\n"
+	       "  -t:         Mount tmpfs at /tmp (implies -v).\n"
 	       "  -T <type>:  Don't access <program> before execve(2), assume <type> ELF binary.\n"
 	       "              <type> must be 'static' or 'dynamic'.\n"
 	       "  -u <user>:  Change uid to <user>.\n"
@@ -285,6 +285,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			}
 			break;
 		case 't':
+			minijail_namespace_vfs(j);
 			minijail_mount_tmp(j);
 			break;
 		case 'v':
