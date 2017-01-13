@@ -1298,7 +1298,7 @@ static void write_ugid_maps_or_die(const struct minijail *j)
 	if (j->gidmap && j->flags.disable_setgroups) {
 		/* Older kernels might not have the /proc/<pid>/setgroups files. */
 		int ret = write_proc_file(j->initpid, "deny", "setgroups");
-		if (ret < 0) {
+		if (ret != 0) {
 			if (ret == -ENOENT) {
 				/* See http://man7.org/linux/man-pages/man7/user_namespaces.7.html. */
 				warn("could not disable setgroups(2)");
