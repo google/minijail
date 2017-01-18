@@ -64,7 +64,7 @@ const char *log_syscalls[] = {"connect", "send"};
 #error "Unsupported platform"
 #endif
 
-const size_t log_syscalls_len = sizeof(log_syscalls)/sizeof(log_syscalls[0]);
+const size_t log_syscalls_len = ARRAY_SIZE(log_syscalls);
 
 int lookup_syscall(const char *name)
 {
