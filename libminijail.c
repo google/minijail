@@ -1264,7 +1264,7 @@ static int remount_proc_readonly(const struct minijail *j)
 			return -errno;
 		}
 	}
-	if (mount("", kProcPath, "proc", kSafeFlags | MS_RDONLY, ""))
+	if (mount("proc", kProcPath, "proc", kSafeFlags | MS_RDONLY, ""))
 		return -errno;
 	return 0;
 }
