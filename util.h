@@ -35,6 +35,8 @@ extern "C" {
 #define info(_msg, ...) \
 	syslog(LOG_INFO, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
 extern const char *log_syscalls[];
 extern const size_t log_syscalls_len;
 
