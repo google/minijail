@@ -19,6 +19,7 @@
 #include <libminijail.h>
 
 #include <android-base/logging.h>
+#include <android-base/macros.h>
 
 gid_t groups[] = { 1001, 1002 };
 
@@ -56,7 +57,7 @@ int main(void) {
     minijail *j = minijail_new();
     minijail_change_user(j, "system");
     minijail_change_group(j, "system");
-    minijail_set_supplementary_gids(j, sizeof(groups) / sizeof(groups[0]), groups);
+    minijail_set_supplementary_gids(j, arraysize(groups), groups);
     // minijail_use_caps(j, CAP_TO_MASK(CAP_SETUID) | CAP_TO_MASK(CAP_SETGID));
     // minijail_use_seccomp_filter(j);
     // minijail_log_seccomp_filter_failures(j);
