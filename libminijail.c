@@ -1238,7 +1238,8 @@ static int enter_pivot_root(const struct minijail *j)
 
 static int mount_tmp(void)
 {
-	return mount("none", "/tmp", "tmpfs", 0, "size=64M,mode=1777");
+	return mount("none", "/tmp", "tmpfs", MS_NODEV | MS_NOEXEC | MS_NOSUID,
+	             "size=64M,mode=1777");
 }
 
 static int remount_proc_readonly(const struct minijail *j)
