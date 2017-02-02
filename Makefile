@@ -16,6 +16,9 @@ ifneq ($(USE_seccomp),yes)
 CPPFLAGS += -DUSE_SECCOMP_SOFTFAIL
 endif
 
+CFLAGS += -Wextra
+CXXFLAGS += -Wextra
+
 all: CC_BINARY(minijail0) CC_LIBRARY(libminijail.so) \
 		CC_LIBRARY(libminijailpreload.so)
 
