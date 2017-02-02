@@ -2,6 +2,7 @@
 *.depends
 /*.gen.c
 *.o
+*.a
 
 # Shared libraries when compiling in-tree.
 *.so
@@ -10,3 +11,6 @@
 libminijail_unittest
 minijail0
 syscall_filter_unittest
+
+# Google Test.
+googletest-release*

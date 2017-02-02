@@ -105,7 +105,7 @@ TEST(bpf, set_bpf_instr) {
 
 TEST(bpf, bpf_load_arg) {
   struct sock_filter load_arg[BPF_LOAD_ARG_LEN];
-  int argidx = 1;
+  const int argidx = 1;
   size_t len = bpf_load_arg(load_arg, argidx);
 
   EXPECT_EQ(len, BPF_LOAD_ARG_LEN);
@@ -182,7 +182,7 @@ TEST(bpf, bpf_comp_jin) {
 TEST(bpf, bpf_arg_comp) {
   struct sock_filter *arg_comp;
   int op = EQ;
-  int argidx = 1;
+  const int argidx = 1;
   unsigned long c = 3;
   unsigned int label_id = 0;
 
@@ -240,6 +240,7 @@ TEST(bpf, bpf_allow_syscall_args) {
 
 class BpfLabelTest : public ::testing::Test {
  protected:
+  virtual void SetUp() { labels_.count = 0; }
   virtual void TearDown() { free_label_strings(&labels_); }
   struct bpf_labels labels_;
 };
@@ -335,6 +336,7 @@ TEST_F(BpfLabelTest, too_many_labels) {
 
 class ArgFilterTest : public ::testing::Test {
  protected:
+  virtual void SetUp() { labels_.count = 0; }
   virtual void TearDown() { free_label_strings(&labels_); }
   struct bpf_labels labels_;
 };
