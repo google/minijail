@@ -136,76 +136,42 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_STATIC_LIBRARY)
 
 
-# libminijail native unit tests. Run with:
-# adb shell /data/nativetest/libminijail_unittest/libminijail_unittest
-# =========================================================
-include $(CLEAR_VARS)
-LOCAL_MODULE := libminijail_unittest
-
-LOCAL_CFLAGS := $(minijailCommonCFlags)
-LOCAL_CLANG := true
-LOCAL_SRC_FILES := \
-	$(libminijailSrcFiles) \
-	libminijail_unittest.c \
-
-LOCAL_STATIC_LIBRARIES := libminijail_generated
-LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
-include $(BUILD_NATIVE_TEST)
-
-
 # libminijail native unit tests using gtest. Run with:
 # adb shell /data/nativetest/libminijail_unittest_gtest/libminijail_unittest_gtest
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail_unittest_gtest
 
+LOCAL_CPP_EXTENSION := .cc
 LOCAL_CFLAGS := $(minijailCommonCFlags) -Wno-writable-strings
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
 	$(libminijailSrcFiles) \
-	libminijail_unittest.cpp \
+	libminijail_unittest.cc \
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_NATIVE_TEST)
 
 
-# libminijail native unit tests for the host. Run with:
-# out/host/linux-x86/nativetest(64)/libminijail_unittest/libminijail_unittest
-# TODO(b/31395668): Re-enable once the seccomp(2) syscall becomes available.
-# =========================================================
+# # libminijail native unit tests for the host. Run with:
+# # out/host/linux-x86/nativetest(64)/libminijail_unittest/libminijail_unittest_gtest
+# # TODO(b/31395668): Re-enable once the seccomp(2) syscall becomes available.
+# # =========================================================
 # include $(CLEAR_VARS)
-# LOCAL_MODULE := libminijail_unittest
+# LOCAL_MODULE := libminijail_unittest_gtest
 # LOCAL_MODULE_HOST_OS := linux
 
+# LOCAL_CPP_EXTENSION := .cc
 # LOCAL_CFLAGS := $(minijailCommonCFlags) -DPRELOADPATH=\"/invalid\"
 # LOCAL_CLANG := true
 # LOCAL_SRC_FILES := \
 # 	$(libminijailSrcFiles) \
-# 	libminijail_unittest.c \
+# 	libminijail_unittest.cc \
 # 	$(hostUnittestSrcFiles)
 
 # LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 # include $(BUILD_HOST_NATIVE_TEST)
-
-
-# Syscall filtering native unit tests. Run with:
-# adb shell /data/nativetest/syscall_filter_unittest/syscall_filter_unittest
-# =========================================================
-include $(CLEAR_VARS)
-LOCAL_MODULE := syscall_filter_unittest
-
-LOCAL_CFLAGS := $(minijailCommonCFlags)
-LOCAL_CLANG := true
-LOCAL_SRC_FILES := \
-	bpf.c \
-	syscall_filter.c \
-	syscall_filter_unittest.c \
-	util.c \
-
-LOCAL_STATIC_LIBRARIES := libminijail_generated
-LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
-include $(BUILD_NATIVE_TEST)
 
 
 # Syscall filtering native unit tests using gtest. Run with:
@@ -214,13 +180,14 @@ include $(BUILD_NATIVE_TEST)
 include $(CLEAR_VARS)
 LOCAL_MODULE := syscall_filter_unittest_gtest
 
+LOCAL_CPP_EXTENSION := .cc
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
 	bpf.c \
 	syscall_filter.c \
 	util.c \
-	syscall_filter_unittest.cpp \
+	syscall_filter_unittest.cc \
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
@@ -228,19 +195,20 @@ include $(BUILD_NATIVE_TEST)
 
 
 # Syscall filtering native unit tests for the host. Run with:
-# out/host/linux-x86/nativetest(64)/syscall_filter_unittest/syscall_filter_unittest
+# out/host/linux-x86/nativetest(64)/syscall_filter_unittest/syscall_filter_unittest_gtest
 # =========================================================
 include $(CLEAR_VARS)
-LOCAL_MODULE := syscall_filter_unittest
+LOCAL_MODULE := syscall_filter_unittest_gtest
 LOCAL_MODULE_HOST_OS := linux
 
+LOCAL_CPP_EXTENSION := .cc
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
 	bpf.c \
 	syscall_filter.c \
-	syscall_filter_unittest.c \
 	util.c \
+	syscall_filter_unittest.cc \
 	$(hostUnittestSrcFiles)
 
 LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
