@@ -12,5 +12,8 @@ libminijail_unittest
 minijail0
 syscall_filter_unittest
 
+# common.mk TEST().
+*.test
+
 # Google Test.
 googletest-release*
