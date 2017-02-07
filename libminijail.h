@@ -61,6 +61,8 @@ void minijail_capbset_drop(struct minijail *j, uint64_t capmask);
 void minijail_reset_signal_mask(struct minijail *j);
 void minijail_namespace_vfs(struct minijail *j);
 void minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path);
+void minijail_new_session_keyring(struct minijail *j);
+
 /*
  * This option is *dangerous* as it negates most of the functionality of
  * minijail_namespace_vfs(). You very likely don't need this.
