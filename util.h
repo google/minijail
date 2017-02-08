@@ -58,6 +58,7 @@ int lookup_syscall(const char *name);
 const char *lookup_syscall_name(int nr);
 
 long int parse_constant(char *constant_str, char **endptr);
+int parse_size(size_t *size, const char *sizespec);
 
 char *strip(char *s);
 char *tokenize(char **stringp, const char *delim);
