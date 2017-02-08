@@ -105,6 +105,9 @@ _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 
 #define MAX_CGROUPS 10 /* 10 different controllers supported by Linux. */
 
+/* Keyctl commands. */
+#define KEYCTL_JOIN_SESSION_KEYRING 1
+
 struct mountpoint {
 	char *src;
 	char *dest;
@@ -153,6 +156,7 @@ struct minijail {
 		int alt_syscall : 1;
 		int reset_signal_mask : 1;
 		int close_open_fds : 1;
+		int new_session_keyring : 1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -433,6 +437,11 @@ void API minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path)
 	}
 	j->mountns_fd = ns_fd;
 	j->flags.enter_vfs = 1;
+}
+
+void API minijail_new_session_keyring(struct minijail *j)
+{
+	j->flags.new_session_keyring = 1;
 }
 
 void API minijail_skip_remount_private(struct minijail *j)
@@ -1646,6 +1655,11 @@ void API minijail_enter(const struct minijail *j)
 
 	if (j->flags.ns_cgroups && unshare(CLONE_NEWCGROUP))
 		pdie("unshare(CLONE_NEWCGROUP) failed");
+
+	if (j->flags.new_session_keyring) {
+		if (syscall(SYS_keyctl, KEYCTL_JOIN_SESSION_KEYRING, NULL) < 0)
+			pdie("keyctl(KEYCTL_JOIN_SESSION_KEYRING) failed");
+	}
 
 	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");
