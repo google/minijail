@@ -151,11 +151,13 @@ static void usage(const char *progn)
 
 	/* clang-format off */
 	printf("\n"
-	       "  -m:         Set the uid map of a user namespace (implies -pU).\n"
+	       "  -m[map]:    Set the uid map of a user namespace (implies -pU).\n"
 	       "              Same arguments as newuidmap(1), multiple mappings should be separated by ',' (comma).\n"
+	       "              With no mapping, map the current uid to root inside the user namespace.\n"
 	       "              Not compatible with -b without the 'writable' option.\n"
-	       "  -M:         Set the gid map of a user namespace (implies -pU).\n"
+	       "  -M[map]:    Set the gid map of a user namespace (implies -pU).\n"
 	       "              Same arguments as newgidmap(1), multiple mappings should be separated by ',' (comma).\n"
+	       "              With no mapping, map the current gid to root inside the user namespace.\n"
 	       "              Not compatible with -b without the 'writable' option.\n"
 	       "  -n:         Set no_new_privs.\n"
 	       "  -N:         Enter a new cgroup namespace.\n"
