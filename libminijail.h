@@ -127,10 +127,16 @@ int minijail_enter_pivot_root(struct minijail *j, const char *dir);
 char *minijail_get_original_path(struct minijail *j, const char *chroot_path);
 
 /*
- * minijail_mount_tmp: enables mounting of a tmpfs filesystem on /tmp.
+ * minijail_mount_tmp: enables mounting of a 64M tmpfs filesystem on /tmp.
  * As be rules of bind mounts, /tmp must exist in chroot.
  */
 void minijail_mount_tmp(struct minijail *j);
+
+/*
+ * minijail_mount_tmp_size: enables mounting of a tmpfs filesystem on /tmp.
+ * As be rules of bind mounts, /tmp must exist in chroot.  Size is in bytes.
+ */
+void minijail_mount_tmp_size(struct minijail *j, size_t size);
 
 /*
  * minijail_mount_with_data: when entering minijail @j,
