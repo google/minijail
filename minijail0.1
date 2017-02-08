@@ -71,13 +71,15 @@ Report blocked syscalls to syslog when using seccomp filter. This option will
 force certain syscalls to be allowed in order to achieve this, depending on the
 system.
 .TP
-\fB-m "<uid> <loweruid> <count>[,<uid> <loweruid> <count>]"\fR
+\fB-m[<uid> <loweruid> <count>[,<uid> <loweruid> <count>]]\fR
 Set the uid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
-\fBnewuidmap(1)\fR. Multiple mappings should be separated by ','.
+\fBnewuidmap(1)\fR. Multiple mappings should be separated by ','. With no mapping,
+map the current uid to root inside the user namespace.
 .TP
-\fB-M "<uid> <loweruid> <count>[,<uid> <loweruid> <count>]"\fR
+\fB-M[<uid> <loweruid> <count>[,<uid> <loweruid> <count>]]\fR
 Set the gid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
-\fBnewgidmap(1)\fR. Multiple mappings should be separated by ','.
+\fBnewgidmap(1)\fR. Multiple mappings should be separated by ','. With no mapping,
+map the current gid to root inside the user namespace.
 .TP
 \fB-n\fR
 Set the process's \fIno_new_privs\fR bit. See \fBprctl(2)\fR and the kernel
@@ -112,7 +114,7 @@ Enable seccomp(2) in mode 13 which restricts the child process to a set of
 system calls defined in the policy file. Note that system calls often change
 names based on the architecture or mode. (uname -m is your friend.)
 .TP
-\fB-t [size]\fR
+\fB-t[size]\fR
 Mounts a tmpfs filesystem on /tmp. /tmp must exist already (e.g. in the chroot).
 The filesystem has a default size of "64M", overridden with an optional
 argument. It has standard /tmp permissions (1777), and is mounted
