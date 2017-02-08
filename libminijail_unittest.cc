@@ -37,6 +37,7 @@ const char *kShellPath = "/bin/sh";
 /* Prototypes needed only by test. */
 void *consumebytes(size_t length, char **buf, size_t *buflength);
 char *consumestr(char **buf, size_t *buflength);
+size_t minijail_get_tmpfs_size(const struct minijail *);
 
 /* Silence unused variable warnings. */
 TEST(silence, silence_unused) {
@@ -270,4 +271,55 @@ TEST(Test, test_minijail_no_fd_leaks) {
   minijail_destroy(j);
 
   close(dev_null);
+}
+
+TEST(Test, parse_size) {
+  size_t size;
+
+  ASSERT_EQ(0, parse_size(&size, "42"));
+  ASSERT_EQ(42U, size);
+
+  ASSERT_EQ(0, parse_size(&size, "16K"));
+  ASSERT_EQ(16384U, size);
+
+  ASSERT_EQ(0, parse_size(&size, "1M"));
+  ASSERT_EQ(1024U * 1024, size);
+
+  uint64_t gigabyte = 1024ULL * 1024 * 1024;
+  ASSERT_EQ(0, parse_size(&size, "3G"));
+  ASSERT_EQ(3U, size / gigabyte);
+  ASSERT_EQ(0U, size % gigabyte);
+
+  ASSERT_EQ(0, parse_size(&size, "4294967294"));
+  ASSERT_EQ(3U, size / gigabyte);
+  ASSERT_EQ(gigabyte - 2, size % gigabyte);
+
+#if __WORDSIZE == 64
+  uint64_t exabyte = gigabyte * 1024 * 1024 * 1024;
+  ASSERT_EQ(0, parse_size(&size, "9E"));
+  ASSERT_EQ(9U, size / exabyte);
+  ASSERT_EQ(0U, size % exabyte);
+
+  ASSERT_EQ(0, parse_size(&size, "15E"));
+  ASSERT_EQ(15U, size / exabyte);
+  ASSERT_EQ(0U, size % exabyte);
+
+  ASSERT_EQ(0, parse_size(&size, "18446744073709551614"));
+  ASSERT_EQ(15U, size / exabyte);
+  ASSERT_EQ(exabyte - 2, size % exabyte);
+
+  ASSERT_EQ(-ERANGE, parse_size(&size, "16E"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "19E"));
+#elif __WORDSIZE == 32
+  ASSERT_EQ(-ERANGE, parse_size(&size, "5G"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "9G"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "9E"));
+#endif
+
+  ASSERT_EQ(-EINVAL, parse_size(&size, ""));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "14u"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "14.2G"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "7GTPE"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "-1G"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "; /bin/rm -- "));
 }

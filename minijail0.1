@@ -112,10 +112,11 @@ Enable seccomp(2) in mode 13 which restricts the child process to a set of
 system calls defined in the policy file. Note that system calls often change
 names based on the architecture or mode. (uname -m is your friend.)
 .TP
-\fB-t\fR
+\fB-t [size]\fR
 Mounts a tmpfs filesystem on /tmp. /tmp must exist already (e.g. in the chroot).
-The default filesystem has a max size of 64M, has standard /tmp permissions
-(1777), and is mounted nodev/noexec/nosuid. Implies \fB-v\fR.
+The filesystem has a default size of "64M", overridden with an optional
+argument. It has standard /tmp permissions (1777), and is mounted
+nodev/noexec/nosuid. Implies \fB-v\fR.
 .TP
 \fB-T <type>\fR
 Assume program's ELF linkage type is \fItype\fR,
