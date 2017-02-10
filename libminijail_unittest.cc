@@ -310,16 +310,17 @@ TEST(Test, parse_size) {
 
   ASSERT_EQ(-ERANGE, parse_size(&size, "16E"));
   ASSERT_EQ(-ERANGE, parse_size(&size, "19E"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "7GTPE"));
 #elif __WORDSIZE == 32
   ASSERT_EQ(-ERANGE, parse_size(&size, "5G"));
   ASSERT_EQ(-ERANGE, parse_size(&size, "9G"));
   ASSERT_EQ(-ERANGE, parse_size(&size, "9E"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "7GTPE"));
 #endif
 
   ASSERT_EQ(-EINVAL, parse_size(&size, ""));
   ASSERT_EQ(-EINVAL, parse_size(&size, "14u"));
   ASSERT_EQ(-EINVAL, parse_size(&size, "14.2G"));
-  ASSERT_EQ(-EINVAL, parse_size(&size, "7GTPE"));
   ASSERT_EQ(-EINVAL, parse_size(&size, "-1G"));
   ASSERT_EQ(-EINVAL, parse_size(&size, "; /bin/rm -- "));
 }
