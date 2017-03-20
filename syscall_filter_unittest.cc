@@ -948,7 +948,6 @@ class FileTest : public ::testing::Test {
 };
 
 TEST_F(FileTest, seccomp_mode1) {
-  // struct sock_fprog actual;
   const char *policy =
       "read: 1\n"
       "write: 1\n"
@@ -958,7 +957,7 @@ TEST_F(FileTest, seccomp_mode1) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
   int res = compile_file(
-      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING);
+      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING, 0);
   fclose(policy_file);
 
   /*
@@ -993,7 +992,7 @@ TEST_F(FileTest, seccomp_read) {
     FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
   int res = compile_file(
-      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING);
+      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING, 0);
   fclose(policy_file);
 
   /*
@@ -1174,7 +1173,7 @@ TEST(FilterTest, missing_atom) {
   struct sock_fprog actual;
   const char* policy = "open:\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy, strlen(policy));
+  FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
@@ -1186,7 +1185,7 @@ TEST(FilterTest, whitespace_atom) {
   struct sock_fprog actual;
   const char* policy = "open:\t    \n";
 
-  FILE* policy_file = write_policy_to_pipe(policy, strlen(policy));
+  FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
   int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
@@ -1315,3 +1314,239 @@ TEST(FilterTest, allow_log_but_kill) {
 
   free(actual.filter);
 }
+
+TEST(FilterTest, include_invalid_token) {
+  struct sock_fprog actual;
+  const char *invalid_token = "@unclude ./test/seccomp.policy\n";
+
+  FILE *policy_file =
+      write_policy_to_pipe(invalid_token, strlen(invalid_token));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  EXPECT_NE(res, 0);
+}
+
+TEST(FilterTest, include_no_space) {
+  struct sock_fprog actual;
+  const char *no_space = "@includetest/seccomp.policy\n";
+
+  FILE *policy_file = write_policy_to_pipe(no_space, strlen(no_space));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  EXPECT_NE(res, 0);
+}
+
+TEST(FilterTest, include_double_token) {
+  struct sock_fprog actual;
+  const char *double_token = "@includeinclude ./test/seccomp.policy\n";
+
+  FILE *policy_file = write_policy_to_pipe(double_token, strlen(double_token));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  EXPECT_NE(res, 0);
+}
+
+TEST(FilterTest, include_no_file) {
+  struct sock_fprog actual;
+  const char *no_file = "@include\n";
+
+  FILE *policy_file = write_policy_to_pipe(no_file, strlen(no_file));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  EXPECT_NE(res, 0);
+}
+
+TEST(FilterTest, include_space_no_file) {
+  struct sock_fprog actual;
+  const char *space_no_file = "@include \n";
+
+  FILE *policy_file =
+      write_policy_to_pipe(space_no_file, strlen(space_no_file));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  EXPECT_NE(res, 0);
+}
+
+TEST(FilterTest, include_implicit_relative_path) {
+  struct sock_fprog actual;
+  const char *implicit_relative_path = "@include test/seccomp.policy\n";
+
+  FILE *policy_file = write_policy_to_pipe(implicit_relative_path,
+                                           strlen(implicit_relative_path));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  EXPECT_NE(res, 0);
+}
+
+TEST(FilterTest, include_extra_text) {
+  struct sock_fprog actual;
+  const char *extra_text = "@include /some/file: sneaky comment\n";
+
+  FILE *policy_file =
+      write_policy_to_pipe(extra_text, strlen(extra_text));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  EXPECT_NE(res, 0);
+}
+
+TEST(FilterTest, include_split_filename) {
+  struct sock_fprog actual;
+  const char *split_filename = "@include /some/file:colon.policy\n";
+
+  FILE *policy_file =
+      write_policy_to_pipe(split_filename, strlen(split_filename));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  EXPECT_NE(res, 0);
+}
+
+TEST(FilterTest, include_nonexistent_file) {
+  struct sock_fprog actual;
+  const char *include_policy = "@include ./nonexistent.policy\n";
+
+  FILE *policy_file =
+      write_policy_to_pipe(include_policy, strlen(include_policy));
+  ASSERT_NE(policy_file, nullptr);
+
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+
+  ASSERT_NE(res, 0);
+}
+
+// TODO(jorgelo): Android unit tests don't currently support data files.
+// Re-enable by creating a temporary policy file at runtime.
+#if !defined(__ANDROID__)
+
+TEST(FilterTest, include) {
+  struct sock_fprog compiled_plain;
+  struct sock_fprog compiled_with_include;
+
+  const char *policy_plain =
+      "read: 1\n"
+      "write: 1\n"
+      "rt_sigreturn: 1\n"
+      "exit: 1\n";
+
+  const char *policy_with_include = "@include ./test/seccomp.policy\n";
+
+  FILE *file_plain = write_policy_to_pipe(policy_plain, strlen(policy_plain));
+  ASSERT_NE(file_plain, nullptr);
+  int res_plain =
+      compile_filter(file_plain, &compiled_plain, USE_RET_KILL, NO_LOGGING);
+  fclose(file_plain);
+
+  FILE *file_with_include =
+      write_policy_to_pipe(policy_with_include, strlen(policy_with_include));
+  ASSERT_NE(file_with_include, nullptr);
+  int res_with_include = compile_filter(
+      file_with_include, &compiled_with_include, USE_RET_KILL, NO_LOGGING);
+  fclose(file_with_include);
+
+  /*
+   * Checks that filter length is the same for a plain policy and an equivalent
+   * policy with an @include statement. Also checks that the filter generated
+   * from the policy with an @include statement is exactly the same as one
+   * generated from a plain policy.
+   */
+  ASSERT_EQ(res_plain, 0);
+  ASSERT_EQ(res_with_include, 0);
+
+  EXPECT_EQ(compiled_plain.len, 13);
+  EXPECT_EQ(compiled_with_include.len, 13);
+
+  EXPECT_ARCH_VALIDATION(compiled_with_include.filter);
+  EXPECT_EQ_STMT(compiled_with_include.filter + ARCH_VALIDATION_LEN,
+                 BPF_LD + BPF_W + BPF_ABS,
+                 syscall_nr);
+  EXPECT_ALLOW_SYSCALL(compiled_with_include.filter + ARCH_VALIDATION_LEN + 1,
+                       __NR_read);
+  EXPECT_ALLOW_SYSCALL(compiled_with_include.filter + ARCH_VALIDATION_LEN + 3,
+                       __NR_write);
+  EXPECT_ALLOW_SYSCALL(compiled_with_include.filter + ARCH_VALIDATION_LEN + 5,
+                       __NR_rt_sigreturn);
+  EXPECT_ALLOW_SYSCALL(compiled_with_include.filter + ARCH_VALIDATION_LEN + 7,
+                       __NR_exit);
+  EXPECT_EQ_STMT(compiled_with_include.filter + ARCH_VALIDATION_LEN + 9,
+                 BPF_RET + BPF_K,
+                 SECCOMP_RET_KILL);
+
+  free(compiled_plain.filter);
+  free(compiled_with_include.filter);
+}
+
+TEST(FilterTest, include_same_syscalls) {
+  struct sock_fprog actual;
+  const char *policy =
+      "read: 1\n"
+      "write: 1\n"
+      "rt_sigreturn: 1\n"
+      "exit: 1\n"
+      "@include ./test/seccomp.policy\n";
+
+  FILE *policy_file =
+      write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+
+  ASSERT_EQ(res, 0);
+  EXPECT_EQ(actual.len,
+            ARCH_VALIDATION_LEN + 1 /* load syscall nr */ +
+                2 * 8 /* check syscalls twice */ + 1 /* filter return */);
+  free(actual.filter);
+}
+
+TEST(FilterTest, include_invalid_policy) {
+  struct sock_fprog actual;
+  const char *policy =
+      "read: 1\n"
+      "write: 1\n"
+      "rt_sigreturn: 1\n"
+      "exit: 1\n"
+      "@include ./test/invalid_syscall_name.policy\n";
+
+  FILE *policy_file =
+      write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+
+  /* Ensure the included (invalid) policy file exists. */
+  FILE *included_file = fopen("./test/invalid_syscall_name.policy", "r");
+  ASSERT_NE(included_file, nullptr);
+  fclose(included_file);
+
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+
+  ASSERT_NE(res, 0);
+}
+
+TEST(FilterTest, include_nested) {
+  struct sock_fprog actual;
+  const char *policy = "@include ./test/nested.policy\n";
+
+  FILE *policy_file =
+      write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+
+  /* Ensure the policy file exists. */
+  FILE *included_file = fopen("./test/nested.policy", "r");
+  ASSERT_NE(included_file, nullptr);
+  fclose(included_file);
+
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+
+  ASSERT_NE(res, 0);
+}
+
+#endif  // !__ANDROID__
