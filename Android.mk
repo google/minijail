@@ -195,7 +195,7 @@ include $(BUILD_NATIVE_TEST)
 
 
 # Syscall filtering native unit tests for the host. Run with:
-# out/host/linux-x86/nativetest(64)/syscall_filter_unittest/syscall_filter_unittest_gtest
+# out/host/linux-x86/nativetest(64)/syscall_filter_unittest_gtest/syscall_filter_unittest_gtest
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := syscall_filter_unittest_gtest

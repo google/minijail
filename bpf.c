@@ -267,8 +267,9 @@ int bpf_label_id(struct bpf_labels *labels, const char *label)
 	}
 	end = begin + labels->count;
 	for (id = 0; begin < end; ++begin, ++id) {
-		if (!strcmp(label, begin->label))
+		if (!strcmp(label, begin->label)) {
 			return id;
+		}
 	}
 
 	/* The label wasn't found. Insert it only if there's space. */
@@ -284,7 +285,6 @@ int bpf_label_id(struct bpf_labels *labels, const char *label)
 	return id;
 }
 
-/* Free label strings. */
 void free_label_strings(struct bpf_labels *labels)
 {
 	if (labels->count == 0)
