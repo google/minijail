@@ -347,7 +347,17 @@ TEST_F(ArgFilterTest, empty_atom) {
   unsigned int id = 0;
 
   struct filter_block* block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  ASSERT_EQ(block, nullptr);
+}
+
+TEST_F(ArgFilterTest, whitespace_atom) {
+  const char* fragment = "\t    ";
+  int nr = 1;
+  unsigned int id = 0;
+
+  struct filter_block* block =
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -357,7 +367,7 @@ TEST_F(ArgFilterTest, no_comparison) {
   unsigned int id = 0;
 
   struct filter_block* block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -367,7 +377,7 @@ TEST_F(ArgFilterTest, no_constant) {
   unsigned int id = 0;
 
   struct filter_block* block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -376,7 +386,7 @@ TEST_F(ArgFilterTest, arg0_equals) {
   int nr = 1;
   unsigned int id = 0;
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -385,11 +395,11 @@ TEST_F(ArgFilterTest, arg0_equals) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison. */
-  curr_block = block->next;
+  curr_block = curr_block->next;
   EXPECT_COMP(curr_block);
 
   /* Third block is a jump and a label (end of AND group). */
@@ -417,7 +427,7 @@ TEST_F(ArgFilterTest, arg0_mask) {
   int nr = 1;
   unsigned int id = 0;
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -426,11 +436,11 @@ TEST_F(ArgFilterTest, arg0_mask) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison. */
-  curr_block = block->next;
+  curr_block = curr_block->next;
   EXPECT_COMP(curr_block);
 
   /* Third block is a jump and a label (end of AND group). */
@@ -458,7 +468,7 @@ TEST_F(ArgFilterTest, arg0_flag_set_inclusion) {
   int nr = 1;
   unsigned int id = 0;
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -467,11 +477,11 @@ TEST_F(ArgFilterTest, arg0_flag_set_inclusion) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison. */
-  curr_block = block->next;
+  curr_block = curr_block->next;
   ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
@@ -501,7 +511,7 @@ TEST_F(ArgFilterTest, arg0_eq_mask) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -510,11 +520,11 @@ TEST_F(ArgFilterTest, arg0_eq_mask) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison. */
-  curr_block = block->next;
+  curr_block = curr_block->next;
   ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
   EXPECT_EQ(curr_block->instrs[BPF_ARG_COMP_LEN - 1].k,
@@ -546,7 +556,7 @@ TEST_F(ArgFilterTest, and_or) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + 3 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -554,7 +564,7 @@ TEST_F(ArgFilterTest, and_or) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison ("arg0 == 0"). */
@@ -603,7 +613,7 @@ TEST_F(ArgFilterTest, ret_errno) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + 2 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -611,7 +621,7 @@ TEST_F(ArgFilterTest, ret_errno) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison ("arg0 == 0"). */
@@ -658,7 +668,7 @@ TEST_F(ArgFilterTest, unconditional_errno) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -666,7 +676,7 @@ TEST_F(ArgFilterTest, unconditional_errno) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is SECCOMP_RET_ERRNO. */
@@ -688,7 +698,7 @@ TEST_F(ArgFilterTest, invalid_arg_token) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -698,7 +708,7 @@ TEST_F(ArgFilterTest, invalid_arg_number) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -708,7 +718,7 @@ TEST_F(ArgFilterTest, extra_chars_in_arg_token) {
   unsigned int id = 0;
 
   struct filter_block* block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -718,7 +728,7 @@ TEST_F(ArgFilterTest, invalid_operator) {
   unsigned int id = 0;
 
   struct filter_block* block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -728,7 +738,7 @@ TEST_F(ArgFilterTest, invalid_constant) {
   unsigned int id = 0;
 
   struct filter_block* block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -738,7 +748,7 @@ TEST_F(ArgFilterTest, extra_tokens) {
   unsigned int id = 0;
 
   struct filter_block* block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -748,7 +758,7 @@ TEST_F(ArgFilterTest, invalid_errno) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -757,7 +767,7 @@ TEST_F(ArgFilterTest, log_no_ret_error) {
   int nr = 1;
   unsigned int id = 0;
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, USE_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, USE_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -766,11 +776,11 @@ TEST_F(ArgFilterTest, log_no_ret_error) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison. */
-  curr_block = block->next;
+  curr_block = curr_block->next;
   ASSERT_NE(curr_block, nullptr);
   EXPECT_COMP(curr_block);
 
@@ -800,7 +810,7 @@ TEST_F(ArgFilterTest, log_bad_ret_error) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -808,7 +818,7 @@ TEST_F(ArgFilterTest, log_bad_ret_error) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison ("arg0 == 0"). */
@@ -844,7 +854,7 @@ TEST_F(ArgFilterTest, no_log_bad_ret_error) {
   unsigned int id = 0;
 
   struct filter_block *block =
-      compile_section(nr, fragment, id, &labels_, USE_LOGGING);
+      compile_policy_line(nr, fragment, id, &labels_, USE_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -852,7 +862,7 @@ TEST_F(ArgFilterTest, no_log_bad_ret_error) {
   /* First block is a label. */
   struct filter_block *curr_block = block;
   ASSERT_NE(curr_block, nullptr);
-  EXPECT_EQ(block->len, 1U);
+  EXPECT_EQ(curr_block->len, 1U);
   EXPECT_LBL(curr_block->instrs);
 
   /* Second block is a comparison ("arg0 == 0"). */
@@ -918,6 +928,126 @@ FILE *write_policy_to_pipe(const char *policy, size_t len) {
 
   close(pipefd[1]);
   return fdopen(pipefd[0], "r");
+}
+
+class FileTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    labels_.count = 0;
+    head_ = new_filter_block();
+    arg_blocks_ = NULL;
+  }
+  virtual void TearDown() {
+    free_label_strings(&labels_);
+    free_block_list(head_);
+    free_block_list(arg_blocks_);
+  }
+  struct bpf_labels labels_;
+  struct filter_block *head_;
+  struct filter_block *arg_blocks_;
+};
+
+TEST_F(FileTest, seccomp_mode1) {
+  // struct sock_fprog actual;
+  const char *policy =
+      "read: 1\n"
+      "write: 1\n"
+      "rt_sigreturn: 1\n"
+      "exit: 1\n";
+
+  FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_file(
+      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+
+  /*
+   * Checks return value and that the blocks only allow expected syscalls.
+   */
+  ASSERT_EQ(res, 0);
+  struct filter_block *curr_block = head_;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL(curr_block->instrs, __NR_read);
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL(curr_block->instrs, __NR_write);
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL(curr_block->instrs, __NR_rt_sigreturn);
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL(curr_block->instrs, __NR_exit);
+
+  EXPECT_EQ(curr_block->next, nullptr);
+}
+
+TEST_F(FileTest, seccomp_read) {
+  const char *policy =
+      "read: arg0 == 0\n"
+      "write: 1\n"
+      "rt_sigreturn: 1\n"
+      "exit: 1\n";
+
+  const int LABEL_ID = 0;
+
+    FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_file(
+      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+
+  /*
+   * Checks return value, that the blocks only allow expected syscalls, and that
+   * labels between |head_| and |arg_blocks_| match.
+   */
+  ASSERT_EQ(res, 0);
+  struct filter_block *curr_block = head_;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL_ARGS(curr_block->instrs,
+                            __NR_read,
+                            LABEL_ID,
+                            JUMP_JT,
+                            JUMP_JF);
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL(curr_block->instrs, __NR_write);
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL(curr_block->instrs, __NR_rt_sigreturn);
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL(curr_block->instrs, __NR_exit);
+
+  ASSERT_NE(arg_blocks_, nullptr);
+  size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+  EXPECT_EQ(arg_blocks_->total_len, exp_total_len);
+
+  /* First block is a label. */
+  curr_block = arg_blocks_;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_EQ(curr_block->len, 1U);
+  EXPECT_ACTUAL_LBL(curr_block->instrs, LABEL_ID);
+
+  /* Second block is a comparison. */
+  curr_block = curr_block->next;
+  EXPECT_COMP(curr_block);
+
+  /* Third block is a jump and a label (end of AND group). */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_GROUP_END(curr_block);
+
+  /* Fourth block is SECCOMP_RET_KILL. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_KILL(curr_block);
+
+  /* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW(curr_block);
+
+  EXPECT_EQ(curr_block->next, nullptr);
 }
 
 TEST(FilterTest, seccomp_mode1) {
@@ -1047,7 +1177,19 @@ TEST(FilterTest, missing_atom) {
   FILE* policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, 0, NO_LOGGING);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  ASSERT_NE(res, 0);
+}
+
+TEST(FilterTest, whitespace_atom) {
+  struct sock_fprog actual;
+  const char* policy = "open:\t    \n";
+
+  FILE* policy_file = write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   ASSERT_NE(res, 0);
 }
@@ -1059,7 +1201,7 @@ TEST(FilterTest, invalid_name) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, 0, NO_LOGGING);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   ASSERT_NE(res, 0);
 }
@@ -1071,14 +1213,14 @@ TEST(FilterTest, invalid_arg) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, 0, NO_LOGGING);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   ASSERT_NE(res, 0);
 }
 
 TEST(FilterTest, nonexistent) {
   struct sock_fprog actual;
-  int res = compile_filter(NULL, &actual, 0, NO_LOGGING);
+  int res = compile_filter(NULL, &actual, USE_RET_KILL, NO_LOGGING);
   ASSERT_NE(res, 0);
 }
 

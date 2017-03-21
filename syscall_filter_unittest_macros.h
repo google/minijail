@@ -44,6 +44,14 @@ do {	\
 	EXPECT_TRUE((_block)->jf == LABEL_JF);			\
 } while (0)
 
+#define EXPECT_ACTUAL_LBL(_block, _id) \
+do {	\
+	EXPECT_TRUE((_block)->code == (BPF_JMP+BPF_JA));	\
+	EXPECT_TRUE((_block)->k == (_id));			\
+	EXPECT_TRUE((_block)->jt == LABEL_JT);			\
+	EXPECT_TRUE((_block)->jf == LABEL_JF);			\
+} while (0)
+
 #define EXPECT_JUMP_LBL(_block) \
 do {	\
 	EXPECT_EQ((_block)->code, BPF_JMP+BPF_JA);	\

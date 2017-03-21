@@ -12,14 +12,13 @@
 #include "util.h"
 
 /* clang-format off */
-#define MAX_LINE_LENGTH 	1024
 #define MAX_POLICY_LINE_LENGTH	1024
 
 #define ONE_INSTR	1
 #define TWO_INSTRS	2
 /* clang-format on */
 
-int seccomp_can_softfail()
+int seccomp_can_softfail(void)
 {
 #if defined(USE_SECCOMP_SOFTFAIL)
 	return 1;
@@ -51,7 +50,7 @@ struct sock_filter *new_instr_buf(size_t count)
 	return buf;
 }
 
-struct filter_block *new_filter_block()
+struct filter_block *new_filter_block(void)
 {
 	struct filter_block *block = calloc(1, sizeof(struct filter_block));
 	if (!block)
@@ -278,10 +277,10 @@ int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
 	return 0;
 }
 
-struct filter_block *compile_section(int nr, const char *policy_line,
-				     unsigned int entry_lbl_id,
-				     struct bpf_labels *labels,
-				     int use_ret_trap)
+struct filter_block *compile_policy_line(int nr, const char *policy_line,
+					 unsigned int entry_lbl_id,
+					 struct bpf_labels *labels,
+					 int use_ret_trap)
 {
 	/*
 	 * |policy_line| should be an expression of the form:
@@ -429,17 +428,115 @@ struct filter_block *compile_section(int nr, const char *policy_line,
 	return head;
 }
 
-int compile_filter(FILE *policy_file, struct sock_fprog *prog, int use_ret_trap,
-		   int allow_logging)
+int compile_file(FILE *policy_file, struct filter_block *head,
+		 struct filter_block **arg_blocks, struct bpf_labels *labels,
+		 int use_ret_trap, int allow_logging)
 {
-	char line[MAX_LINE_LENGTH];
-	int line_count = 0;
+	/*
+	 * Loop through all the lines in the policy file.
+	 * Build a jump table for the syscall number.
+	 * If the policy line has an arg filter, build the arg filter
+	 * as well.
+	 * Chain the filter sections together and dump them into
+	 * the final buffer at the end.
+	 */
+	char *line = NULL;
+	size_t len = 0;
+	while (getline(&line, &len, policy_file) != -1) {
+		char *policy_line = line;
+		char *syscall_name = strsep(&policy_line, ":");
+		int nr = -1;
 
+		syscall_name = strip(syscall_name);
+
+		/* Allow comments and empty lines. */
+		if (*syscall_name == '#' || *syscall_name == '\0') {
+			/* Reuse |line| in the next getline() call. */
+			continue;
+		}
+
+		policy_line = strip(policy_line);
+		if (*policy_line == '\0') {
+			warn("compile_file: empty policy line");
+			free(line);
+			return -1;
+		}
+
+		nr = lookup_syscall(syscall_name);
+		if (nr < 0) {
+			warn("compile_file: nonexistent syscall '%s'",
+			     syscall_name);
+			if (allow_logging) {
+				/*
+				 * If we're logging failures, assume we're in a
+				 * debugging case and continue.
+				 * This is not super risky because an invalid
+				 * syscall name is likely caused by a typo or by
+				 * leftover lines from a different architecture.
+				 * In either case, not including a policy line
+				 * is equivalent to killing the process if the
+				 * syscall is made, so there's no added attack
+				 * surface.
+				 */
+				/* Reuse |line| in the next getline() call. */
+				continue;
+			}
+			free(line);
+			return -1;
+		}
+
+		/*
+		 * For each syscall, add either a simple ALLOW,
+		 * or an arg filter block.
+		 */
+		if (strcmp(policy_line, "1") == 0) {
+			/* Add simple ALLOW. */
+			append_allow_syscall(head, nr);
+		} else {
+			/*
+			 * Create and jump to the label that will hold
+			 * the arg filter block.
+			 */
+			unsigned int id = bpf_label_id(labels, syscall_name);
+			struct sock_filter *nr_comp =
+			    new_instr_buf(ALLOW_SYSCALL_LEN);
+			bpf_allow_syscall_args(nr_comp, nr, id);
+			append_filter_block(head, nr_comp, ALLOW_SYSCALL_LEN);
+
+			/* Build the arg filter block. */
+			struct filter_block *block = compile_policy_line(
+			    nr, policy_line, id, labels, use_ret_trap);
+
+			if (!block) {
+				if (*arg_blocks) {
+					free_block_list(*arg_blocks);
+				}
+				free(line);
+				return -1;
+			}
+
+			if (*arg_blocks) {
+				extend_filter_block_list(*arg_blocks, block);
+			} else {
+				*arg_blocks = block;
+			}
+		}
+		/* Reuse |line| in the next getline() call. */
+	}
+	free(line);
+	return 0;
+}
+
+int compile_filter(FILE *initial_file, struct sock_fprog *prog,
+		   int use_ret_trap, int allow_logging)
+{
 	struct bpf_labels labels;
 	labels.count = 0;
 
-	if (!policy_file)
+	if (!initial_file) {
+		warn("compile_filter: |initial_file| is NULL");
 		return -1;
+	}
 
 	struct filter_block *head = new_filter_block();
 	struct filter_block *arg_blocks = NULL;
@@ -458,93 +555,13 @@ int compile_filter(FILE *policy_file, struct sock_fprog *prog, int use_ret_trap,
 	if (allow_logging)
 		allow_logging_syscalls(head);
 
-	/*
-	 * Loop through all the lines in the policy file.
-	 * Build a jump table for the syscall number.
-	 * If the policy line has an arg filter, build the arg filter
-	 * as well.
-	 * Chain the filter sections together and dump them into
-	 * the final buffer at the end.
-	 */
-	while (fgets(line, sizeof(line), policy_file)) {
-		++line_count;
-		char *policy_line = line;
-		char *syscall_name = strsep(&policy_line, ":");
-		int nr = -1;
-
-		syscall_name = strip(syscall_name);
-
-		/* Allow comments and empty lines. */
-		if (*syscall_name == '#' || *syscall_name == '\0')
-			continue;
-
-		if (strlen(policy_line) == 0) {
-			warn("compile_filter: empty policy line");
-			free_block_list(head);
-			return -1;
-		}
-
-		nr = lookup_syscall(syscall_name);
-		if (nr < 0) {
-			warn("compile_filter: nonexistent syscall '%s'",
-			     syscall_name);
-			if (allow_logging) {
-				/*
-				 * If we're logging failures, assume we're in a
-				 * debugging case and continue.
-				 * This is not super risky because an invalid
-				 * syscall name is likely caused by a typo or by
-				 * leftover lines from a different architecture.
-				 * In either case, not including a policy line
-				 * is equivalent to killing the process if the
-				 * syscall is made, so there's no added attack
-				 * surface.
-				 */
-				continue;
-			}
-			free_block_list(head);
-			return -1;
-		}
-
-		policy_line = strip(policy_line);
-
-		/*
-		 * For each syscall, add either a simple ALLOW,
-		 * or an arg filter block.
-		 */
-		if (strcmp(policy_line, "1") == 0) {
-			/* Add simple ALLOW. */
-			append_allow_syscall(head, nr);
-		} else {
-			/*
-			 * Create and jump to the label that will hold
-			 * the arg filter block.
-			 */
-			unsigned int id = bpf_label_id(&labels, syscall_name);
-			struct sock_filter *nr_comp =
-			    new_instr_buf(ALLOW_SYSCALL_LEN);
-			bpf_allow_syscall_args(nr_comp, nr, id);
-			append_filter_block(head, nr_comp, ALLOW_SYSCALL_LEN);
-
-			/* Build the arg filter block. */
-			struct filter_block *block = compile_section(
-			    nr, policy_line, id, &labels, use_ret_trap);
-
-			if (!block) {
-				if (arg_blocks) {
-					free_block_list(arg_blocks);
-				}
-				free_label_strings(&labels);
-				free_block_list(head);
-				return -1;
-			}
-
-			if (arg_blocks) {
-				extend_filter_block_list(arg_blocks, block);
-			} else {
-				arg_blocks = block;
-			}
-		}
+	if (compile_file(initial_file, head, &arg_blocks, &labels, use_ret_trap,
+			 allow_logging) != 0) {
+		warn("compile_filter: compile_file() failed");
+		free_block_list(head);
+		free_block_list(arg_blocks);
+		free_label_strings(&labels);
+		return -1;
 	}
 
 	/*
