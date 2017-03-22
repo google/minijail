@@ -1,0 +1,16 @@
+# In this directory, test with:
+# make LIBDIR=.
+# ./minijail0 -n -S examples/cat.policy -- /bin/cat /proc/self/status
+# This policy only works on x86_64.
+
+read: 1
+write: 1
+rt_sigreturn: 1
+exit_group: 1
+
+open: 1
+close: 1
+fstat: 1
+# Enforce W^X.
+mmap: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
+fadvise64: 1
