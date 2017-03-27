@@ -32,7 +32,8 @@ struct filter_block *compile_policy_line(int nr, const char *policy_line,
 					 int do_ret_trap);
 int compile_file(FILE *policy_file, struct filter_block *head,
 		 struct filter_block **arg_blocks, struct bpf_labels *labels,
-		 int use_ret_trap, int allow_logging);
+		 int use_ret_trap, int allow_logging,
+		 unsigned int include_level);
 int compile_filter(FILE *policy_file, struct sock_fprog *prog, int do_ret_trap,
 		   int add_logging_syscalls);
 
