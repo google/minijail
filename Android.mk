@@ -141,6 +141,7 @@ include $(BUILD_STATIC_LIBRARY)
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail_unittest_gtest
+LOCAL_COMPATIBILITY_SUITE := device-tests
 
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_CFLAGS := $(minijailCommonCFlags) -Wno-writable-strings
@@ -179,6 +180,7 @@ include $(BUILD_NATIVE_TEST)
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := syscall_filter_unittest_gtest
+LOCAL_COMPATIBILITY_SUITE := device-tests
 
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_CFLAGS := $(minijailCommonCFlags)
@@ -219,6 +221,7 @@ include $(BUILD_HOST_NATIVE_TEST)
 # =========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := libminijail_test
+LOCAL_COMPATIBILITY_SUITE := device-tests
 
 LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
