@@ -12,7 +12,8 @@ CPPFLAGS += -DPRELOADPATH="$(PRELOADPATH)"
 ifneq ($(HAVE_SECUREBITS_H),no)
 CPPFLAGS += -DHAVE_SECUREBITS_H
 endif
-ifneq ($(USE_seccomp),yes)
+
+ifeq ($(USE_seccomp),no)
 CPPFLAGS += -DUSE_SECCOMP_SOFTFAIL
 endif
 
