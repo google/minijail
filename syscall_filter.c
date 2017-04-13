@@ -254,7 +254,7 @@ int compile_atom(struct filter_block *head, char *atom,
 
 int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
 {
-	char *errno_ptr;
+	char *errno_ptr = NULL;
 
 	/* Splits the 'return' keyword and the actual errno value. */
 	char *ret_str = strtok_r(ret_errno, " ", &errno_ptr);
