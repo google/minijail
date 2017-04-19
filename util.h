@@ -18,6 +18,7 @@
 extern "C" {
 #endif
 
+/* clang-format off */
 #define die(_msg, ...) do { \
 	syslog(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__); \
 	abort(); \
@@ -36,11 +37,13 @@ extern "C" {
 	syslog(LOG_INFO, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+/* clang-format on */
 
 extern const char *log_syscalls[];
 extern const size_t log_syscalls_len;
 
-static inline int is_android() {
+static inline int is_android()
+{
 #if defined(__ANDROID__)
 	return 1;
 #else
@@ -50,7 +53,8 @@ static inline int is_android() {
 
 void __asan_init(void) __attribute__((weak));
 
-static inline int running_with_asan() {
+static inline int running_with_asan()
+{
 	return &__asan_init != 0;
 }
 
@@ -64,8 +68,6 @@ char *strip(char *s);
 char *tokenize(char **stringp, const char *delim);
 
 char *path_join(const char *external_path, const char *internal_path);
-int write_proc_file(pid_t pid, const char *content, const char *basename);
-int write_pid_to_path(pid_t pid, const char *path);
 
 /*
  * consumebytes: consumes @length bytes from a buffer @buf of length @buflength
