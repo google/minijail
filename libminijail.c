@@ -8,19 +8,14 @@
 #define _GNU_SOURCE
 
 #include <asm/unistd.h>
-#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
-#include <inttypes.h>
-#include <limits.h>
 #include <linux/capability.h>
-#include <net/if.h>
 #include <pwd.h>
 #include <sched.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -30,7 +25,6 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/prctl.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/user.h>
@@ -44,35 +38,10 @@
 #include "signal_handler.h"
 #include "syscall_filter.h"
 #include "syscall_wrapper.h"
+#include "system.h"
 #include "util.h"
 
-#ifdef HAVE_SECUREBITS_H
-# include <linux/securebits.h>
-#else
-# define SECURE_ALL_BITS	0x55
-# define SECURE_ALL_LOCKS	(SECURE_ALL_BITS << 1)
-#endif
-/* For kernels < 4.3. */
-#define OLD_SECURE_ALL_BITS	0x15
-#define OLD_SECURE_ALL_LOCKS	(OLD_SECURE_ALL_BITS << 1)
-
-/*
- * Assert the value of SECURE_ALL_BITS at compile-time.
- * Brillo devices are currently compiled against 4.4 kernel headers. Kernel 4.3
- * added a new securebit.
- * When a new securebit is added, the new SECURE_ALL_BITS mask will return EPERM
- * when used on older kernels. The compile-time assert will catch this situation
- * at compile time.
- */
-#ifdef __BRILLO__
-_Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
-#endif
-
 /* Until these are reliably available in linux/prctl.h. */
-#ifndef PR_SET_SECCOMP
-# define PR_SET_SECCOMP 22
-#endif
-
 #ifndef PR_ALT_SYSCALL
 # define PR_ALT_SYSCALL 0x43724f53
 #endif
@@ -83,7 +52,7 @@ _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 #endif
 
 #ifndef SECCOMP_MODE_FILTER
-# define SECCOMP_MODE_FILTER 2 /* uses user-supplied filter. */
+#define SECCOMP_MODE_FILTER 2 /* Uses user-supplied filter. */
 #endif
 
 #ifndef SECCOMP_SET_MODE_STRICT
@@ -1095,39 +1064,6 @@ out:
 }
 
 /*
- * setup_mount_destination: Ensures the mount target exists.
- * Creates it if needed and possible.
- */
-static int setup_mount_destination(const char *source, const char *dest,
-				   uid_t uid, uid_t gid)
-{
-	int rc;
-	struct stat st_buf;
-
-	rc = stat(dest, &st_buf);
-	if (rc == 0) /* destination exists */
-		return 0;
-
-	/*
-	 * Try to create the destination.
-	 * Either make a directory or touch a file depending on the source type.
-	 * If the source doesn't exist, assume it is a filesystem type such as
-	 * "tmpfs" and create a directory to mount it on.
-	 */
-	rc = stat(source, &st_buf);
-	if (rc || S_ISDIR(st_buf.st_mode) || S_ISBLK(st_buf.st_mode)) {
-		if (mkdir(dest, 0700))
-			return -errno;
-	} else {
-		int fd = open(dest, O_RDWR | O_CREAT, 0700);
-		if (fd < 0)
-			return -errno;
-		close(fd);
-	}
-	return chown(dest, uid, gid);
-}
-
-/*
  * mount_one: Applies mounts from @m for @j, recursing as needed.
  * @j Minijail these mounts are for
  * @m Head of list of mounts
@@ -1403,37 +1339,6 @@ static void drop_ugid(const struct minijail *j)
 		pdie("setresuid(%d, %d, %d) failed", j->uid, j->uid, j->uid);
 }
 
-/*
- * We specifically do not use cap_valid() as that only tells us the last
- * valid cap we were *compiled* against (i.e. what the version of kernel
- * headers says). If we run on a different kernel version, then it's not
- * uncommon for that to be less (if an older kernel) or more (if a newer
- * kernel).
- * Normally, we suck up the answer via /proc. On Android, not all processes are
- * guaranteed to be able to access '/proc/sys/kernel/cap_last_cap' so we
- * programmatically find the value by calling prctl(PR_CAPBSET_READ).
- */
-static unsigned int get_last_valid_cap()
-{
-	unsigned int last_valid_cap = 0;
-	if (is_android()) {
-		for (; prctl(PR_CAPBSET_READ, last_valid_cap, 0, 0, 0) >= 0;
-		     ++last_valid_cap);
-
-		/* |last_valid_cap| will be the first failing value. */
-		if (last_valid_cap > 0) {
-			last_valid_cap--;
-		}
-	} else {
-		const char cap_file[] = "/proc/sys/kernel/cap_last_cap";
-		FILE *fp = fopen(cap_file, "re");
-		if (fscanf(fp, "%u", &last_valid_cap) != 1)
-			pdie("fscanf(%s)", cap_file);
-		fclose(fp);
-	}
-	return last_valid_cap;
-}
-
 static void drop_capbset(uint64_t keep_mask, unsigned int last_valid_cap)
 {
 	const uint64_t one = 1;
@@ -1569,35 +1474,6 @@ static void set_seccomp_filter(const struct minijail *j)
 	}
 }
 
-static void config_net_loopback(void)
-{
-	static const char ifname[] = "lo";
-	int sock;
-	struct ifreq ifr;
-
-	/* Make sure people don't try to add really long names. */
-	_Static_assert(sizeof(ifname) <= IFNAMSIZ, "interface name too long");
-
-	sock = socket(AF_LOCAL, SOCK_DGRAM|SOCK_CLOEXEC, 0);
-	if (sock < 0)
-		pdie("socket(AF_LOCAL) failed");
-
-	/*
-	 * Do the equiv of `ip link set up lo`.  The kernel will assign
-	 * IPv4 (127.0.0.1) & IPv6 (::1) addresses automatically!
-	 */
-	strcpy(ifr.ifr_name, ifname);
-	if (ioctl(sock, SIOCGIFFLAGS, &ifr) < 0)
-		pdie("ioctl(SIOCGIFFLAGS) failed");
-
-	/* The kernel preserves ifr.ifr_name for use. */
-	ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
-	if (ioctl(sock, SIOCSIFFLAGS, &ifr) < 0)
-		pdie("ioctl(SIOCSIFFLAGS) failed");
-
-	close(sock);
-}
-
 void API minijail_enter(const struct minijail *j)
 {
 	/*
@@ -1691,25 +1567,9 @@ void API minijail_enter(const struct minijail *j)
 		if (prctl(PR_SET_KEEPCAPS, 1))
 			pdie("prctl(PR_SET_KEEPCAPS) failed");
 
-		/*
-		 * Kernels 4.3+ define a new securebit
-		 * (SECURE_NO_CAP_AMBIENT_RAISE), so using the SECURE_ALL_BITS
-		 * and SECURE_ALL_LOCKS masks from newer kernel headers will
-		 * return EPERM on older kernels. Detect this, and retry with
-		 * the right mask for older (2.6.26-4.2) kernels.
-		 */
-		int securebits_ret = prctl(PR_SET_SECUREBITS,
-					   SECURE_ALL_BITS | SECURE_ALL_LOCKS);
-		if (securebits_ret < 0) {
-			if (errno == EPERM) {
-				/* Possibly running on kernel < 4.3. */
-				securebits_ret = prctl(
-				    PR_SET_SECUREBITS,
-				    OLD_SECURE_ALL_BITS | OLD_SECURE_ALL_LOCKS);
-			}
+		if (lock_securebits() < 0) {
+			pdie("locking securebits failed");
 		}
-		if (securebits_ret < 0)
-			pdie("prctl(PR_SET_SECUREBITS) failed");
 	}
 
 	if (j->flags.no_new_privs) {
@@ -1840,7 +1700,7 @@ int API minijail_to_fd(struct minijail *j, int fd)
 int setup_preload(void)
 {
 #if defined(__ANDROID__)
-	/* Don't use LDPRELOAD on Brillo. */
+	/* Don't use LDPRELOAD on Android. */
 	return 0;
 #else
 	char *oldenv = getenv(kLdPreloadEnvVar) ? : "";
@@ -1859,7 +1719,7 @@ int setup_preload(void)
 #endif
 }
 
-int setup_pipe(int fds[2])
+static int setup_pipe(int fds[2])
 {
 	int r = pipe(fds);
 	char fd_buf[11];
@@ -1872,26 +1732,7 @@ int setup_pipe(int fds[2])
 	return 0;
 }
 
-int setup_pipe_end(int fds[2], size_t index)
-{
-	if (index > 1)
-		return -1;
-
-	close(fds[1 - index]);
-	return fds[index];
-}
-
-int setup_and_dupe_pipe_end(int fds[2], size_t index, int fd)
-{
-	if (index > 1)
-		return -1;
-
-	close(fds[1 - index]);
-	/* dup2(2) the corresponding end of the pipe into |fd|. */
-	return dup2(fds[index], fd);
-}
-
-int close_open_fds(int *inheritable_fds, size_t size)
+static int close_open_fds(int *inheritable_fds, size_t size)
 {
 	const char *kFdPath = "/proc/self/fd";
 

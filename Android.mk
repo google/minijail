@@ -23,6 +23,7 @@ libminijailSrcFiles := \
 	signal_handler.c \
 	syscall_filter.c \
 	syscall_wrapper.c \
+	system.c \
 	util.c
 
 hostUnittestSrcFiles := \

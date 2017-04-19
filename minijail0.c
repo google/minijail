@@ -4,6 +4,7 @@
  */
 
 #include <dlfcn.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -184,7 +185,8 @@ static void seccomp_filter_usage(const char *progn)
 {
 	const struct syscall_entry *entry = syscall_table;
 	printf("Usage: %s -S <policy.file> <program> [args...]\n\n"
-	       "System call names supported:\n", progn);
+	       "System call names supported:\n",
+	       progn);
 	for (; entry->name && entry->nr >= 0; ++entry)
 		printf("  %s [%d]\n", entry->name, entry->nr);
 	printf("\nSee minijail0(5) for example policies.\n");
@@ -196,7 +198,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int opt;
 	int use_seccomp_filter = 0;
 	int binding = 0;
-	int pivot_root = 0, chroot = 0;
+	int chroot = 0, pivot_root = 0;
 	int mount_ns = 0, skip_remount = 0;
 	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
 	const size_t path_max = 4096;
@@ -208,7 +210,11 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 
 	const char *optstring =
 	    "u:g:sS:c:C:P:b:V:f:m::M::k:a:e::T:vrGhHinNplLt::IUKwyY";
-	while ((opt = getopt(argc, argv, optstring)) != -1) {
+	int longoption_index = 0;
+	const struct option long_options[] = {{0, 0, 0, 0}};
+
+	while ((opt = getopt_long(argc, argv, optstring, long_options,
+				  &longoption_index)) != -1) {
 		switch (opt) {
 		case 'u':
 			set_user(j, optarg);
@@ -384,7 +390,8 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 				 * This means that we're likely *not* running as
 				 * root, so we also have to disable
 				 * setgroups(2) to be able to set the gid map.
-				 * See http://man7.org/linux/man-pages/man7/user_namespaces.7.html
+				 * See
+				 * http://man7.org/linux/man-pages/man7/user_namespaces.7.html
 				 */
 				minijail_namespace_user_disable_setgroups(j);
 
@@ -451,7 +458,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	 */
 	if (use_seccomp_filter) {
 		minijail_parse_seccomp_filters(j, filter_path);
-		free((void*)filter_path);
+		free((void *)filter_path);
 	}
 
 	if (argc == optind) {
