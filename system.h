@@ -19,15 +19,39 @@
 #ifndef _SYSTEM_H_
 #define _SYSTEM_H_
 
+#include <sys/capability.h>
+#include <sys/prctl.h>
 #include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* Control the ambient capability set. */
+#ifndef PR_CAP_AMBIENT
+#define PR_CAP_AMBIENT 47
+#endif
+
+#ifndef PR_CAP_AMBIENT_IS_SET
+#define PR_CAP_AMBIENT_IS_SET 1
+#endif
+
+#ifndef PR_CAP_AMBIENT_RAISE
+#define PR_CAP_AMBIENT_RAISE 2
+#endif
+
+#ifndef PR_CAP_AMBIENT_LOWER
+#define PR_CAP_AMBIENT_LOWER 3
+#endif
+
+#ifndef PR_CAP_AMBIENT_CLEAR_ALL
+#define PR_CAP_AMBIENT_CLEAR_ALL 4
+#endif
+
 int lock_securebits(void);
 
 unsigned int get_last_valid_cap(void);
+int cap_ambient_supported(void);
 
 int config_net_loopback(void);
 
