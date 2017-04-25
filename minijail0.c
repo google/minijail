@@ -116,7 +116,7 @@ static void usage(const char *progn)
 	       "  [-b <src>,<dest>[,<writeable>]] [-k <src>,<dest>,<type>[,<flags>][,<data>]]\n"
 	       "  [-c <caps>] [-C <dir>] [-P <dir>] [-e[file]] [-f <file>] [-g <group>]\n"
 	       "  [-m[<uid> <loweruid> <count>]*] [-M[<gid> <lowergid> <count>]*]\n"
-	       "  [-S <file>] [-T <type>] [-u <user>] [-V <file>]\n"
+	       "  [-S <file>] [-t[size]] [-T <type>] [-u <user>] [-V <file>]\n"
 	       "  <program> [args...]\n"
 	       "  -a <table>: Use alternate syscall table <table>.\n"
 	       "  -b:         Bind <src> to <dest> in chroot.\n"
@@ -177,7 +177,8 @@ static void usage(const char *progn)
 	       "  -v:         Enter new mount namespace.\n"
 	       "  -V <file>:  Enter specified mount namespace.\n"
 	       "  -w:         Create and join a new anonymous session keyring.\n"
-	       "  -Y:         Synchronize seccomp filters across thread group.\n");
+	       "  -Y:         Synchronize seccomp filters across thread group.\n"
+	       "  --ambient:  Raise ambient capabilities. Requires -c.\n");
 	/* clang-format on */
 }
 
@@ -201,6 +202,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int chroot = 0, pivot_root = 0;
 	int mount_ns = 0, skip_remount = 0;
 	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
+	int caps = 0, ambient_caps = 0;
 	const size_t path_max = 4096;
 	char *map;
 	size_t size;
@@ -211,7 +213,12 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const char *optstring =
 	    "u:g:sS:c:C:P:b:V:f:m::M::k:a:e::T:vrGhHinNplLt::IUKwyY";
 	int longoption_index = 0;
-	const struct option long_options[] = {{0, 0, 0, 0}};
+	/* clang-format off */
+	const struct option long_options[] = {
+		{"ambient", no_argument, 0, 128},
+		{0, 0, 0, 0},
+	};
+	/* clang-format on */
 
 	while ((opt = getopt_long(argc, argv, optstring, long_options,
 				  &longoption_index)) != -1) {
@@ -253,6 +260,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			binding = 1;
 			break;
 		case 'c':
+			caps = 1;
 			use_caps(j, optarg);
 			break;
 		case 'C':
@@ -427,12 +435,24 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'Y':
 			minijail_set_seccomp_filter_tsync(j);
 			break;
+		/* Long options. */
+		case 128: /* Ambient caps. */
+			ambient_caps = 1;
+			minijail_set_ambient_caps(j);
+			break;
 		default:
 			usage(argv[0]);
 			exit(1);
 		}
 		if (optind < argc && argv[optind][0] != '-')
 			break;
+	}
+
+	/* Can only set ambient caps when using regular caps. */
+	if (ambient_caps && !caps) {
+		fprintf(stderr, "Can't set ambient capabilities (--ambient) "
+				"without actually using capabilities (-c).\n");
+		exit(1);
 	}
 
 	/* Only allow bind mounts when entering a chroot or using pivot_root. */
