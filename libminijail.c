@@ -100,6 +100,7 @@ struct minijail {
 		int keep_suppl_gids : 1;
 		int use_caps : 1;
 		int capbset_drop : 1;
+		int set_ambient_caps : 1;
 		int vfs : 1;
 		int enter_vfs : 1;
 		int skip_remount_private : 1;
@@ -386,6 +387,11 @@ void API minijail_capbset_drop(struct minijail *j, uint64_t capmask)
 	}
 	j->cap_bset = capmask;
 	j->flags.capbset_drop = 1;
+}
+
+void API minijail_set_ambient_caps(struct minijail *j)
+{
+	j->flags.set_ambient_caps = 1;
 }
 
 void API minijail_reset_signal_mask(struct minijail *j)
@@ -1358,17 +1364,15 @@ static void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 
 	cap_t caps = cap_get_proc();
 	cap_value_t flag[1];
+	const size_t ncaps = sizeof(j->caps) * 8;
 	const uint64_t one = 1;
 	unsigned int i;
 	if (!caps)
 		die("can't get process caps");
-	if (cap_clear_flag(caps, CAP_INHERITABLE))
-		die("can't clear inheritable caps");
-	if (cap_clear_flag(caps, CAP_EFFECTIVE))
-		die("can't clear effective caps");
-	if (cap_clear_flag(caps, CAP_PERMITTED))
-		die("can't clear permitted caps");
-	for (i = 0; i < sizeof(j->caps) * 8 && i <= last_valid_cap; ++i) {
+	if (cap_clear(caps))
+		die("can't clear caps");
+
+	for (i = 0; i < ncaps && i <= last_valid_cap; ++i) {
 		/* Keep CAP_SETPCAP for dropping bounding set bits. */
 		if (i != CAP_SETPCAP && !(j->caps & (one << i)))
 			continue;
@@ -1404,6 +1408,31 @@ static void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 
 	if (cap_set_proc(caps))
 		die("can't apply final cleaned capset");
+
+	/*
+	 * If ambient capabilities are supported, clear all capabilities first,
+	 * then raise the requested ones.
+	 */
+	if (j->flags.set_ambient_caps) {
+		if (!cap_ambient_supported()) {
+			pdie("ambient capabilities not supported");
+		}
+		if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL) != 0) {
+			pdie("can't clear ambient capabilities");
+		}
+
+		for (i = 0; i < ncaps && i <= last_valid_cap; ++i) {
+			if (!(j->caps & (one << i)))
+				continue;
+
+			if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, i, 0,
+				  0) != 0) {
+				pdie("prctl(PR_CAP_AMBIENT, "
+				     "PR_CAP_AMBIENT_RAISE, %u) failed",
+				     i);
+			}
+		}
+	}
 
 	cap_free(caps);
 }

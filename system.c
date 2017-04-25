@@ -35,40 +35,33 @@
 #define SECURE_ALL_BITS 0x55
 #define SECURE_ALL_LOCKS (SECURE_ALL_BITS << 1)
 #endif
-/* For kernels < 4.3. */
-#define OLD_SECURE_ALL_BITS 0x15
-#define OLD_SECURE_ALL_LOCKS (OLD_SECURE_ALL_BITS << 1)
+
+#define SECURE_BITS_NO_AMBIENT 0x15
+#define SECURE_LOCKS_NO_AMBIENT (SECURE_BITS_NO_AMBIENT << 1)
 
 /*
  * Assert the value of SECURE_ALL_BITS at compile-time.
- * Brillo devices are currently compiled against 4.4 kernel headers. Kernel 4.3
+ * Android devices are currently compiled against 4.4 kernel headers. Kernel 4.3
  * added a new securebit.
  * When a new securebit is added, the new SECURE_ALL_BITS mask will return EPERM
  * when used on older kernels. The compile-time assert will catch this situation
  * at compile time.
  */
-#ifdef __BRILLO__
+#if defined(__ANDROID__)
 _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 #endif
 
 int lock_securebits(void)
 {
 	/*
-	 * Kernels 4.3+ define a new securebit (SECURE_NO_CAP_AMBIENT_RAISE),
-	 * so using the SECURE_ALL_BITS and SECURE_ALL_LOCKS masks from
-	 * newer kernel headers will return EPERM on older kernels. Detect this,
-	 * and retry with the right mask for older (2.6.26-4.2) kernels.
+	 * Ambient capabilities can only be raised if they're already present
+	 * in the permitted *and* inheritable set. Therefore, we don't really
+	 * need to lock the NO_CAP_AMBIENT_RAISE securebit, since we are already
+	 * configuring the permitted and inheritable set.
 	 */
 	int securebits_ret =
-	    prctl(PR_SET_SECUREBITS, SECURE_ALL_BITS | SECURE_ALL_LOCKS);
-	if (securebits_ret < 0) {
-		if (errno == EPERM) {
-			/* Possibly running on kernel < 4.3. */
-			securebits_ret =
-			    prctl(PR_SET_SECUREBITS,
-				  OLD_SECURE_ALL_BITS | OLD_SECURE_ALL_LOCKS);
-		}
-	}
+	    prctl(PR_SET_SECUREBITS,
+		  SECURE_BITS_NO_AMBIENT | SECURE_LOCKS_NO_AMBIENT);
 	if (securebits_ret < 0) {
 		pwarn("prctl(PR_SET_SECUREBITS) failed");
 		return -1;
@@ -142,6 +135,12 @@ unsigned int get_last_valid_cap(void)
 		fclose(fp);
 	}
 	return last_valid_cap;
+}
+
+int cap_ambient_supported(void)
+{
+	return prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_IS_SET, CAP_CHOWN, 0, 0) >=
+	       0;
 }
 
 int config_net_loopback(void)
