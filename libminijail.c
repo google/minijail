@@ -1417,7 +1417,8 @@ static void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 		if (!cap_ambient_supported()) {
 			pdie("ambient capabilities not supported");
 		}
-		if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL) != 0) {
+		if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0) !=
+		    0) {
 			pdie("can't clear ambient capabilities");
 		}
 
