@@ -550,6 +550,7 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 			goto free_line;
 		}
 
+		syscall_name = strip(syscall_name);
 		int nr = lookup_syscall(syscall_name);
 		if (nr < 0) {
 			warn("compile_file: nonexistent syscall '%s'",
