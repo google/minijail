@@ -1169,6 +1169,24 @@ TEST(FilterTest, seccomp_read_write) {
   free(actual.filter);
 }
 
+TEST(FilterTest, misplaced_whitespace) {
+  struct sock_fprog actual;
+  const char *policy = "open :1\n";
+
+  FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+
+  /* Checks return value and filter length. */
+  ASSERT_EQ(res, 0);
+  EXPECT_EQ(actual.len,
+            ARCH_VALIDATION_LEN + 1 /* load syscall nr */ + ALLOW_SYSCALL_LEN +
+                1 /* ret kill */);
+  free(actual.filter);
+}
+
 TEST(FilterTest, missing_atom) {
   struct sock_fprog actual;
   const char* policy = "open:\n";
