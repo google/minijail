@@ -139,7 +139,6 @@ static void usage(const char *progn)
 	       "  -h:         Help (this message).\n"
 	       "  -H:         Seccomp filter help message.\n"
 	       "  -i:         Exit immediately after fork (do not act as init).\n"
-	       "              Not compatible with -p.\n"
 	       "  -I:         Run <program> as init (pid 1) inside a new pid namespace (implies -p).\n"
 	       "  -K:         Don't mark all existing mounts as MS_PRIVATE.\n"
 	       "  -l:         Enter new IPC namespace.\n"
