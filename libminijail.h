@@ -104,6 +104,12 @@ int minijail_use_alt_syscall(struct minijail *j, const char *table);
 int minijail_add_to_cgroup(struct minijail *j, const char *path);
 
 /*
+ * Install signal handlers in the minijail process that forward received
+ * signals to the jailed child process.
+ */
+int minijail_forward_signals(struct minijail *j);
+
+/*
  * minijail_enter_chroot: enables chroot() restriction for @j
  * @j   minijail to apply restriction to
  * @dir directory to chroot() to. Owned by caller.
