@@ -118,32 +118,32 @@ static void usage(const char *progn)
 	       "  [-m[<uid> <loweruid> <count>]*] [-M[<gid> <lowergid> <count>]*]\n"
 	       "  [-S <file>] [-t[size]] [-T <type>] [-u <user>] [-V <file>]\n"
 	       "  <program> [args...]\n"
-	       "  -a <table>: Use alternate syscall table <table>.\n"
-	       "  -b:         Bind <src> to <dest> in chroot.\n"
-	       "              Multiple instances allowed.\n"
-	       "  -k:         Mount <src> at <dest> in chroot.\n"
-	       "              <flags> and <data> can be specified as in mount(2).\n"
-	       "              Multiple instances allowed.\n"
-	       "  -c <caps>:  Restrict caps to <caps>.\n"
-	       "  -C <dir>:   chroot(2) to <dir>.\n"
-	       "              Not compatible with -P.\n"
-	       "  -P <dir>:   pivot_root(2) to <dir> (implies -v).\n"
-	       "              Not compatible with -C.\n"
-	       "  -e[file]:   Enter new network namespace, or existing one if |file| is provided.\n"
-	       "  -f <file>:  Write the pid of the jailed process to <file>.\n"
-	       "  -g <group>: Change gid to <group>.\n"
-	       "  -G:         Inherit supplementary groups from uid.\n"
-	       "              Not compatible with -y.\n"
-	       "  -y:         Keep uid's supplementary groups.\n"
-	       "              Not compatible with -G.\n"
-	       "  -h:         Help (this message).\n"
-	       "  -H:         Seccomp filter help message.\n"
-	       "  -i:         Exit immediately after fork (do not act as init).\n"
-	       "  -I:         Run <program> as init (pid 1) inside a new pid namespace (implies -p).\n"
-	       "  -K:         Don't mark all existing mounts as MS_PRIVATE.\n"
-	       "  -l:         Enter new IPC namespace.\n"
-	       "  -L:         Report blocked syscalls to syslog when using seccomp filter.\n"
-	       "              Forces the following syscalls to be allowed:\n"
+	       "  -a <table>:   Use alternate syscall table <table>.\n"
+	       "  -b:           Bind <src> to <dest> in chroot.\n"
+	       "                Multiple instances allowed.\n"
+	       "  -k:           Mount <src> at <dest> in chroot.\n"
+	       "                <flags> and <data> can be specified as in mount(2).\n"
+	       "                Multiple instances allowed.\n"
+	       "  -c <caps>:    Restrict caps to <caps>.\n"
+	       "  -C <dir>:     chroot(2) to <dir>.\n"
+	       "                Not compatible with -P.\n"
+	       "  -P <dir>:     pivot_root(2) to <dir> (implies -v).\n"
+	       "                Not compatible with -C.\n"
+	       "  -e[file]:     Enter new network namespace, or existing one if |file| is provided.\n"
+	       "  -f <file>:    Write the pid of the jailed process to <file>.\n"
+	       "  -g <group>:   Change gid to <group>.\n"
+	       "  -G:           Inherit supplementary groups from uid.\n"
+	       "                Not compatible with -y.\n"
+	       "  -y:           Keep uid's supplementary groups.\n"
+	       "                Not compatible with -G.\n"
+	       "  -h:           Help (this message).\n"
+	       "  -H:           Seccomp filter help message.\n"
+	       "  -i:           Exit immediately after fork (do not act as init).\n"
+	       "  -I:           Run <program> as init (pid 1) inside a new pid namespace (implies -p).\n"
+	       "  -K:           Don't mark all existing mounts as MS_PRIVATE.\n"
+	       "  -l:           Enter new IPC namespace.\n"
+	       "  -L:           Report blocked syscalls to syslog when using seccomp filter.\n"
+	       "                Forces the following syscalls to be allowed:\n"
 	       "                  ", progn);
 	/* clang-format on */
 	for (i = 0; i < log_syscalls_len; i++)
@@ -151,34 +151,35 @@ static void usage(const char *progn)
 
 	/* clang-format off */
 	printf("\n"
-	       "  -m[map]:    Set the uid map of a user namespace (implies -pU).\n"
-	       "              Same arguments as newuidmap(1), multiple mappings should be separated by ',' (comma).\n"
-	       "              With no mapping, map the current uid to root inside the user namespace.\n"
-	       "              Not compatible with -b without the 'writable' option.\n"
-	       "  -M[map]:    Set the gid map of a user namespace (implies -pU).\n"
-	       "              Same arguments as newgidmap(1), multiple mappings should be separated by ',' (comma).\n"
-	       "              With no mapping, map the current gid to root inside the user namespace.\n"
-	       "              Not compatible with -b without the 'writable' option.\n"
-	       "  -n:         Set no_new_privs.\n"
-	       "  -N:         Enter a new cgroup namespace.\n"
-	       "  -p:         Enter new pid namespace (implies -vr).\n"
-	       "  -r:         Remount /proc read-only (implies -v).\n"
-	       "  -s:         Use seccomp.\n"
-	       "  -S <file>:  Set seccomp filter using <file>.\n"
-	       "              E.g., '-S /usr/share/filters/<prog>.$(uname -m)'.\n"
-	       "              Requires -n when not running as root.\n"
-	       "  -t[size]:   Mount tmpfs at /tmp (implies -v).\n"
-	       "              Optional argument specifies size (default \"64M\").\n"
-	       "  -T <type>:  Don't access <program> before execve(2), assume <type> ELF binary.\n"
-	       "              <type> must be 'static' or 'dynamic'.\n"
-	       "  -u <user>:  Change uid to <user>.\n"
-	       "  -U:         Enter new user namespace (implies -p).\n"
-	       "  -v:         Enter new mount namespace.\n"
-	       "  -V <file>:  Enter specified mount namespace.\n"
-	       "  -w:         Create and join a new anonymous session keyring.\n"
-	       "  -Y:         Synchronize seccomp filters across thread group.\n"
-	       "  -z:         Don't forward signals to jailed process.\n"
-	       "  --ambient:  Raise ambient capabilities. Requires -c.\n");
+	       "  -m[map]:      Set the uid map of a user namespace (implies -pU).\n"
+	       "                Same arguments as newuidmap(1), multiple mappings should be separated by ',' (comma).\n"
+	       "                With no mapping, map the current uid to root inside the user namespace.\n"
+	       "                Not compatible with -b without the 'writable' option.\n"
+	       "  -M[map]:      Set the gid map of a user namespace (implies -pU).\n"
+	       "                Same arguments as newgidmap(1), multiple mappings should be separated by ',' (comma).\n"
+	       "                With no mapping, map the current gid to root inside the user namespace.\n"
+	       "                Not compatible with -b without the 'writable' option.\n"
+	       "  -n:           Set no_new_privs.\n"
+	       "  -N:           Enter a new cgroup namespace.\n"
+	       "  -p:           Enter new pid namespace (implies -vr).\n"
+	       "  -r:           Remount /proc read-only (implies -v).\n"
+	       "  -s:           Use seccomp.\n"
+	       "  -S <file>:    Set seccomp filter using <file>.\n"
+	       "                E.g., '-S /usr/share/filters/<prog>.$(uname -m)'.\n"
+	       "                Requires -n when not running as root.\n"
+	       "  -t[size]:     Mount tmpfs at /tmp (implies -v).\n"
+	       "                Optional argument specifies size (default \"64M\").\n"
+	       "  -T <type>:    Don't access <program> before execve(2), assume <type> ELF binary.\n"
+	       "                <type> must be 'static' or 'dynamic'.\n"
+	       "  -u <user>:    Change uid to <user>.\n"
+	       "  -U:           Enter new user namespace (implies -p).\n"
+	       "  -v:           Enter new mount namespace.\n"
+	       "  -V <file>:    Enter specified mount namespace.\n"
+	       "  -w:           Create and join a new anonymous session keyring.\n"
+	       "  -Y:           Synchronize seccomp filters across thread group.\n"
+	       "  -z:           Don't forward signals to jailed process.\n"
+	       "  --ambient:    Raise ambient capabilities. Requires -c.\n"
+	       "  --uts[=name]: Enter a new UTS namespace (and set hostname).\n");
 	/* clang-format on */
 }
 
@@ -217,6 +218,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	/* clang-format off */
 	const struct option long_options[] = {
 		{"ambient", no_argument, 0, 128},
+		{"uts", optional_argument, 0, 129},
 		{0, 0, 0, 0},
 	};
 	/* clang-format on */
@@ -443,6 +445,11 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 128: /* Ambient caps. */
 			ambient_caps = 1;
 			minijail_set_ambient_caps(j);
+			break;
+		case 129: /* UTS/hostname namespace. */
+			minijail_namespace_uts(j);
+			if (optarg)
+				minijail_namespace_set_hostname(j, optarg);
 			break;
 		default:
 			usage(argv[0]);
