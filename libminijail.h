@@ -71,6 +71,8 @@ void minijail_new_session_keyring(struct minijail *j);
  */
 void minijail_skip_remount_private(struct minijail *j);
 void minijail_namespace_ipc(struct minijail *j);
+void minijail_namespace_uts(struct minijail *j);
+int minijail_namespace_set_hostname(struct minijail *j, const char *name);
 void minijail_namespace_net(struct minijail *j);
 void minijail_namespace_enter_net(struct minijail *j, const char *ns_path);
 void minijail_namespace_cgroups(struct minijail *j);
