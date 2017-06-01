@@ -106,6 +106,7 @@ struct minijail {
 		int skip_remount_private : 1;
 		int pids : 1;
 		int ipc : 1;
+		int uts : 1;
 		int net : 1;
 		int enter_net : 1;
 		int ns_cgroups : 1;
@@ -144,6 +145,7 @@ struct minijail {
 	char *pid_file_path;
 	char *uidmap;
 	char *gidmap;
+	char *hostname;
 	size_t filter_len;
 	struct sock_fprog *filter_prog;
 	char *alt_syscall_table;
@@ -437,6 +439,22 @@ void API minijail_namespace_pids(struct minijail *j)
 void API minijail_namespace_ipc(struct minijail *j)
 {
 	j->flags.ipc = 1;
+}
+
+void API minijail_namespace_uts(struct minijail *j)
+{
+	j->flags.uts = 1;
+}
+
+int API minijail_namespace_set_hostname(struct minijail *j, const char *name)
+{
+	if (j->hostname)
+		return -EINVAL;
+	minijail_namespace_uts(j);
+	j->hostname = strdup(name);
+	if (!j->hostname)
+		return -ENOMEM;
+	return 0;
 }
 
 void API minijail_namespace_net(struct minijail *j)
@@ -869,6 +887,8 @@ void minijail_marshal_helper(struct marshal_state *state,
 	}
 	if (j->chrootdir)
 		marshal_append(state, j->chrootdir, strlen(j->chrootdir) + 1);
+	if (j->hostname)
+		marshal_append(state, j->hostname, strlen(j->hostname) + 1);
 	if (j->alt_syscall_table) {
 		marshal_append(state, j->alt_syscall_table,
 			       strlen(j->alt_syscall_table) + 1);
@@ -954,6 +974,15 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 		j->chrootdir = strdup(chrootdir);
 		if (!j->chrootdir)
 			goto bad_chrootdir;
+	}
+
+	if (j->hostname) {	/* stale pointer */
+		char *hostname = consumestr(&serialized, &length);
+		if (!hostname)
+			goto bad_hostname;
+		j->hostname = strdup(hostname);
+		if (!j->hostname)
+			goto bad_hostname;
 	}
 
 	if (j->alt_syscall_table) {	/* stale pointer */
@@ -1062,6 +1091,9 @@ bad_syscall_table:
 	if (j->chrootdir)
 		free(j->chrootdir);
 bad_chrootdir:
+	if (j->hostname)
+		free(j->hostname);
+bad_hostname:
 	if (j->suppl_gid_list)
 		free(j->suppl_gid_list);
 bad_gid_list:
@@ -1071,6 +1103,7 @@ clear_pointers:
 	j->user = NULL;
 	j->suppl_gid_list = NULL;
 	j->chrootdir = NULL;
+	j->hostname = NULL;
 	j->alt_syscall_table = NULL;
 	j->cgroup_count = 0;
 out:
@@ -1592,6 +1625,14 @@ void API minijail_enter(const struct minijail *j)
 
 	if (j->flags.ipc && unshare(CLONE_NEWIPC)) {
 		pdie("unshare(CLONE_NEWIPC) failed");
+	}
+
+	if (j->flags.uts) {
+		if (unshare(CLONE_NEWUTS))
+			pdie("unshare(CLONE_NEWUTS) failed");
+
+		if (j->hostname && sethostname(j->hostname, strlen(j->hostname)))
+			pdie("sethostname(%s) failed", j->hostname);
 	}
 
 	if (j->flags.enter_net) {
@@ -2345,6 +2386,8 @@ void API minijail_destroy(struct minijail *j)
 		free(j->uidmap);
 	if (j->gidmap)
 		free(j->gidmap);
+	if (j->hostname)
+		free(j->hostname);
 	if (j->alt_syscall_table)
 		free(j->alt_syscall_table);
 	for (i = 0; i < j->cgroup_count; ++i)

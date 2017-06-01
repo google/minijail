@@ -147,6 +147,10 @@ Keep the current user's supplementary groups.
 .TP
 \fB-Y\fR
 Synchronize seccomp filters across thread group.
+.TP
+\fB--uts[=hostname]\fR
+Create a new UTS/hostname namespace, and optionally set the hostname in the new
+namespace to \fIhostname\fR.
 .SH IMPLEMENTATION
 This program is broken up into two parts: \fBminijail0\fR (the frontend) and a helper
 library called \fBlibminijailpreload\fR. Some jailings can only be achieved from
