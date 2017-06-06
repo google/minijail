@@ -105,6 +105,9 @@ Remount /proc readonly. This implies \fB-v\fR. Remounting /proc readonly means
 that even if the process has write access to a system config knob in /proc
 (e.g., in /sys/kernel), it cannot change the value.
 .TP
+\fB-R <rlim_type, rlim_cur, rlim_max>\fR
+Set an rlimit value, see \fBgetrlimit\fR(2) for allowed values.
+.TP
 \fB-s\fR
 Enable \fBseccomp\fR(2) in mode 1, which restricts the child process to a very
 small set of system calls.

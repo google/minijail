@@ -25,6 +25,7 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/user.h>
@@ -74,8 +75,16 @@
 
 #define MAX_CGROUPS 10 /* 10 different controllers supported by Linux. */
 
+#define MAX_RLIMITS 32 /* Currently there are 15 supported by Linux. */
+
 /* Keyctl commands. */
 #define KEYCTL_JOIN_SESSION_KEYRING 1
+
+struct minijail_rlimit {
+	int type;
+	uint32_t cur;
+	uint32_t max;
+};
 
 struct mountpoint {
 	char *src;
@@ -155,6 +164,8 @@ struct minijail {
 	size_t tmpfs_size;
 	char *cgroups[MAX_CGROUPS];
 	size_t cgroup_count;
+	struct minijail_rlimit rlimits[MAX_RLIMITS];
+	size_t rlimit_count;
 };
 
 /*
@@ -636,6 +647,26 @@ int API minijail_add_to_cgroup(struct minijail *j, const char *path)
 		return -ENOMEM;
 	j->cgroup_count++;
 	j->flags.cgroups = 1;
+	return 0;
+}
+
+int API minijail_rlimit(struct minijail *j, int type, uint32_t cur,
+			uint32_t max)
+{
+	size_t i;
+
+	if (j->rlimit_count >= MAX_RLIMITS)
+		return -ENOMEM;
+	/* It's an error if the caller sets the same rlimit multiple times. */
+	for (i = 0; i < j->rlimit_count; i++) {
+		if (j->rlimits[i].type == type)
+			return -EEXIST;
+	}
+
+	j->rlimits[j->rlimit_count].type = type;
+	j->rlimits[j->rlimit_count].cur = cur;
+	j->rlimits[j->rlimit_count].max = max;
+	j->rlimit_count++;
 	return 0;
 }
 
@@ -1304,6 +1335,19 @@ static void add_to_cgroups_or_die(const struct minijail *j)
 	for (i = 0; i < j->cgroup_count; ++i) {
 		if (write_pid_to_path(j->initpid, j->cgroups[i]))
 			kill_child_and_die(j, "failed to add to cgroups");
+	}
+}
+
+static void set_rlimits_or_die(const struct minijail *j)
+{
+	size_t i;
+
+	for (i = 0; i < j->rlimit_count; ++i) {
+		struct rlimit limit;
+		limit.rlim_cur = j->rlimits[i].cur;
+		limit.rlim_max = j->rlimits[i].max;
+		if (prlimit(j->initpid, j->rlimits[i].type, &limit, NULL))
+			kill_child_and_die(j, "failed to set rlimit");
 	}
 }
 
@@ -2117,6 +2161,9 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 
 		if (j->flags.cgroups)
 			add_to_cgroups_or_die(j);
+
+		if (j->rlimit_count)
+			set_rlimits_or_die(j);
 
 		if (j->flags.userns)
 			write_ugid_maps_or_die(j);
