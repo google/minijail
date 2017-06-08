@@ -209,11 +209,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	char *map;
 	size_t size;
 	const char *filter_path;
-	if (argc > 1 && argv[1][0] != '-')
-		return 1;
 
 	const char *optstring =
-	    "u:g:sS:c:C:P:b:V:f:m::M::k:a:e::T:vrGhHinNplLt::IUKwyYz";
+	    "+u:g:sS:c:C:P:b:V:f:m::M::k:a:e::T:vrGhHinNplLt::IUKwyYz";
 	int longoption_index = 0;
 	/* clang-format off */
 	const struct option long_options[] = {
@@ -455,8 +453,6 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			usage(argv[0]);
 			exit(1);
 		}
-		if (optind < argc && argv[optind][0] != '-')
-			break;
 	}
 
 	/* Can only set ambient caps when using regular caps. */
