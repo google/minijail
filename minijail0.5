@@ -3,7 +3,7 @@
 minijail0 \- sandbox a process
 .SH DESCRIPTION
 .PP
-Runs PROGRAM inside a sandbox. See minijail(1) for details.
+Runs PROGRAM inside a sandbox. See \fBminijail\fR(1) for details.
 .SH EXAMPLES
 
 Safely switch from root to nobody while dropping all capabilities and
@@ -34,7 +34,7 @@ The policy file supplied to the \fB-S\fR argument supports the following syntax:
   \fB<empty line>\fR
   \fB# any single line comment\fR
 
-A policy that emulates seccomp(2) in mode 1 may look like:
+A policy that emulates \fBseccomp\fR(2) in mode 1 may look like:
   read: 1
   write: 1
   sig_return: 1
