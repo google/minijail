@@ -10,7 +10,7 @@ Runs PROGRAM inside a sandbox.
 .TP
 \fB-a <table>\fR
 Run using the alternate syscall table named \fItable\fR. Only available on kernels
-and architectures that support the PR_ALT_SYSCALL option of prctl(2).
+and architectures that support the \fBPR_ALT_SYSCALL\fR option of \fBprctl\fR(2).
 .TP
 \fB-b <src>,<dest>[,<writeable>]
 Bind-mount \fIsrc\fR into the chroot directory at \fIdest\fR, optionally writeable.
@@ -24,7 +24,7 @@ capabilities unless those subprocesses have POSIX file capabilities. See
 \fBcapabilities\fR(7).
 .TP
 \fB-C <dir>\fR
-Change root (using chroot(2)) to \fIdir\fR.
+Change root (using \fBchroot\fR(2)) to \fIdir\fR.
 .TP
 \fB-e[file]\fR
 Enter a new network namespace, or if \fIfile\fR is specified, enter an existing
@@ -73,16 +73,16 @@ system.
 .TP
 \fB-m[<uid> <loweruid> <count>[,<uid> <loweruid> <count>]]\fR
 Set the uid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
-\fBnewuidmap(1)\fR. Multiple mappings should be separated by ','. With no mapping,
+\fBnewuidmap\fR(1). Multiple mappings should be separated by ','. With no mapping,
 map the current uid to root inside the user namespace.
 .TP
 \fB-M[<uid> <loweruid> <count>[,<uid> <loweruid> <count>]]\fR
 Set the gid mapping of a user namespace (implies \fB-pU\fR). Same arguments as
-\fBnewgidmap(1)\fR. Multiple mappings should be separated by ','. With no mapping,
+\fBnewgidmap\fR(1). Multiple mappings should be separated by ','. With no mapping,
 map the current gid to root inside the user namespace.
 .TP
 \fB-n\fR
-Set the process's \fIno_new_privs\fR bit. See \fBprctl(2)\fR and the kernel
+Set the process's \fIno_new_privs\fR bit. See \fBprctl\fR(2) and the kernel
 source file \fIDocumentation/prctl/no_new_privs.txt\fR for more info.
 .TP
 \fB-N\fR
@@ -106,11 +106,11 @@ that even if the process has write access to a system config knob in /proc
 (e.g., in /sys/kernel), it cannot change the value.
 .TP
 \fB-s\fR
-Enable seccomp(2) in mode 1, which restricts the child process to a very small
-set of system calls.
+Enable \fBseccomp\fR(2) in mode 1, which restricts the child process to a very
+small set of system calls.
 .TP
 \fB-S <arch-specific seccomp_filter policy file>\fR
-Enable seccomp(2) in mode 13 which restricts the child process to a set of
+Enable \fBseccomp\fR(2) in mode 13 which restricts the child process to a set of
 system calls defined in the policy file. Note that system calls often change
 names based on the architecture or mode. (uname -m is your friend.)
 .TP
@@ -171,4 +171,4 @@ The Chromium OS Authors <chromiumos-dev@chromium.org>
 Copyright \(co 2011 The Chromium OS Authors
 License BSD-like.
 .SH "SEE ALSO"
-\fBlibminijail.h\fR \fBminijail0(5)\fR
+\fBlibminijail.h\fR \fBminijail0\fR(5)
