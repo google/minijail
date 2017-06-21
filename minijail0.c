@@ -163,7 +163,7 @@ static void usage(const char *progn)
 	       "  -N:           Enter a new cgroup namespace.\n"
 	       "  -p:           Enter new pid namespace (implies -vr).\n"
 	       "  -r:           Remount /proc read-only (implies -v).\n"
-	       "  -s:           Use seccomp.\n"
+	       "  -s:           Use seccomp mode 1 (not the same as -S).\n"
 	       "  -S <file>:    Set seccomp filter using <file>.\n"
 	       "                E.g., '-S /usr/share/filters/<prog>.$(uname -m)'.\n"
 	       "                Requires -n when not running as root.\n"
@@ -205,6 +205,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int mount_ns = 0, skip_remount = 0;
 	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
 	int caps = 0, ambient_caps = 0;
+	int seccomp = -1;
 	const size_t path_max = 4096;
 	char *map;
 	size_t size;
@@ -234,9 +235,19 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_no_new_privs(j);
 			break;
 		case 's':
+			if (seccomp != -1 && seccomp != 1) {
+				fprintf(stderr, "Do not use -s & -S together.\n");
+				exit(1);
+			}
+			seccomp = 1;
 			minijail_use_seccomp(j);
 			break;
 		case 'S':
+			if (seccomp != -1 && seccomp != 2) {
+				fprintf(stderr, "Do not use -s & -S together.\n");
+				exit(1);
+			}
+			seccomp = 2;
 			minijail_use_seccomp_filter(j);
 			if (strlen(optarg) >= path_max) {
 				fprintf(stderr, "Filter path is too long.\n");

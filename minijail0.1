@@ -108,6 +108,8 @@ that even if the process has write access to a system config knob in /proc
 \fB-s\fR
 Enable \fBseccomp\fR(2) in mode 1, which restricts the child process to a very
 small set of system calls.
+You most likely do not want to use this with the seccomp filter mode (\fB-S\fR)
+as they are completely different (even though they have similar names).
 .TP
 \fB-S <arch-specific seccomp_filter policy file>\fR
 Enable \fBseccomp\fR(2) in mode 13 which restricts the child process to a set of
