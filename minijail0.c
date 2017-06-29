@@ -75,6 +75,22 @@ static void add_binding(struct minijail *j, char *arg)
 	}
 }
 
+static void add_rlimit(struct minijail *j, char *arg)
+{
+	char *type = strtok(arg, ",");
+	char *cur = strtok(NULL, ",");
+	char *max = strtok(NULL, ",");
+	if (!type || !cur || !max) {
+		fprintf(stderr, "Bad rlimit '%s'.\n", arg);
+		exit(1);
+	}
+	if (minijail_rlimit(j, atoi(type), atoi(cur), atoi(max))) {
+		fprintf(stderr, "minijail_rlimit '%s,%s,%s' failed.\n",
+			type, cur, max);
+		exit(1);
+	}
+}
+
 static void add_mount(struct minijail *j, char *arg)
 {
 	char *src = strtok(arg, ",");
@@ -111,12 +127,12 @@ static void usage(const char *progn)
 {
 	size_t i;
 	/* clang-format off */
-	printf("Usage: %s [-GhHiIKlLnNprstUvyYz]\n"
+	printf("Usage: %s [-GhHiIKlLnNprRstUvyYz]\n"
 	       "  [-a <table>]\n"
 	       "  [-b <src>,<dest>[,<writeable>]] [-k <src>,<dest>,<type>[,<flags>][,<data>]]\n"
 	       "  [-c <caps>] [-C <dir>] [-P <dir>] [-e[file]] [-f <file>] [-g <group>]\n"
 	       "  [-m[<uid> <loweruid> <count>]*] [-M[<gid> <lowergid> <count>]*]\n"
-	       "  [-S <file>] [-t[size]] [-T <type>] [-u <user>] [-V <file>]\n"
+	       "  [-R <type,cur,max>] [-S <file>] [-t[size]] [-T <type>] [-u <user>] [-V <file>]\n"
 	       "  <program> [args...]\n"
 	       "  -a <table>:   Use alternate syscall table <table>.\n"
 	       "  -b:           Bind <src> to <dest> in chroot.\n"
@@ -163,6 +179,7 @@ static void usage(const char *progn)
 	       "  -N:           Enter a new cgroup namespace.\n"
 	       "  -p:           Enter new pid namespace (implies -vr).\n"
 	       "  -r:           Remount /proc read-only (implies -v).\n"
+	       "  -R:           Set rlimits, can be specified multiple times.\n"
 	       "  -s:           Use seccomp mode 1 (not the same as -S).\n"
 	       "  -S <file>:    Set seccomp filter using <file>.\n"
 	       "                E.g., '-S /usr/share/filters/<prog>.$(uname -m)'.\n"
@@ -212,7 +229,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const char *filter_path;
 
 	const char *optstring =
-	    "+u:g:sS:c:C:P:b:V:f:m::M::k:a:e::T:vrGhHinNplLt::IUKwyYz";
+	    "+u:g:sS:c:C:P:b:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUKwyYz";
 	int longoption_index = 0;
 	/* clang-format off */
 	const struct option long_options[] = {
@@ -429,6 +446,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 					"Could not set alt-syscall table.\n");
 				exit(1);
 			}
+			break;
+		case 'R':
+			add_rlimit(j, optarg);
 			break;
 		case 'T':
 			if (!strcmp(optarg, "static"))
