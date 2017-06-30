@@ -523,8 +523,46 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		free((void *)filter_path);
 	}
 
+	/*
+	 * There should be at least one additional unparsed argument: the
+	 * executable name.
+	 */
 	if (argc == optind) {
 		usage(argv[0]);
+		exit(1);
+	}
+
+	if (*elftype == ELFERROR) {
+		/*
+		 * -T was not specified.
+		 * Get the path to the program adjusted for changing root.
+		 */
+		char *program_path =
+		    minijail_get_original_path(j, argv[optind]);
+
+		/* Check that we can access the target program. */
+		if (access(program_path, X_OK)) {
+			fprintf(stderr,
+				"Target program '%s' is not accessible.\n",
+				argv[optind]);
+			exit(1);
+		}
+
+		/* Check if target is statically or dynamically linked. */
+		*elftype = get_elf_linkage(program_path);
+		free(program_path);
+	}
+
+	/*
+	 * Setting capabilities need either a dynamically-linked binary, or the
+	 * use of ambient capabilities for them to be able to survive an
+	 * execve(2).
+	 */
+	if (caps && *elftype == ELFSTATIC && !ambient_caps) {
+		fprintf(stderr, "Can't run statically-linked binaries with "
+				"capabilities (-c) without also setting "
+				"ambient capabilities. Try passing "
+				"--ambient.\n");
 		exit(1);
 	}
 
@@ -540,26 +578,6 @@ int main(int argc, char *argv[])
 	int consumed = parse_args(j, argc, argv, &exit_immediately, &elftype);
 	argc -= consumed;
 	argv += consumed;
-
-	if (elftype == ELFERROR) {
-		/*
-		 * -T was not specified.
-		 * Get the path to the program adjusted for changing root.
-		 */
-		char *program_path = minijail_get_original_path(j, argv[0]);
-
-		/* Check that we can access the target program. */
-		if (access(program_path, X_OK)) {
-			fprintf(stderr,
-				"Target program '%s' is not accessible.\n",
-				argv[0]);
-			return 1;
-		}
-
-		/* Check if target is statically or dynamically linked. */
-		elftype = get_elf_linkage(program_path);
-		free(program_path);
-	}
 
 	if (elftype == ELFSTATIC) {
 		/*
