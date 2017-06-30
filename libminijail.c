@@ -2011,9 +2011,11 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	}
 
 	if (!use_preload) {
-		if (j->flags.use_caps && j->caps != 0)
-			die("non-empty capabilities are not supported without "
-			    "LD_PRELOAD");
+		if (j->flags.use_caps && j->caps != 0 &&
+		    !j->flags.set_ambient_caps) {
+			die("non-empty, non-ambient capabilities are not "
+			    "supported without LD_PRELOAD");
+		}
 	}
 
 	/*
