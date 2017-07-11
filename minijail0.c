@@ -48,6 +48,18 @@ static void set_group(struct minijail *j, const char *arg)
 	}
 }
 
+static void skip_securebits(struct minijail *j, const char *arg)
+{
+	uint64_t securebits_skip_mask;
+	char *end = NULL;
+	securebits_skip_mask = strtoull(arg, &end, 16);
+	if (*end) {
+		fprintf(stderr, "Invalid securebit mask: '%s'\n", arg);
+		exit(1);
+	}
+	minijail_skip_setting_securebits(j, securebits_skip_mask);
+}
+
 static void use_caps(struct minijail *j, const char *arg)
 {
 	uint64_t caps;
@@ -137,6 +149,9 @@ static void usage(const char *progn)
 	       "  -a <table>:   Use alternate syscall table <table>.\n"
 	       "  -b:           Bind <src> to <dest> in chroot.\n"
 	       "                Multiple instances allowed.\n"
+	       "  -B <mask>     Skip setting securebits in <mask> when restricting capabilities (-c).\n"
+	       "                By default, SECURE_NOROOT, SECURE_NO_SETUID_FIXUP, and \n"
+	       "                SECURE_KEEP_CAPS (together with their respective locks) are set.\n"
 	       "  -k:           Mount <src> at <dest> in chroot.\n"
 	       "                <flags> and <data> can be specified as in mount(2).\n"
 	       "                Multiple instances allowed.\n"
@@ -229,7 +244,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const char *filter_path;
 
 	const char *optstring =
-	    "+u:g:sS:c:C:P:b:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUKwyYz";
+	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUKwyYz";
 	int longoption_index = 0;
 	/* clang-format off */
 	const struct option long_options[] = {
@@ -287,6 +302,9 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 		case 'b':
 			add_binding(j, optarg);
 			binding = 1;
+			break;
+		case 'B':
+			skip_securebits(j, optarg);
 			break;
 		case 'c':
 			caps = 1;

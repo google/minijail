@@ -51,7 +51,7 @@
 _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 #endif
 
-int lock_securebits(void)
+int lock_securebits(uint64_t skip_mask)
 {
 	/*
 	 * Ambient capabilities can only be raised if they're already present
@@ -59,9 +59,12 @@ int lock_securebits(void)
 	 * need to lock the NO_CAP_AMBIENT_RAISE securebit, since we are already
 	 * configuring the permitted and inheritable set.
 	 */
-	int securebits_ret =
-	    prctl(PR_SET_SECUREBITS,
-		  SECURE_BITS_NO_AMBIENT | SECURE_LOCKS_NO_AMBIENT);
+	uint64_t securebits =
+	    (SECURE_BITS_NO_AMBIENT | SECURE_LOCKS_NO_AMBIENT) & ~skip_mask;
+	if (!securebits) {
+		return 0;
+	}
+	int securebits_ret = prctl(PR_SET_SECUREBITS, securebits);
 	if (securebits_ret < 0) {
 		pwarn("prctl(PR_SET_SECUREBITS) failed");
 		return -1;
