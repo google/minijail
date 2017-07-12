@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef _SCOPED_MINIJAIL_H_
+#define _SCOPED_MINIJAIL_H_
+
 #include <memory>
 
 #include "libminijail.h"
@@ -27,3 +30,5 @@ struct ScopedMinijailDeleter {
 }
 
 using ScopedMinijail = std::unique_ptr<minijail, ScopedMinijailDeleter>;
+
+#endif /* _SCOPED_MINIJAIL_H_ */
