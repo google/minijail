@@ -59,7 +59,7 @@ int lock_securebits(uint64_t skip_mask)
 	 * need to lock the NO_CAP_AMBIENT_RAISE securebit, since we are already
 	 * configuring the permitted and inheritable set.
 	 */
-	uint64_t securebits =
+	unsigned long securebits =
 	    (SECURE_BITS_NO_AMBIENT | SECURE_LOCKS_NO_AMBIENT) & ~skip_mask;
 	if (!securebits) {
 		return 0;
