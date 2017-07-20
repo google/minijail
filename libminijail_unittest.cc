@@ -273,6 +273,41 @@ TEST(Test, test_minijail_no_fd_leaks) {
   close(dev_null);
 }
 
+static int early_exit(void* payload) {
+  exit(static_cast<int>(reinterpret_cast<intptr_t>(payload)));
+}
+
+TEST(Test, test_minijail_callback) {
+  pid_t pid;
+  int mj_run_ret;
+  int status;
+#if defined(__ANDROID__)
+  char filename[] = "/system/bin/cat";
+#else
+  char filename[] = "/bin/cat";
+#endif
+  char *argv[2];
+  int exit_code = 42;
+
+  struct minijail *j = minijail_new();
+
+  status =
+      minijail_add_hook(j, &early_exit, reinterpret_cast<void *>(exit_code),
+			MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS);
+  EXPECT_EQ(status, 0);
+
+  argv[0] = filename;
+  argv[1] = NULL;
+  mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv, &pid, NULL,
+						 NULL, NULL);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  status = minijail_wait(j);
+  EXPECT_EQ(status, exit_code);
+
+  minijail_destroy(j);
+}
+
 TEST(Test, parse_size) {
   size_t size;
 
