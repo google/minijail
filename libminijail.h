@@ -30,6 +30,31 @@ enum {
 
 struct minijail;
 
+/*
+ * A hook that can be used to execute code at various events during minijail
+ * setup in the forked process. These can only be used if the jailed process is
+ * not going to be invoked with LD_PRELOAD.
+ *
+ * If the return value is non-zero, it will be interpreted as -errno and the
+ * process will abort.
+ */
+typedef int (*minijail_hook_t)(void *context);
+
+/*
+ * The events during minijail setup in which hooks can run. All the events are
+ * run in the new process.
+ */
+typedef enum {
+	/* The hook will run just before dropping capabilities. */
+	MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS,
+
+	/* The hook will run just before calling execve(2). */
+	MINIJAIL_HOOK_EVENT_PRE_EXECVE,
+
+	/* Sentinel for error checking. Must be last. */
+	MINIJAIL_HOOK_EVENT_MAX,
+} minijail_hook_event_t;
+
 /* Allocates a new minijail with no restrictions. */
 struct minijail *minijail_new(void);
 
@@ -198,6 +223,19 @@ int minijail_mount(struct minijail *j, const char *src, const char *dest,
  */
 int minijail_bind(struct minijail *j, const char *src, const char *dest,
 		  int writeable);
+
+/*
+ * minijail_add_hook: adds @hook to the list of hooks that will be
+ * invoked when @event is reached during minijail setup. The caller is
+ * responsible for the lifetime of @payload.
+ * @j         minijail to add the hook to
+ * @hook      the function that will be invoked
+ * @payload   an opaque pointer
+ * @event     the event that will trigger the hook
+ */
+int minijail_add_hook(struct minijail *j,
+		      minijail_hook_t hook, void *payload,
+		      minijail_hook_event_t event);
 
 /*
  * Lock this process into the given minijail. Note that this procedure cannot
