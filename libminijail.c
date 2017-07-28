@@ -96,6 +96,13 @@ struct mountpoint {
 	struct mountpoint *next;
 };
 
+struct hook {
+	minijail_hook_t hook;
+	void *payload;
+	minijail_hook_event_t event;
+	struct hook *next;
+};
+
 struct minijail {
 	/*
 	 * WARNING: if you add a flag here you need to make sure it's
@@ -167,6 +174,8 @@ struct minijail {
 	struct minijail_rlimit rlimits[MAX_RLIMITS];
 	size_t rlimit_count;
 	uint64_t securebits_skip_mask;
+	struct hook *hooks_head;
+	struct hook *hooks_tail;
 };
 
 /*
@@ -753,6 +762,32 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 	return minijail_mount(j, src, dest, "", flags);
 }
 
+int API minijail_add_hook(struct minijail *j, minijail_hook_t hook,
+			  void *payload, minijail_hook_event_t event)
+{
+	struct hook *c;
+
+	if (hook == NULL)
+		return -EINVAL;
+	if (event >= MINIJAIL_HOOK_EVENT_MAX)
+		return -EINVAL;
+	c = calloc(1, sizeof(*c));
+	if (!c)
+		return -ENOMEM;
+
+	c->hook = hook;
+	c->payload = payload;
+	c->event = event;
+
+	if (j->hooks_tail)
+		j->hooks_tail->next = c;
+	else
+		j->hooks_head = c;
+	j->hooks_tail = c;
+
+	return 0;
+}
+
 static void clear_seccomp_options(struct minijail *j)
 {
 	j->flags.seccomp_filter = 0;
@@ -978,6 +1013,8 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 	j->mounts_head = NULL;
 	j->mounts_tail = NULL;
 	j->filter_prog = NULL;
+	j->hooks_head = NULL;
+	j->hooks_tail = NULL;
 
 	if (j->user) {		/* stale pointer */
 		char *user = consumestr(&serialized, &length);
@@ -1632,6 +1669,42 @@ static void install_signal_handlers(void)
 	}
 }
 
+static const char *lookup_hook_name(minijail_hook_event_t event)
+{
+	switch (event) {
+	case MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS:
+		return "pre-drop-caps";
+	case MINIJAIL_HOOK_EVENT_PRE_EXECVE:
+		return "pre-execve";
+	case MINIJAIL_HOOK_EVENT_MAX:
+		/*
+		 * Adding this in favor of a default case to force the
+		 * compiler to error out if a new enum value is added.
+		 */
+		break;
+	}
+	return "unknown";
+}
+
+static void run_hooks_or_die(const struct minijail *j,
+			     minijail_hook_event_t event)
+{
+	int rc;
+	int hook_index = 0;
+	for (struct hook *c = j->hooks_head; c; c = c->next) {
+		if (c->event != event)
+			continue;
+		rc = c->hook(c->payload);
+		if (rc != 0) {
+			errno = -rc;
+			pdie("%s hook (index %d) failed",
+			     lookup_hook_name(event), hook_index);
+		}
+		/* Only increase the index within the same hook event type. */
+		++hook_index;
+	}
+}
+
 void API minijail_enter(const struct minijail *j)
 {
 	/*
@@ -1714,6 +1787,8 @@ void API minijail_enter(const struct minijail *j)
 
 	if (j->flags.remount_proc_ro && remount_proc_readonly(j))
 		pdie("remount");
+
+	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS);
 
 	/*
 	 * If we're only dropping capabilities from the bounding set, but not
@@ -2023,6 +2098,10 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 			die("non-empty, non-ambient capabilities are not "
 			    "supported without LD_PRELOAD");
 		}
+	}
+
+	if (use_preload && j->hooks_head != NULL) {
+		die("Minijail hooks are not supported with LD_PRELOAD");
 	}
 
 	/*
@@ -2350,6 +2429,8 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 		}
 	}
 
+	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_EXECVE);
+
 	/*
 	 * If we aren't pid-namespaced, or the jailed program asked to be init:
 	 *   calling process
@@ -2430,6 +2511,12 @@ void API minijail_destroy(struct minijail *j)
 		free(m);
 	}
 	j->mounts_tail = NULL;
+	while (j->hooks_head) {
+		struct hook *c = j->hooks_head;
+		j->hooks_head = c->next;
+		free(c);
+	}
+	j->hooks_tail = NULL;
 	if (j->user)
 		free(j->user);
 	if (j->suppl_gid_list)
