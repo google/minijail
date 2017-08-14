@@ -14,6 +14,9 @@ and architectures that support the \fBPR_ALT_SYSCALL\fR option of \fBprctl\fR(2)
 .TP
 \fB-b <src>,<dest>[,<writeable>]
 Bind-mount \fIsrc\fR into the chroot directory at \fIdest\fR, optionally writeable.
+The \fIsrc\fR path must be an absolute path.
+If the destination does not exist, it will be created as a file or directory
+based on the \fIsrc\fR type.
 .TP
 \fB-c <caps>\fR
 Restrict capabilities to \fIcaps\fR. When used in conjunction with \fB-u\fR and
@@ -56,6 +59,9 @@ Run \fIprogram\fR as init (pid 1) inside a new pid namespace (implies \fB-p\fR).
 .TP
 \fB-k <src>,<dest>,<type>[,<flags>]\fR
 Mount \fIsrc\fR, a \fItype\fR filesystem, into the chroot directory at \fIdest\fR, with optional \fIflags\fR.
+If the mount is not a pseudo filesystem (e.g. proc or sysfs), \fIsrc\fR path
+must be an absolute path (e.g. \fI/dev/sda1\fR and not \fIsda1\fR).
+If the destination does not exist, it will be created as a directory.
 .TP
 \fB-K\fR
 Don't mark all existing mounts as MS_PRIVATE.
