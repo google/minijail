@@ -238,6 +238,17 @@ int minijail_add_hook(struct minijail *j,
 		      minijail_hook_event_t event);
 
 /*
+ * minijail_preserve_fd: preserves @parent_fd and makes it available as
+ * @child_fd in the child process. @parent_fd will be closed if no other
+ * redirect has claimed it as a @child_fd.  This works even if
+ * minijail_close_open_fds() is invoked.
+ * @j         minijail to add the fd to
+ * @parent_fd the fd in the parent process
+ * @child_fd  the fd that will be available in the child process
+ */
+int minijail_preserve_fd(struct minijail *j, int parent_fd, int child_fd);
+
+/*
  * Lock this process into the given minijail. Note that this procedure cannot
  * fail, since there is no way to undo privilege-dropping; therefore, if any
  * part of the privilege-drop fails, minijail_enter() will abort the entire

@@ -308,6 +308,56 @@ TEST(Test, test_minijail_callback) {
   minijail_destroy(j);
 }
 
+TEST(Test, test_minijail_preserve_fd) {
+  int mj_run_ret;
+  int status;
+#if defined(__ANDROID__)
+  char filename[] = "/system/bin/cat";
+#else
+  char filename[] = "/bin/cat";
+#endif
+  char *argv[2];
+  char teststr[] = "test\n";
+  size_t teststr_len = strlen(teststr);
+  int read_pipe[2];
+  int write_pipe[2];
+  char buf[1024];
+
+  struct minijail *j = minijail_new();
+
+  status = pipe(read_pipe);
+  ASSERT_EQ(status, 0);
+  status = pipe(write_pipe);
+  ASSERT_EQ(status, 0);
+
+  status = minijail_preserve_fd(j, write_pipe[0], STDIN_FILENO);
+  ASSERT_EQ(status, 0);
+  status = minijail_preserve_fd(j, read_pipe[1], STDOUT_FILENO);
+  ASSERT_EQ(status, 0);
+  minijail_close_open_fds(j);
+
+  argv[0] = filename;
+  argv[1] = NULL;
+  mj_run_ret = minijail_run_no_preload(j, argv[0], argv);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  close(write_pipe[0]);
+  status = write(write_pipe[1], teststr, teststr_len);
+  EXPECT_EQ(status, (int)teststr_len);
+  close(write_pipe[1]);
+
+  close(read_pipe[1]);
+  status = read(read_pipe[0], buf, 8);
+  EXPECT_EQ(status, (int)teststr_len);
+  buf[teststr_len] = 0;
+  EXPECT_EQ(strcmp(buf, teststr), 0);
+
+  status = minijail_wait(j);
+  EXPECT_EQ(status, 0);
+
+  minijail_destroy(j);
+}
+
 TEST(Test, parse_size) {
   size_t size;
 
