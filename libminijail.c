@@ -77,6 +77,8 @@
 
 #define MAX_RLIMITS 32 /* Currently there are 15 supported by Linux. */
 
+#define MAX_PRESERVED_FDS 10
+
 /* Keyctl commands. */
 #define KEYCTL_JOIN_SESSION_KEYRING 1
 
@@ -101,6 +103,11 @@ struct hook {
 	void *payload;
 	minijail_hook_event_t event;
 	struct hook *next;
+};
+
+struct preserved_fd {
+	int parent_fd;
+	int child_fd;
 };
 
 struct minijail {
@@ -176,6 +183,8 @@ struct minijail {
 	uint64_t securebits_skip_mask;
 	struct hook *hooks_head;
 	struct hook *hooks_tail;
+	struct preserved_fd preserved_fds[MAX_PRESERVED_FDS];
+	size_t preserved_fd_count;
 };
 
 /*
@@ -785,6 +794,18 @@ int API minijail_add_hook(struct minijail *j, minijail_hook_t hook,
 		j->hooks_head = c;
 	j->hooks_tail = c;
 
+	return 0;
+}
+
+int API minijail_preserve_fd(struct minijail *j, int parent_fd, int child_fd)
+{
+	if (parent_fd < 0 || child_fd < 0)
+		return -EINVAL;
+	if (j->preserved_fd_count >= MAX_PRESERVED_FDS)
+		return -ENOMEM;
+	j->preserved_fds[j->preserved_fd_count].parent_fd = parent_fd;
+	j->preserved_fds[j->preserved_fd_count].child_fd = child_fd;
+	j->preserved_fd_count++;
 	return 0;
 }
 
@@ -2010,6 +2031,32 @@ static int close_open_fds(int *inheritable_fds, size_t size)
 	return 0;
 }
 
+static int redirect_fds(struct minijail *j)
+{
+	size_t i, i2;
+	int closeable;
+	for (i = 0; i < j->preserved_fd_count; i++) {
+		if (dup2(j->preserved_fds[i].parent_fd,
+			 j->preserved_fds[i].child_fd) == -1) {
+			return -1;
+		}
+	}
+	/*
+	 * After all fds have been duped, we are now free to close all parent
+	 * fds that are *not* child fds.
+	 */
+	for (i = 0; i < j->preserved_fd_count; i++) {
+		closeable = true;
+		for (i2 = 0; i2 < j->preserved_fd_count; i2++) {
+			closeable &= j->preserved_fds[i].parent_fd !=
+				     j->preserved_fds[i2].child_fd;
+		}
+		if (closeable)
+			close(j->preserved_fds[i].parent_fd);
+	}
+	return 0;
+}
+
 int minijail_run_internal(struct minijail *j, const char *filename,
 			  char *const argv[], pid_t *pchild_pid,
 			  int *pstdin_fd, int *pstdout_fd, int *pstderr_fd,
@@ -2311,9 +2358,10 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 	}
 
 	if (j->flags.close_open_fds) {
-		const size_t kMaxInheritableFdsSize = 10;
+		const size_t kMaxInheritableFdsSize = 10 + MAX_PRESERVED_FDS;
 		int inheritable_fds[kMaxInheritableFdsSize];
 		size_t size = 0;
+		size_t i;
 		if (use_preload) {
 			inheritable_fds[size++] = pipe_fds[0];
 			inheritable_fds[size++] = pipe_fds[1];
@@ -2334,10 +2382,20 @@ int minijail_run_internal(struct minijail *j, const char *filename,
 			inheritable_fds[size++] = stderr_fds[0];
 			inheritable_fds[size++] = stderr_fds[1];
 		}
+		for (i = 0; i < j->preserved_fd_count; i++) {
+			/*
+			 * Preserve all parent_fds. They will be dup2(2)-ed in
+			 * the child later.
+			 */
+			inheritable_fds[size++] = j->preserved_fds[i].parent_fd;
+		}
 
 		if (close_open_fds(inheritable_fds, size) < 0)
 			die("failed to close open file descriptors");
 	}
+
+	if (redirect_fds(j))
+		die("failed to set up fd redirections");
 
 	if (sync_child)
 		wait_for_parent_setup(child_sync_pipe_fds);
