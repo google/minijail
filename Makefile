@@ -42,7 +42,8 @@ all: CC_BINARY(minijail0) CC_LIBRARY(libminijail.so) \
 parse_seccomp_policy: CXX_BINARY(parse_seccomp_policy)
 
 tests: TEST(CXX_BINARY(libminijail_unittest)) \
-	TEST(CXX_BINARY(syscall_filter_unittest))
+	TEST(CXX_BINARY(syscall_filter_unittest)) \
+	TEST(CXX_BINARY(system_unittest))
 
 
 CC_BINARY(minijail0): LDLIBS += -lcap -ldl
@@ -80,6 +81,15 @@ CXX_BINARY(syscall_filter_unittest): syscall_filter_unittest.o \
 		syscall_filter.o bpf.o util.o libconstants.gen.o \
 		libsyscalls.gen.o
 clean: CLEAN(syscall_filter_unittest)
+
+
+CXX_BINARY(system_unittest): CXXFLAGS += $(GTEST_CXXFLAGS)
+CXX_BINARY(system_unittest): LDLIBS += $(GTEST_MAIN)
+ifeq ($(USE_SYSTEM_GTEST),no)
+CXX_BINARY(system_unittest): $(GTEST_MAIN)
+endif
+CXX_BINARY(system_unittest): system_unittest.o system.o
+clean: CLEAN(system_unittest)
 
 
 CXX_BINARY(parse_seccomp_policy): parse_seccomp_policy.o syscall_filter.o \
