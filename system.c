@@ -203,7 +203,7 @@ int setup_and_dupe_pipe_end(int fds[2], size_t index, int fd)
 
 int write_pid_to_path(pid_t pid, const char *path)
 {
-	FILE *fp = fopen(path, "w");
+	FILE *fp = fopen(path, "we");
 
 	if (!fp) {
 		pwarn("failed to open '%s'", path);
