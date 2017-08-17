@@ -189,6 +189,44 @@ LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
 include $(BUILD_HOST_NATIVE_TEST)
 
 
+# System functionality unit tests using gtest. Run with:
+# adb shell /data/nativetest/system_unittest_gtest/system_unittest_gtest
+# =========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := system_unittest_gtest
+LOCAL_COMPATIBILITY_SUITE := device-tests
+
+LOCAL_CPP_EXTENSION := .cc
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	system.c \
+	system_unittest.cc \
+
+LOCAL_STATIC_LIBRARIES := libminijail_generated
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
+include $(BUILD_NATIVE_TEST)
+
+
+# System functionality native unit tests for the host. Run with:
+# out/host/linux-x86/nativetest(64)/system_unittest_gtest/system_unittest_gtest
+# =========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := system_unittest_gtest
+LOCAL_MODULE_HOST_OS := linux
+
+LOCAL_CPP_EXTENSION := .cc
+LOCAL_CFLAGS := $(minijailCommonCFlags)
+LOCAL_CLANG := true
+LOCAL_SRC_FILES := \
+	system.c \
+	system_unittest.cc \
+	$(hostUnittestSrcFiles)
+
+LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
+include $(BUILD_HOST_NATIVE_TEST)
+
+
 # libminijail_test executable for brillo_Minijail test.
 # =========================================================
 include $(CLEAR_VARS)
