@@ -19,6 +19,7 @@
 #ifndef _SYSTEM_H_
 #define _SYSTEM_H_
 
+#include <stdbool.h>
 #include <sys/capability.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
@@ -62,7 +63,7 @@ int write_pid_to_path(pid_t pid, const char *path);
 int write_proc_file(pid_t pid, const char *content, const char *basename);
 
 int setup_mount_destination(const char *source, const char *dest, uid_t uid,
-			    uid_t gid);
+			    uid_t gid, bool bind);
 
 #ifdef __cplusplus
 }; /* extern "C" */
