@@ -2052,14 +2052,17 @@ static int redirect_fds(struct minijail *j)
 /*
  * Structure that specifies how to start a minijail.
  *
- * filename - The program to exec in the child.
- * argv - Arguments for the child program.
+ * filename - The program to exec in the child. Required if `exec_in_child` = 1.
+ * argv - Arguments for the child program. Required if `exec_in_child` = 1.
  * use_preload - If true use LD_PRELOAD.
+ * exec_in_child - If true, run `filename`. Otherwise, the child will return to
+ *     the caller.
  */
 struct minijail_run_config {
 	const char *filename;
 	char *const *argv;
 	int use_preload;
+	int exec_in_child;
 };
 
 /*
@@ -2089,6 +2092,7 @@ int API minijail_run(struct minijail *j, const char *filename,
 		.filename = filename,
 		.argv = argv,
 		.use_preload = true,
+		.exec_in_child = true,
 	};
 	struct minijail_run_status status = {};
 	return minijail_run_internal(j, &config, &status);
@@ -2101,6 +2105,7 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 		.filename = filename,
 		.argv = argv,
 		.use_preload = true,
+		.exec_in_child = true,
 	};
 	struct minijail_run_status status = {
 		.pchild_pid = pchild_pid,
@@ -2115,6 +2120,7 @@ int API minijail_run_pipe(struct minijail *j, const char *filename,
 		.filename = filename,
 		.argv = argv,
 		.use_preload = true,
+		.exec_in_child = true,
 	};
 	struct minijail_run_status status = {
 		.pstdin_fd = pstdin_fd,
@@ -2130,6 +2136,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 		.filename = filename,
 		.argv = argv,
 		.use_preload = true,
+		.exec_in_child = true,
 	};
 	struct minijail_run_status status = {
 		.pstdin_fd = pstdin_fd,
@@ -2147,6 +2154,7 @@ int API minijail_run_no_preload(struct minijail *j, const char *filename,
 		.filename = filename,
 		.argv = argv,
 		.use_preload = false,
+		.exec_in_child = true,
 	};
 	struct minijail_run_status status = {};
 	return minijail_run_internal(j, &config, &status);
@@ -2164,6 +2172,7 @@ int API minijail_run_pid_pipes_no_preload(struct minijail *j,
 		.filename = filename,
 		.argv = argv,
 		.use_preload = false,
+		.exec_in_child = true,
 	};
 	struct minijail_run_status status = {
 		.pstdin_fd = pstdin_fd,
@@ -2171,6 +2180,13 @@ int API minijail_run_pid_pipes_no_preload(struct minijail *j,
 		.pstderr_fd = pstderr_fd,
 		.pchild_pid = pchild_pid,
 	};
+	return minijail_run_internal(j, &config, &status);
+}
+
+pid_t API minijail_fork(struct minijail *j)
+{
+	struct minijail_run_config config = {};
+	struct minijail_run_status status = {};
 	return minijail_run_internal(j, &config, &status);
 }
 
@@ -2197,6 +2213,11 @@ static int minijail_run_internal(struct minijail *j,
 	int use_preload = config->use_preload;
 
 	if (use_preload) {
+		if (j->hooks_head != NULL)
+			die("Minijail hooks are not supported with LD_PRELOAD");
+		if (!config->exec_in_child)
+			die("minijail_fork is not supported with LD_PRELOAD");
+
 		oldenv = getenv(kLdPreloadEnvVar);
 		if (oldenv) {
 			oldenv_copy = strdup(oldenv);
@@ -2214,10 +2235,6 @@ static int minijail_run_internal(struct minijail *j,
 			die("non-empty, non-ambient capabilities are not "
 			    "supported without LD_PRELOAD");
 		}
-	}
-
-	if (use_preload && j->hooks_head != NULL) {
-		die("Minijail hooks are not supported with LD_PRELOAD");
 	}
 
 	/*
@@ -2413,6 +2430,12 @@ static int minijail_run_internal(struct minijail *j,
 			*status_out->pstderr_fd =
 				setup_pipe_end(stderr_fds, 0 /* read end */);
 
+		/*
+		 * If forking return the child pid, in the normal exec case
+		 * return 0 for success.
+		 */
+		if (!config->exec_in_child)
+			return child_pid;
 		return 0;
 	}
 	/* Child process. */
@@ -2530,10 +2553,15 @@ static int minijail_run_internal(struct minijail *j,
 		 */
 		j->flags.pids = 0;
 	}
-	/* Jail this process, then execve(2) the target. */
+
+	/*
+	 * Jail this process.
+	 * If forking, return.
+	 * If not, execve(2) the target.
+	 */
 	minijail_enter(j);
 
-	if (pid_namespace && do_init) {
+	if (config->exec_in_child && pid_namespace && do_init) {
 		/*
 		 * pid namespace: this process will become init inside the new
 		 * namespace. We don't want all programs we might exec to have
@@ -2557,6 +2585,9 @@ static int minijail_run_internal(struct minijail *j,
 	}
 
 	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_EXECVE);
+
+	if (!config->exec_in_child)
+		return 0;
 
 	/*
 	 * If we aren't pid-namespaced, or the jailed program asked to be init:
