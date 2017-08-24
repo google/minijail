@@ -29,6 +29,15 @@ namespace {
 // A random path that really really should not exist on the host.
 const char kNoSuchDir[] = "/.x/..x/...x/path/should/not/exist/";
 
+// A random file that should exist.
+const char kValidFile[] = "/etc/passwd";
+
+// A random directory that should exist.
+const char kValidDir[] = "/";
+
+// A random character device that should exist.
+const char kValidCharDev[] = "/dev/null";
+
 // Return a temp filename in the cwd that this test can manipulate.
 // It will not exist when it returns, and the user has to free the memory.
 char *get_temp_path() {
@@ -121,4 +130,80 @@ TEST(write_pid_to_path, basic) {
   EXPECT_EQ(5u, fread(data, 1, sizeof(data), fp));
   fclose(fp);
   EXPECT_EQ(0, strcmp(data, "1234\n"));
+
+  free(path);
+}
+
+// If the destination exists, there's nothing to do.
+TEST(setup_mount_destination, dest_exists) {
+  // Pick some paths that should always exist.  We pass in invalid pointers
+  // for other args so we crash if the dest check doesn't short circuit.
+  EXPECT_EQ(0, setup_mount_destination(nullptr, kValidDir, 0, 0, false));
+  EXPECT_EQ(0, setup_mount_destination(nullptr, "/proc", 0, 0, true));
+  EXPECT_EQ(0, setup_mount_destination(nullptr, "/dev", 0, 0, false));
+}
+
+// When given a bind mount where the source is relative, reject it.
+TEST(setup_mount_destination, reject_relative_bind) {
+  // Pick a destination we know doesn't exist.
+  EXPECT_NE(0, setup_mount_destination("foo", kNoSuchDir, 0, 0, true));
+}
+
+// A mount of a pseudo filesystem should make the destination dir.
+TEST(setup_mount_destination, create_pseudo_fs) {
+  char *path = get_temp_path();
+  ASSERT_NE(nullptr, path);
+
+  // Passing -1 for uid/gid tells chown to make no changes.
+  EXPECT_EQ(0, setup_mount_destination("none", path, -1, -1, false));
+  // We check it's a directory by deleting it as such.
+  EXPECT_EQ(0, rmdir(path));
+
+  free(path);
+}
+
+// If the source path does not exist, we should error out.
+TEST(setup_mount_destination, missing_source) {
+  // The missing dest path is so we can exercise the source logic.
+  EXPECT_NE(0, setup_mount_destination(kNoSuchDir, kNoSuchDir, 0, 0, false));
+  EXPECT_NE(0, setup_mount_destination(kNoSuchDir, kNoSuchDir, 0, 0, true));
+}
+
+// A bind mount of a directory should create the destination dir.
+TEST(setup_mount_destination, create_bind_dir) {
+  char *path = get_temp_path();
+  ASSERT_NE(nullptr, path);
+
+  // Passing -1 for uid/gid tells chown to make no changes.
+  EXPECT_EQ(0, setup_mount_destination(kValidDir, path, -1, -1, true));
+  // We check it's a directory by deleting it as such.
+  EXPECT_EQ(0, rmdir(path));
+
+  free(path);
+}
+
+// A bind mount of a file should create the destination file.
+TEST(setup_mount_destination, create_bind_file) {
+  char *path = get_temp_path();
+  ASSERT_NE(nullptr, path);
+
+  // Passing -1 for uid/gid tells chown to make no changes.
+  EXPECT_EQ(0, setup_mount_destination(kValidFile, path, -1, -1, true));
+  // We check it's a file by deleting it as such.
+  EXPECT_EQ(0, unlink(path));
+
+  free(path);
+}
+
+// A mount of a character device should create the destination char.
+TEST(setup_mount_destination, create_char_dev) {
+  char *path = get_temp_path();
+  ASSERT_NE(nullptr, path);
+
+  // Passing -1 for uid/gid tells chown to make no changes.
+  EXPECT_EQ(0, setup_mount_destination(kValidCharDev, path, -1, -1, false));
+  // We check it's a directory by deleting it as such.
+  EXPECT_EQ(0, rmdir(path));
+
+  free(path);
 }
