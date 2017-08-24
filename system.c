@@ -227,10 +227,11 @@ int write_pid_to_path(pid_t pid, const char *path)
  * Creates it if needed and possible.
  */
 int setup_mount_destination(const char *source, const char *dest, uid_t uid,
-			    uid_t gid)
+			    uid_t gid, bool bind)
 {
 	int rc;
 	struct stat st_buf;
+	bool domkdir;
 
 	rc = stat(dest, &st_buf);
 	if (rc == 0) /* destination exists */
@@ -239,15 +240,47 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 	/*
 	 * Try to create the destination.
 	 * Either make a directory or touch a file depending on the source type.
-	 * If the source doesn't exist, assume it is a filesystem type such as
-	 * "tmpfs" and create a directory to mount it on.
+	 *
+	 * If the source isn't an absolute path, assume it is a filesystem type
+	 * such as "tmpfs" and create a directory to mount it on.  The dest will
+	 * be something like "none" or "proc" which we shouldn't be checking.
 	 */
-	rc = stat(source, &st_buf);
-	if (rc || S_ISDIR(st_buf.st_mode) || S_ISBLK(st_buf.st_mode)) {
+	if (source[0] == '/') {
+		/* The source is an absolute path -- it better exist! */
+		rc = stat(source, &st_buf);
+		if (rc)
+			return -errno;
+
+		/*
+		 * If bind mounting, we only create a directory if the source
+		 * is a directory, else we always bind mount it as a file to
+		 * support device nodes, sockets, etc...
+		 *
+		 * For all other mounts, we assume a block/char source is
+		 * going to want a directory to mount to.  If the source is
+		 * something else (e.g. a fifo or socket), this probably will
+		 * not do the right thing, but we'll fail later on when we try
+		 * to mount(), so shouldn't be a big deal.
+		 */
+		domkdir = S_ISDIR(st_buf.st_mode) ||
+			  (!bind && (S_ISBLK(st_buf.st_mode) ||
+				     S_ISCHR(st_buf.st_mode)));
+	} else {
+		/* The source is a relative path -- assume it's a pseudo fs. */
+
+		/* Disallow relative bind mounts. */
+		if (bind)
+			return -EINVAL;
+
+		domkdir = true;
+	}
+
+	/* Now that we know what we want to do, do it! */
+	if (domkdir) {
 		if (mkdir(dest, 0700))
 			return -errno;
 	} else {
-		int fd = open(dest, O_RDWR | O_CREAT, 0700);
+		int fd = open(dest, O_RDWR | O_CREAT | O_CLOEXEC, 0700);
 		if (fd < 0)
 			return -errno;
 		close(fd);
