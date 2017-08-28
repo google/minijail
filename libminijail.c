@@ -1223,7 +1223,8 @@ static int mount_one(const struct minijail *j, struct mountpoint *m)
 	if (asprintf(&dest, "%s%s", j->chrootdir, m->dest) < 0)
 		return -ENOMEM;
 
-	if (setup_mount_destination(m->src, dest, j->uid, j->gid))
+	if (setup_mount_destination(m->src, dest, j->uid, j->gid,
+				    (m->flags & MS_BIND)))
 		pdie("creating mount target '%s' failed", dest);
 
 	/*
