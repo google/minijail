@@ -24,13 +24,18 @@ fi
 OUTFILE="$1"
 
 INCLUDES='
+#if defined(__i386__) || defined(__x86_64__)
+#include <asm/prctl.h>
+#endif // __i386__ || __x86_64__
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/prctl.h>
 #include <linux/sched.h>
+#include <linux/termios.h>
 #include <stddef.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <sys/resource.h>
 #include <sys/types.h>'
 
 # Generate a dependency file which helps the build tool to see when it
@@ -62,7 +67,7 @@ $INCLUDES
 const struct constant_entry constant_table[] = {
 $(echo "$INCLUDES" | \
   ${CC} -dD - -E | \
-  grep -E '^#define [[:upper:]][[:upper:]0-9_]*(\s)+[[:alnum:]]' | \
+  grep -E '^#define [[:upper:]][[:upper:]0-9_]*(\s)+[[:alnum:]_]' | \
   grep -Ev '(SIGRTMAX|SIGRTMIN|SIG_|NULL)' | \
   sort -u | \
   sed -Ee "${SED_MULTILINE}")
