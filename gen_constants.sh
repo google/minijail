@@ -31,6 +31,7 @@ INCLUDES='
 #include <fcntl.h>
 #include <linux/prctl.h>
 #include <linux/sched.h>
+#include <linux/serial.h>
 #include <linux/termios.h>
 #include <stddef.h>
 #include <signal.h>
