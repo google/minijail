@@ -132,8 +132,13 @@ argument. It has standard /tmp permissions (1777), and is mounted
 nodev/noexec/nosuid. Implies \fB-v\fR.
 .TP
 \fB-T <type>\fR
-Assume program's ELF linkage type is \fItype\fR,
-which should be either 'static' or 'dynamic'.
+Assume binary's ELF linkage type is \fItype\fR, which must be either 'static'
+or 'dynamic'. Either setting will prevent minijail0 from manually parsing the
+ELF header to determine the type. Type 'static' can be used to avoid preload
+hooking, and will force minijail0 to instead set everything up before the
+program is executed. Type 'dynamic' will force minijail0 to preload
+\fIlibminijailpreload.so\fR to setup hooks, but will fail on actually
+statically-linked binaries.
 .TP
 \fB-u <user>\fR
 Change users to \fIuser\fR, which may be either a user name or a numeric user
