@@ -543,6 +543,13 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 		 * statement, treat |policy_line| as a regular policy line.
 		 */
 		char *syscall_name = strsep(&policy_line, ":");
+		if (policy_line == NULL) {
+			warn("compile_file: malformed policy line, missing "
+			     "':'");
+			ret = -1;
+			goto free_line;
+		}
+
 		policy_line = strip(policy_line);
 		if (*policy_line == '\0') {
 			warn("compile_file: empty policy line");
