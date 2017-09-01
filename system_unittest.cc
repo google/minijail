@@ -126,7 +126,7 @@ TEST(write_pid_to_path, basic) {
   FILE *fp = fopen(path, "re");
   unlink(path);
   EXPECT_NE(nullptr, fp);
-  char data[5];
+  char data[6] = {};
   EXPECT_EQ(5u, fread(data, 1, sizeof(data), fp));
   fclose(fp);
   EXPECT_EQ(0, strcmp(data, "1234\n"));
