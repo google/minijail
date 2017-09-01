@@ -947,6 +947,22 @@ class FileTest : public ::testing::Test {
   struct filter_block *arg_blocks_;
 };
 
+TEST_F(FileTest, malformed_policy) {
+  const char *policy =
+      "malformed";
+
+  FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_file(
+      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING, 0);
+  fclose(policy_file);
+
+  /*
+   * Policy is malformed, but process should not crash.
+   */
+  ASSERT_EQ(res, -1);
+}
+
 TEST_F(FileTest, seccomp_mode1) {
   const char *policy =
       "read: 1\n"
