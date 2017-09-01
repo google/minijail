@@ -628,5 +628,9 @@ int main(int argc, char *argv[])
 		info("not running init loop, exiting immediately");
 		return 0;
 	}
-	return minijail_wait(j);
+	int ret = minijail_wait(j);
+#if defined(__SANITIZE_ADDRESS__)
+	minijail_destroy(j);
+#endif /* __SANITIZE_ADDRESS__ */
+	return ret;
 }
