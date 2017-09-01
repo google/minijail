@@ -606,6 +606,7 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 			if (!block) {
 				if (*arg_blocks) {
 					free_block_list(*arg_blocks);
+					*arg_blocks = NULL;
 				}
 				ret = -1;
 				goto free_line;
