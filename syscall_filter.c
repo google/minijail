@@ -258,7 +258,7 @@ int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
 
 	/* Splits the 'return' keyword and the actual errno value. */
 	char *ret_str = strtok_r(ret_errno, " ", &errno_ptr);
-	if (strncmp(ret_str, "return", strlen("return")))
+	if (!ret_str || strncmp(ret_str, "return", strlen("return")))
 		return -1;
 
 	char *errno_val_str = strtok_r(NULL, " ", &errno_ptr);
