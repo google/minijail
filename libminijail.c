@@ -2087,9 +2087,9 @@ struct minijail_run_status {
 	pid_t *pchild_pid;
 };
 
-int minijail_run_internal(struct minijail *j,
-                          const struct minijail_run_config *config,
-                          struct minijail_run_status *status_out);
+static int minijail_run_internal(struct minijail *j,
+				 const struct minijail_run_config *config,
+				 struct minijail_run_status *status_out);
 
 int API minijail_run(struct minijail *j, const char *filename,
 		     char *const argv[])
@@ -2183,9 +2183,9 @@ int API minijail_run_pid_pipes_no_preload(struct minijail *j,
 	return minijail_run_internal(j, &config, &status);
 }
 
-int minijail_run_internal(struct minijail *j,
-			  const struct minijail_run_config *config,
-			  struct minijail_run_status *status_out)
+static int minijail_run_internal(struct minijail *j,
+				 const struct minijail_run_config *config,
+				 struct minijail_run_status *status_out)
 {
 	char *oldenv, *oldenv_copy = NULL;
 	pid_t child_pid;
