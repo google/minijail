@@ -201,8 +201,9 @@ static void usage(const char *progn)
 	       "                Requires -n when not running as root.\n"
 	       "  -t[size]:     Mount tmpfs at /tmp (implies -v).\n"
 	       "                Optional argument specifies size (default \"64M\").\n"
-	       "  -T <type>:    Don't access <program> before execve(2), assume <type> ELF binary.\n"
-	       "                <type> must be 'static' or 'dynamic'.\n"
+	       "  -T <type>:    Assume <program> is a <type> ELF binary; <type> can be 'static' or 'dynamic'.\n"
+	       "                This will avoid accessing <program> binary before execve(2).\n"
+	       "                Type 'static' will avoid preload hooking.\n"
 	       "  -u <user>:    Change uid to <user>.\n"
 	       "  -U:           Enter new user namespace (implies -p).\n"
 	       "  -v:           Enter new mount namespace.\n"
@@ -627,5 +628,9 @@ int main(int argc, char *argv[])
 		info("not running init loop, exiting immediately");
 		return 0;
 	}
-	return minijail_wait(j);
+	int ret = minijail_wait(j);
+#if defined(__SANITIZE_ADDRESS__)
+	minijail_destroy(j);
+#endif /* __SANITIZE_ADDRESS__ */
+	return ret;
 }

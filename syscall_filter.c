@@ -258,7 +258,7 @@ int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
 
 	/* Splits the 'return' keyword and the actual errno value. */
 	char *ret_str = strtok_r(ret_errno, " ", &errno_ptr);
-	if (strncmp(ret_str, "return", strlen("return")))
+	if (!ret_str || strncmp(ret_str, "return", strlen("return")))
 		return -1;
 
 	char *errno_val_str = strtok_r(NULL, " ", &errno_ptr);
@@ -543,6 +543,13 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 		 * statement, treat |policy_line| as a regular policy line.
 		 */
 		char *syscall_name = strsep(&policy_line, ":");
+		if (policy_line == NULL) {
+			warn("compile_file: malformed policy line, missing "
+			     "':'");
+			ret = -1;
+			goto free_line;
+		}
+
 		policy_line = strip(policy_line);
 		if (*policy_line == '\0') {
 			warn("compile_file: empty policy line");
@@ -599,6 +606,7 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 			if (!block) {
 				if (*arg_blocks) {
 					free_block_list(*arg_blocks);
+					*arg_blocks = NULL;
 				}
 				ret = -1;
 				goto free_line;
