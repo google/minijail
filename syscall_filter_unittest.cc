@@ -1616,4 +1616,21 @@ TEST(FilterTest, include_nested) {
   ASSERT_NE(res, 0);
 }
 
+TEST(FilterTest, error_cleanup_leak) {
+  struct sock_fprog actual;
+  const char *policy =
+      "read:&&\n"
+      "read:&&";
+
+  FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+
+  /*
+   * Policy is malformed, but process should not leak.
+   */
+  ASSERT_EQ(res, -1);
+}
+
 #endif  // !__ANDROID__

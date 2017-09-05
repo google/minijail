@@ -629,6 +629,7 @@ free_line:
 int compile_filter(FILE *initial_file, struct sock_fprog *prog,
 		   int use_ret_trap, int allow_logging)
 {
+	int ret = 0;
 	struct bpf_labels labels;
 	labels.count = 0;
 
@@ -657,10 +658,8 @@ int compile_filter(FILE *initial_file, struct sock_fprog *prog,
 	if (compile_file(initial_file, head, &arg_blocks, &labels, use_ret_trap,
 			 allow_logging, 0 /* include_level */) != 0) {
 		warn("compile_filter: compile_file() failed");
-		free_block_list(head);
-		free_block_list(arg_blocks);
-		free_label_strings(&labels);
-		return -1;
+		ret = -1;
+		goto free_filter;
 	}
 
 	/*
@@ -675,30 +674,41 @@ int compile_filter(FILE *initial_file, struct sock_fprog *prog,
 	/* Allocate the final buffer, now that we know its size. */
 	size_t final_filter_len =
 	    head->total_len + (arg_blocks ? arg_blocks->total_len : 0);
-	if (final_filter_len > BPF_MAXINSNS)
-		return -1;
+	if (final_filter_len > BPF_MAXINSNS) {
+		ret = -1;
+		goto free_filter;
+	}
 
 	struct sock_filter *final_filter =
 	    calloc(final_filter_len, sizeof(struct sock_filter));
 
-	if (flatten_block_list(head, final_filter, 0, final_filter_len) < 0)
-		return -1;
+	if (flatten_block_list(head, final_filter, 0, final_filter_len) < 0) {
+		free(final_filter);
+		ret = -1;
+		goto free_filter;
+	}
 
 	if (flatten_block_list(arg_blocks, final_filter, head->total_len,
-			       final_filter_len) < 0)
-		return -1;
+			       final_filter_len) < 0) {
+		free(final_filter);
+		ret = -1;
+		goto free_filter;
+	}
 
-	free_block_list(head);
-	free_block_list(arg_blocks);
-
-	if (bpf_resolve_jumps(&labels, final_filter, final_filter_len) < 0)
-		return -1;
-
-	free_label_strings(&labels);
+	if (bpf_resolve_jumps(&labels, final_filter, final_filter_len) < 0) {
+		free(final_filter);
+		ret = -1;
+		goto free_filter;
+	}
 
 	prog->filter = final_filter;
 	prog->len = final_filter_len;
-	return 0;
+
+free_filter:
+	free_block_list(head);
+	free_block_list(arg_blocks);
+	free_label_strings(&labels);
+	return ret;
 }
 
 int flatten_block_list(struct filter_block *head, struct sock_filter *filter,
