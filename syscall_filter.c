@@ -173,7 +173,7 @@ int compile_atom(struct filter_block *head, char *atom,
 		 struct bpf_labels *labels, int nr, int grp_idx)
 {
 	/* Splits the atom. */
-	char *atom_ptr;
+	char *atom_ptr = NULL;
 	char *argidx_str = strtok_r(atom, " ", &atom_ptr);
 	if (argidx_str == NULL) {
 		warn("empty atom");
