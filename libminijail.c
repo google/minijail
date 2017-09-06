@@ -2691,3 +2691,8 @@ void API minijail_destroy(struct minijail *j)
 		free(j->cgroups[i]);
 	free(j);
 }
+
+void API minijail_log_to_fd(int fd, int min_priority)
+{
+	init_logging(LOG_TO_FD, fd, min_priority);
+}

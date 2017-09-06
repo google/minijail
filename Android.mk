@@ -26,9 +26,13 @@ libminijailSrcFiles := \
 	system.c \
 	util.c
 
+targetUnittestSrcFiles := \
+	testrunner.cc
+
 hostUnittestSrcFiles := \
 	linux-x86/libconstants.gen.c \
-	linux-x86/libsyscalls.gen.c
+	linux-x86/libsyscalls.gen.c \
+	testrunner.cc
 
 minijailCommonCFlags := -DHAVE_SECUREBITS_H -Wall -Werror
 minijailCommonLibraries := libcap
@@ -121,6 +125,7 @@ LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
 	$(libminijailSrcFiles) \
 	libminijail_unittest.cc \
+	$(targetUnittestSrcFiles)
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
@@ -162,6 +167,7 @@ LOCAL_SRC_FILES := \
 	syscall_filter.c \
 	util.c \
 	syscall_filter_unittest.cc \
+	$(targetUnittestSrcFiles)
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
@@ -201,7 +207,9 @@ LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
 	system.c \
+	util.c \
 	system_unittest.cc \
+	$(targetUnittestSrcFiles)
 
 LOCAL_STATIC_LIBRARIES := libminijail_generated
 LOCAL_SHARED_LIBRARIES := $(minijailCommonLibraries)
@@ -220,6 +228,7 @@ LOCAL_CFLAGS := $(minijailCommonCFlags)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := \
 	system.c \
+	util.c \
 	system_unittest.cc \
 	$(hostUnittestSrcFiles)
 
