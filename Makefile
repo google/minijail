@@ -18,6 +18,19 @@ ifeq ($(USE_seccomp),no)
 CPPFLAGS += -DUSE_SECCOMP_SOFTFAIL
 endif
 
+ifeq ($(USE_ASAN),yes)
+CPPFLAGS += -fsanitize=address
+LDFLAGS += -fsanitize=address
+USE_EXIT_ON_DIE = yes
+endif
+
+# Setting this flag can be useful for both AddressSanitizer builds and running
+# fuzzing tools, which do not expect crashes on gracefully-handled malformed
+# inputs.
+ifeq ($(USE_EXIT_ON_DIE),yes)
+CPPFLAGS += -DUSE_EXIT_ON_DIE
+endif
+
 CFLAGS += -Wextra -Wno-missing-field-initializers
 CXXFLAGS += -Wextra -Wno-missing-field-initializers
 
