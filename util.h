@@ -42,7 +42,7 @@ extern "C" {
 extern const char *log_syscalls[];
 extern const size_t log_syscalls_len;
 
-static inline int is_android()
+static inline int is_android(void)
 {
 #if defined(__ANDROID__)
 	return 1;
@@ -53,7 +53,7 @@ static inline int is_android()
 
 void __asan_init(void) __attribute__((weak));
 
-static inline int running_with_asan()
+static inline int running_with_asan(void)
 {
 	return &__asan_init != 0;
 }
