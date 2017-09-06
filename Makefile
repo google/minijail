@@ -94,7 +94,7 @@ clean: CLEAN(system_unittest)
 
 CXX_BINARY(parse_seccomp_policy): parse_seccomp_policy.o syscall_filter.o \
 		bpf.o util.o libconstants.gen.o libsyscalls.gen.o
-clean: CLEAN(parse_policy)
+clean: CLEAN(parse_seccomp_policy)
 
 
 libsyscalls.gen.o: CPPFLAGS += -I$(SRC)
