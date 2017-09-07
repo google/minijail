@@ -9,6 +9,6 @@
 #ifndef SIGNAL_HANDLER_H
 #define SIGNAL_HANDLER_H
 
-int install_sigsys_handler();
+int install_sigsys_handler(void);
 
 #endif /* SIGNAL_HANDLER_H */
