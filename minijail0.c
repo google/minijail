@@ -242,7 +242,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const size_t path_max = 4096;
 	char *map;
 	size_t size;
-	const char *filter_path;
+	const char *filter_path = NULL;
 
 	const char *optstring =
 	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUKwyYz";
