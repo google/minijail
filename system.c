@@ -17,7 +17,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <net/if.h>
+#include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -286,4 +288,74 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 		close(fd);
 	}
 	return chown(dest, uid, gid);
+}
+
+/*
+ * lookup_user: Gets the uid/gid for the given username.
+ */
+int lookup_user(const char *user, uid_t *uid, gid_t *gid)
+{
+	char *buf = NULL;
+	struct passwd pw;
+	struct passwd *ppw = NULL;
+	ssize_t sz = sysconf(_SC_GETPW_R_SIZE_MAX);
+	if (sz == -1)
+		sz = 65536; /* your guess is as good as mine... */
+
+	/*
+	 * sysconf(_SC_GETPW_R_SIZE_MAX), under glibc, is documented to return
+	 * the maximum needed size of the buffer, so we don't have to search.
+	 */
+	buf = malloc(sz);
+	if (!buf)
+		return -ENOMEM;
+	getpwnam_r(user, &pw, buf, sz, &ppw);
+	/*
+	 * We're safe to free the buffer here. The strings inside |pw| point
+	 * inside |buf|, but we don't use any of them; this leaves the pointers
+	 * dangling but it's safe. |ppw| points at |pw| if getpwnam_r(3)
+	 * succeeded.
+	 */
+	free(buf);
+	/* getpwnam_r(3) does *not* set errno when |ppw| is NULL. */
+	if (!ppw)
+		return -1;
+
+	*uid = ppw->pw_uid;
+	*gid = ppw->pw_gid;
+	return 0;
+}
+
+/*
+ * lookup_group: Gets the gid for the given group name.
+ */
+int lookup_group(const char *group, gid_t *gid)
+{
+	char *buf = NULL;
+	struct group gr;
+	struct group *pgr = NULL;
+	ssize_t sz = sysconf(_SC_GETGR_R_SIZE_MAX);
+	if (sz == -1)
+		sz = 65536; /* and mine is as good as yours, really */
+
+	/*
+	 * sysconf(_SC_GETGR_R_SIZE_MAX), under glibc, is documented to return
+	 * the maximum needed size of the buffer, so we don't have to search.
+	 */
+	buf = malloc(sz);
+	if (!buf)
+		return -ENOMEM;
+	getgrnam_r(group, &gr, buf, sz, &pgr);
+	/*
+	 * We're safe to free the buffer here. The strings inside gr point
+	 * inside buf, but we don't use any of them; this leaves the pointers
+	 * dangling but it's safe. pgr points at gr if getgrnam_r succeeded.
+	 */
+	free(buf);
+	/* getgrnam_r(3) does *not* set errno when |pgr| is NULL. */
+	if (!pgr)
+		return -1;
+
+	*gid = pgr->gr_gid;
+	return 0;
 }
