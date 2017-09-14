@@ -19,10 +19,16 @@
 extern "C" {
 #endif
 
+#if defined(USE_EXIT_ON_DIE)
+#define do_abort() exit(1)
+#else
+#define do_abort() abort()
+#endif
+
 /* clang-format off */
 #define die(_msg, ...) do { \
 	do_log(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__); \
-	abort(); \
+	do_abort(); \
 } while (0)
 
 #define pdie(_msg, ...) \
