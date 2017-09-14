@@ -339,6 +339,16 @@ int minijail_wait(struct minijail *j);
  */
 void minijail_destroy(struct minijail *j);
 
+/*
+ * minijail_log_to_fd: redirects the module-wide logging to an FD instead of
+ * syslog.
+ * @fd           FD to log to. Caller must ensure this is available after
+ *               jailing (e.g. with minijail_preserve_fd()).
+ * @min_priority the minimum logging priority. Same as the priority argument
+ *               to syslog(2).
+ */
+void minijail_log_to_fd(int fd, int min_priority);
+
 #ifdef __cplusplus
 }; /* extern "C" */
 #endif

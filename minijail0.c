@@ -212,7 +212,9 @@ static void usage(const char *progn)
 	       "  -Y:           Synchronize seccomp filters across thread group.\n"
 	       "  -z:           Don't forward signals to jailed process.\n"
 	       "  --ambient:    Raise ambient capabilities. Requires -c.\n"
-	       "  --uts[=name]: Enter a new UTS namespace (and set hostname).\n");
+	       "  --uts[=name]: Enter a new UTS namespace (and set hostname).\n"
+	       "  --logging=<s>:Use <s> as the logging system.\n"
+	       "                <s> must be 'syslog' (default) or 'stderr'.\n");
 	/* clang-format on */
 }
 
@@ -243,6 +245,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	char *map;
 	size_t size;
 	const char *filter_path = NULL;
+	int log_to_stderr = 0;
 
 	const char *optstring =
 	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUKwyYz";
@@ -251,6 +254,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const struct option long_options[] = {
 		{"ambient", no_argument, 0, 128},
 		{"uts", optional_argument, 0, 129},
+		{"logging", required_argument, 0, 130},
 		{0, 0, 0, 0},
 	};
 	/* clang-format on */
@@ -499,8 +503,31 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			if (optarg)
 				minijail_namespace_set_hostname(j, optarg);
 			break;
+		case 130: /* Logging. */
+			if (!strcmp(optarg, "syslog"))
+				log_to_stderr = 0;
+			else if (!strcmp(optarg, "stderr")) {
+				log_to_stderr = 1;
+			} else {
+				fprintf(stderr, "--logger must be 'syslog' or "
+						"'stderr'.\n");
+				exit(1);
+			}
+			break;
 		default:
 			usage(argv[0]);
+			exit(1);
+		}
+	}
+
+	if (log_to_stderr) {
+		init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
+		/*
+		 * When logging to stderr, ensure the FD survives the jailing.
+		 */
+		if (0 !=
+		    minijail_preserve_fd(j, STDERR_FILENO, STDERR_FILENO)) {
+			fprintf(stderr, "Could not preserve stderr.\n");
 			exit(1);
 		}
 	}
@@ -625,7 +652,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (exit_immediately) {
-		info("not running init loop, exiting immediately");
+		info("not running init loop, exiting immediately\n");
 		return 0;
 	}
 	int ret = minijail_wait(j);
