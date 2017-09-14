@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 	}
 
 	struct sock_fprog fp;
-	int res = compile_filter(f, &fp, 0, 0);
+	int res = compile_filter(argv[1], f, &fp, 0, 0);
 	if (res != 0) {
 		die("compile_filter failed");
 	}
