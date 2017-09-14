@@ -358,6 +358,52 @@ TEST(Test, test_minijail_preserve_fd) {
   minijail_destroy(j);
 }
 
+TEST(Test,
+#if defined(__ANDROID__)
+// TODO(lhchavez): Android unit tests don't currently support entering user
+// namespaces as unprivileged users.
+DISABLED_test_tmpfs_userns
+#else
+test_tmpfs_userns
+#endif
+) {
+  int mj_run_ret;
+  int status;
+  char *argv[4];
+  char uidmap[128], gidmap[128];
+  constexpr uid_t kTargetUid = 1000;  // Any non-zero value will do.
+  constexpr gid_t kTargetGid = 1000;
+
+  struct minijail *j = minijail_new();
+
+  minijail_namespace_pids(j);
+  minijail_namespace_vfs(j);
+  minijail_mount_tmp(j);
+  minijail_run_as_init(j);
+
+  // Perform userns mapping.
+  minijail_namespace_user(j);
+  snprintf(uidmap, sizeof(uidmap), "%d %d 1", kTargetUid, getuid());
+  snprintf(gidmap, sizeof(gidmap), "%d %d 1", kTargetGid, getgid());
+  minijail_change_uid(j, kTargetUid);
+  minijail_change_gid(j, kTargetGid);
+  minijail_uidmap(j, uidmap);
+  minijail_gidmap(j, gidmap);
+  minijail_namespace_user_disable_setgroups(j);
+
+  argv[0] = (char*)kShellPath;
+  argv[1] = "-c";
+  argv[2] = "exec touch /tmp/foo";
+  argv[3] = NULL;
+  mj_run_ret = minijail_run_no_preload(j, argv[0], argv);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  status = minijail_wait(j);
+  EXPECT_EQ(status, 0);
+
+  minijail_destroy(j);
+}
+
 TEST(Test, parse_size) {
   size_t size;
 
