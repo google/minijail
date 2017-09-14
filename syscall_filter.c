@@ -16,6 +16,13 @@
 
 #define ONE_INSTR	1
 #define TWO_INSTRS	2
+
+#define compiler_warn(_state, _msg, ...)                                       \
+	warn("%s: %s(%zd): " _msg, __func__, (_state)->filename,               \
+	     (_state)->line_number, ## __VA_ARGS__)
+
+#define compiler_pwarn(_state, _msg, ...)                                      \
+	compiler_warn(_state, _msg ": %m", ## __VA_ARGS__)
 /* clang-format on */
 
 int seccomp_can_softfail(void)
@@ -169,38 +176,39 @@ int is_implicit_relative_path(const char *filename)
 	return filename[0] != '/' && (filename[0] != '.' || filename[1] != '/');
 }
 
-int compile_atom(struct filter_block *head, char *atom,
-		 struct bpf_labels *labels, int nr, int grp_idx)
+int compile_atom(struct parser_state *state, struct filter_block *head,
+		 char *atom, struct bpf_labels *labels, int nr, int grp_idx)
 {
 	/* Splits the atom. */
 	char *atom_ptr = NULL;
 	char *argidx_str = strtok_r(atom, " ", &atom_ptr);
 	if (argidx_str == NULL) {
-		warn("empty atom");
+		compiler_warn(state, "empty atom");
 		return -1;
 	}
 
 	char *operator_str = strtok_r(NULL, " ", &atom_ptr);
 	if (operator_str == NULL) {
-		warn("invalid atom '%s'", argidx_str);
+		compiler_warn(state, "invalid atom '%s'", argidx_str);
 		return -1;
 	}
 
 	char *constant_str = strtok_r(NULL, " ", &atom_ptr);
 	if (constant_str == NULL) {
-		warn("invalid atom '%s %s'", argidx_str, operator_str);
+		compiler_warn(state, "invalid atom '%s %s'", argidx_str,
+			      operator_str);
 		return -1;
 	}
 
 	/* Checks that there are no extra tokens. */
 	const char *extra = strtok_r(NULL, " ", &atom_ptr);
 	if (extra != NULL) {
-		warn("extra token '%s'", extra);
+		compiler_warn(state, "extra token '%s'", extra);
 		return -1;
 	}
 
 	if (strncmp(argidx_str, "arg", 3)) {
-		warn("invalid argument token '%s'", argidx_str);
+		compiler_warn(state, "invalid argument token '%s'", argidx_str);
 		return -1;
 	}
 
@@ -211,20 +219,21 @@ int compile_atom(struct filter_block *head, char *atom,
 	 * and that there was nothing left after the index.
 	 */
 	if (argidx_ptr == argidx_str + 3 || *argidx_ptr != '\0') {
-		warn("invalid argument index '%s'", argidx_str + 3);
+		compiler_warn(state, "invalid argument index '%s'",
+			      argidx_str + 3);
 		return -1;
 	}
 
 	int op = str_to_op(operator_str);
 	if (op < MIN_OPERATOR) {
-		warn("invalid operator '%s'", operator_str);
+		compiler_warn(state, "invalid operator '%s'", operator_str);
 		return -1;
 	}
 
 	char *constant_str_ptr;
 	long int c = parse_constant(constant_str, &constant_str_ptr);
 	if (constant_str_ptr == constant_str) {
-		warn("invalid constant '%s'", constant_str);
+		compiler_warn(state, "invalid constant '%s'", constant_str);
 		return -1;
 	}
 
@@ -252,7 +261,8 @@ int compile_atom(struct filter_block *head, char *atom,
 	return 0;
 }
 
-int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
+int compile_errno(struct parser_state *state, struct filter_block *head,
+		  char *ret_errno, int use_ret_trap)
 {
 	char *errno_ptr = NULL;
 
@@ -268,7 +278,8 @@ int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
 		int errno_val = parse_constant(errno_val_str, &errno_val_ptr);
 		/* Checks to see if we parsed an actual errno. */
 		if (errno_val_ptr == errno_val_str || errno_val == -1) {
-			warn("invalid errno value '%s'", errno_val_ptr);
+			compiler_warn(state, "invalid errno value '%s'",
+				      errno_val_ptr);
 			return -1;
 		}
 
@@ -282,7 +293,8 @@ int compile_errno(struct filter_block *head, char *ret_errno, int use_ret_trap)
 	return 0;
 }
 
-struct filter_block *compile_policy_line(int nr, const char *policy_line,
+struct filter_block *compile_policy_line(struct parser_state *state, int nr,
+					 const char *policy_line,
 					 unsigned int entry_lbl_id,
 					 struct bpf_labels *labels,
 					 int use_ret_trap)
@@ -324,7 +336,7 @@ struct filter_block *compile_policy_line(int nr, const char *policy_line,
 
 	/* Checks for empty policy lines. */
 	if (strlen(policy_line) == 0) {
-		warn("empty policy line");
+		compiler_warn(state, "empty policy line");
 		return NULL;
 	}
 
@@ -353,7 +365,7 @@ struct filter_block *compile_policy_line(int nr, const char *policy_line,
 
 	/* Checks whether we're unconditionally blocking this syscall. */
 	if (strncmp(line, "return", strlen("return")) == 0) {
-		if (compile_errno(head, line, use_ret_trap) < 0) {
+		if (compile_errno(state, head, line, use_ret_trap) < 0) {
 			free_block_list(head);
 			free(line);
 			return NULL;
@@ -378,7 +390,8 @@ struct filter_block *compile_policy_line(int nr, const char *policy_line,
 		char *comp;
 		while ((comp = tokenize(&group_str, "&&")) != NULL) {
 			/* Compiles each atom into a BPF block. */
-			if (compile_atom(head, comp, labels, nr, grp_idx) < 0) {
+			if (compile_atom(state, head, comp, labels, nr,
+					 grp_idx) < 0) {
 				free_block_list(head);
 				free(line);
 				return NULL;
@@ -407,7 +420,7 @@ struct filter_block *compile_policy_line(int nr, const char *policy_line,
 	 * otherwise just kill the task.
 	 */
 	if (ret_errno) {
-		if (compile_errno(head, ret_errno, use_ret_trap) < 0) {
+		if (compile_errno(state, head, ret_errno, use_ret_trap) < 0) {
 			free_block_list(head);
 			free(line);
 			return NULL;
@@ -433,16 +446,18 @@ struct filter_block *compile_policy_line(int nr, const char *policy_line,
 	return head;
 }
 
-int parse_include_statement(char *policy_line, unsigned int include_level,
+int parse_include_statement(struct parser_state *state, char *policy_line,
+			    unsigned int include_level,
 			    const char **ret_filename)
 {
 	if (strncmp("@include", policy_line, strlen("@include")) != 0) {
-		warn("invalid statement '%s'", policy_line);
+		compiler_warn(state, "invalid statement '%s'", policy_line);
 		return -1;
 	}
 
 	if (policy_line[strlen("@include")] != ' ') {
-		warn("invalid include statement '%s'", policy_line);
+		compiler_warn(state, "invalid include statement '%s'",
+			      policy_line);
 		return -1;
 	}
 
@@ -453,7 +468,7 @@ int parse_include_statement(char *policy_line, unsigned int include_level,
 	 * harder to understand.
 	 */
 	if (include_level > 0) {
-		warn("@include statement nested too deep");
+		compiler_warn(state, "@include statement nested too deep");
 		return -1;
 	}
 
@@ -470,9 +485,10 @@ int parse_include_statement(char *policy_line, unsigned int include_level,
 	 */
 	const char *filename = statement;
 	if (is_implicit_relative_path(filename)) {
-		warn("compile_file: implicit relative path '%s' not supported, "
-		     "use './%s'",
-		     filename, filename);
+		compiler_warn(
+		    state,
+		    "implicit relative path '%s' not supported, use './%s'",
+		    filename, filename);
 		return -1;
 	}
 
@@ -480,11 +496,17 @@ int parse_include_statement(char *policy_line, unsigned int include_level,
 	return 0;
 }
 
-int compile_file(FILE *policy_file, struct filter_block *head,
-		 struct filter_block **arg_blocks, struct bpf_labels *labels,
-		 int use_ret_trap, int allow_logging,
+int compile_file(const char *filename, FILE *policy_file,
+		 struct filter_block *head, struct filter_block **arg_blocks,
+		 struct bpf_labels *labels, int use_ret_trap, int allow_logging,
 		 unsigned int include_level)
 {
+	/* clang-format off */
+	struct parser_state state = {
+		.filename = filename,
+		.line_number = 0,
+	};
+	/* clang-format on */
 	/*
 	 * Loop through all the lines in the policy file.
 	 * Build a jump table for the syscall number.
@@ -501,6 +523,8 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 		char *policy_line = line;
 		policy_line = strip(policy_line);
 
+		state.line_number++;
+
 		/* Allow comments and empty lines. */
 		if (*policy_line == '#' || *policy_line == '\0') {
 			/* Reuse |line| in the next getline() call. */
@@ -510,26 +534,29 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 		/* Allow @include statements. */
 		if (*policy_line == '@') {
 			const char *filename = NULL;
-			if (parse_include_statement(policy_line, include_level,
+			if (parse_include_statement(&state, policy_line,
+						    include_level,
 						    &filename) != 0) {
-				warn("compile_file: failed to parse include "
-				     "statement");
+				compiler_warn(
+				    &state,
+				    "failed to parse include statement");
 				ret = -1;
 				goto free_line;
 			}
 
 			FILE *included_file = fopen(filename, "re");
 			if (included_file == NULL) {
-				pwarn("compile_file: fopen('%s') failed",
-				      filename);
+				compiler_pwarn(&state, "fopen('%s') failed",
+					       filename);
 				ret = -1;
 				goto free_line;
 			}
-			if (compile_file(included_file, head, arg_blocks,
-					 labels, use_ret_trap, allow_logging,
+			if (compile_file(filename, included_file, head,
+					 arg_blocks, labels, use_ret_trap,
+					 allow_logging,
 					 ++include_level) == -1) {
-				warn("compile_file: '@include %s' failed",
-				     filename);
+				compiler_warn(&state, "'@include %s' failed",
+					      filename);
 				fclose(included_file);
 				ret = -1;
 				goto free_line;
@@ -552,7 +579,7 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 
 		policy_line = strip(policy_line);
 		if (*policy_line == '\0') {
-			warn("compile_file: empty policy line");
+			compiler_warn(&state, "empty policy line");
 			ret = -1;
 			goto free_line;
 		}
@@ -560,8 +587,8 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 		syscall_name = strip(syscall_name);
 		int nr = lookup_syscall(syscall_name);
 		if (nr < 0) {
-			warn("compile_file: nonexistent syscall '%s'",
-			     syscall_name);
+			compiler_warn(&state, "nonexistent syscall '%s'",
+				      syscall_name);
 			if (allow_logging) {
 				/*
 				 * If we're logging failures, assume we're in a
@@ -601,7 +628,7 @@ int compile_file(FILE *policy_file, struct filter_block *head,
 
 			/* Build the arg filter block. */
 			struct filter_block *block = compile_policy_line(
-			    nr, policy_line, id, labels, use_ret_trap);
+			    &state, nr, policy_line, id, labels, use_ret_trap);
 
 			if (!block) {
 				if (*arg_blocks) {
@@ -626,8 +653,8 @@ free_line:
 	return ret;
 }
 
-int compile_filter(FILE *initial_file, struct sock_fprog *prog,
-		   int use_ret_trap, int allow_logging)
+int compile_filter(const char *filename, FILE *initial_file,
+		   struct sock_fprog *prog, int use_ret_trap, int allow_logging)
 {
 	int ret = 0;
 	struct bpf_labels labels;
@@ -655,8 +682,9 @@ int compile_filter(FILE *initial_file, struct sock_fprog *prog,
 	if (allow_logging)
 		allow_logging_syscalls(head);
 
-	if (compile_file(initial_file, head, &arg_blocks, &labels, use_ret_trap,
-			 allow_logging, 0 /* include_level */) != 0) {
+	if (compile_file(filename, initial_file, head, &arg_blocks, &labels,
+			 use_ret_trap, allow_logging,
+			 0 /* include_level */) != 0) {
 		warn("compile_filter: compile_file() failed");
 		ret = -1;
 		goto free_filter;
