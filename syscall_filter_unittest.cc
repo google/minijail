@@ -336,57 +336,55 @@ TEST_F(BpfLabelTest, too_many_labels) {
 
 class ArgFilterTest : public ::testing::Test {
  protected:
-  virtual void SetUp() { labels_.count = 0; }
+  virtual void SetUp() {
+    labels_.count = 0;
+    state_.filename = "policy";
+    state_.line_number = 1;
+  }
   virtual void TearDown() { free_label_strings(&labels_); }
   struct bpf_labels labels_;
+  int nr_ = 1;
+  unsigned int id_ = 0;
+  struct parser_state state_;
 };
 
 TEST_F(ArgFilterTest, empty_atom) {
   const char* fragment = "";
-  int nr = 1;
-  unsigned int id = 0;
 
   struct filter_block* block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, whitespace_atom) {
   const char* fragment = "\t    ";
-  int nr = 1;
-  unsigned int id = 0;
 
   struct filter_block* block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, no_comparison) {
   const char* fragment = "arg0";
-  int nr = 1;
-  unsigned int id = 0;
 
   struct filter_block* block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, no_constant) {
   const char* fragment = "arg0 ==";
-  int nr = 1;
-  unsigned int id = 0;
 
   struct filter_block* block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, arg0_equals) {
   const char *fragment = "arg0 == 0";
-  int nr = 1;
-  unsigned int id = 0;
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -424,10 +422,9 @@ TEST_F(ArgFilterTest, arg0_equals) {
 
 TEST_F(ArgFilterTest, arg0_mask) {
   const char *fragment = "arg1 & O_RDWR";
-  int nr = 1;
-  unsigned int id = 0;
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -465,10 +462,9 @@ TEST_F(ArgFilterTest, arg0_mask) {
 
 TEST_F(ArgFilterTest, arg0_flag_set_inclusion) {
   const char *fragment = "arg0 in O_RDONLY|O_CREAT";
-  int nr = 1;
-  unsigned int id = 0;
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -507,11 +503,9 @@ TEST_F(ArgFilterTest, arg0_flag_set_inclusion) {
 
 TEST_F(ArgFilterTest, arg0_eq_mask) {
   const char *fragment = "arg1 == O_WRONLY|O_CREAT";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -552,11 +546,9 @@ TEST_F(ArgFilterTest, arg0_eq_mask) {
 
 TEST_F(ArgFilterTest, and_or) {
   const char *fragment = "arg0 == 0 && arg1 == 0 || arg0 == 1";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + 3 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -609,11 +601,9 @@ TEST_F(ArgFilterTest, and_or) {
 
 TEST_F(ArgFilterTest, ret_errno) {
   const char *fragment = "arg0 == 0 || arg0 == 1; return 1";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + 2 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -664,11 +654,9 @@ TEST_F(ArgFilterTest, ret_errno) {
 
 TEST_F(ArgFilterTest, unconditional_errno) {
   const char *fragment = "return 1";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -694,80 +682,65 @@ TEST_F(ArgFilterTest, unconditional_errno) {
 
 TEST_F(ArgFilterTest, invalid_arg_token) {
   const char *fragment = "org0 == 0";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, invalid_arg_number) {
   const char *fragment = "argnn == 0";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, extra_chars_in_arg_token) {
   const char* fragment = "arg0n == 0";
-  int nr = 1;
-  unsigned int id = 0;
 
   struct filter_block* block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, invalid_operator) {
   const char* fragment = "arg0 invalidop 0";
-  int nr = 1;
-  unsigned int id = 0;
 
   struct filter_block* block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, invalid_constant) {
   const char *fragment = "arg0 == INVALIDCONSTANT";
-  int nr = 1;
-  unsigned int id = 0;
 
   struct filter_block* block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, extra_tokens) {
   const char* fragment = "arg0 == 0 EXTRATOKEN";
-  int nr = 1;
-  unsigned int id = 0;
 
   struct filter_block* block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, invalid_errno) {
   const char *fragment = "arg0 == 0 && arg1 == 1; return errno";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_EQ(block, nullptr);
 }
 
 TEST_F(ArgFilterTest, log_no_ret_error) {
   const char *fragment = "arg0 == 0";
-  int nr = 1;
-  unsigned int id = 0;
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, USE_LOGGING);
+
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_LOGGING);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -806,11 +779,9 @@ TEST_F(ArgFilterTest, log_no_ret_error) {
 
 TEST_F(ArgFilterTest, log_bad_ret_error) {
   const char *fragment = "arg0 == 0; return";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, NO_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -850,11 +821,9 @@ TEST_F(ArgFilterTest, log_bad_ret_error) {
 
 TEST_F(ArgFilterTest, no_log_bad_ret_error) {
   const char *fragment = "arg0 == 0; return";
-  int nr = 1;
-  unsigned int id = 0;
 
-  struct filter_block *block =
-      compile_policy_line(nr, fragment, id, &labels_, USE_LOGGING);
+  struct filter_block* block =
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_LOGGING);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -953,8 +922,8 @@ TEST_F(FileTest, malformed_policy) {
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_file(
-      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING, 0);
+  int res = compile_file("policy", policy_file, head_, &arg_blocks_, &labels_,
+                         USE_RET_KILL, NO_LOGGING, 0);
   fclose(policy_file);
 
   /*
@@ -970,8 +939,8 @@ TEST_F(FileTest, double_free_on_compile_error) {
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_file(
-      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING, 0);
+  int res = compile_file("policy", policy_file, head_, &arg_blocks_, &labels_,
+                         USE_RET_KILL, NO_LOGGING, 0);
   fclose(policy_file);
 
   /*
@@ -986,8 +955,8 @@ TEST_F(FileTest, invalid_return) {
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_file(
-      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING, 0);
+  int res = compile_file("policy", policy_file, head_, &arg_blocks_, &labels_,
+                         USE_RET_KILL, NO_LOGGING, 0);
   fclose(policy_file);
 
   /*
@@ -1005,8 +974,8 @@ TEST_F(FileTest, seccomp_mode1) {
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_file(
-      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING, 0);
+  int res = compile_file("policy", policy_file, head_, &arg_blocks_, &labels_,
+                         USE_RET_KILL, NO_LOGGING, 0);
   fclose(policy_file);
 
   /*
@@ -1040,8 +1009,8 @@ TEST_F(FileTest, seccomp_read) {
 
     FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_file(
-      policy_file, head_, &arg_blocks_, &labels_, USE_RET_KILL, NO_LOGGING, 0);
+  int res = compile_file("policy", policy_file, head_, &arg_blocks_, &labels_,
+                         USE_RET_KILL, NO_LOGGING, 0);
   fclose(policy_file);
 
   /*
@@ -1109,7 +1078,8 @@ TEST(FilterTest, seccomp_mode1) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
 
   /*
@@ -1146,7 +1116,8 @@ TEST(FilterTest, seccomp_mode1_trap) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_TRAP, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_TRAP, NO_LOGGING);
   fclose(policy_file);
 
   /*
@@ -1184,7 +1155,8 @@ TEST(FilterTest, seccomp_read_write) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
 
   /*
@@ -1225,7 +1197,8 @@ TEST(FilterTest, misplaced_whitespace) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
 
   /* Checks return value and filter length. */
@@ -1243,7 +1216,8 @@ TEST(FilterTest, missing_atom) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   ASSERT_NE(res, 0);
 }
@@ -1255,7 +1229,8 @@ TEST(FilterTest, whitespace_atom) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   ASSERT_NE(res, 0);
 }
@@ -1267,7 +1242,8 @@ TEST(FilterTest, invalid_name) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   ASSERT_NE(res, 0);
 }
@@ -1279,14 +1255,15 @@ TEST(FilterTest, invalid_arg) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   ASSERT_NE(res, 0);
 }
 
 TEST(FilterTest, nonexistent) {
   struct sock_fprog actual;
-  int res = compile_filter(NULL, &actual, USE_RET_KILL, NO_LOGGING);
+  int res = compile_filter("policy", NULL, &actual, USE_RET_KILL, NO_LOGGING);
   ASSERT_NE(res, 0);
 }
 
@@ -1301,7 +1278,8 @@ TEST(FilterTest, log) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_TRAP, USE_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_TRAP, USE_LOGGING);
   fclose(policy_file);
 
   size_t i;
@@ -1347,7 +1325,8 @@ TEST(FilterTest, allow_log_but_kill) {
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, USE_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, USE_LOGGING);
   fclose(policy_file);
 
   size_t i;
@@ -1389,7 +1368,8 @@ TEST(FilterTest, include_invalid_token) {
   FILE *policy_file =
       write_policy_to_pipe(invalid_token, strlen(invalid_token));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   EXPECT_NE(res, 0);
 }
@@ -1400,7 +1380,8 @@ TEST(FilterTest, include_no_space) {
 
   FILE *policy_file = write_policy_to_pipe(no_space, strlen(no_space));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   EXPECT_NE(res, 0);
 }
@@ -1411,7 +1392,8 @@ TEST(FilterTest, include_double_token) {
 
   FILE *policy_file = write_policy_to_pipe(double_token, strlen(double_token));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   EXPECT_NE(res, 0);
 }
@@ -1422,7 +1404,8 @@ TEST(FilterTest, include_no_file) {
 
   FILE *policy_file = write_policy_to_pipe(no_file, strlen(no_file));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   EXPECT_NE(res, 0);
 }
@@ -1434,7 +1417,8 @@ TEST(FilterTest, include_space_no_file) {
   FILE *policy_file =
       write_policy_to_pipe(space_no_file, strlen(space_no_file));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   EXPECT_NE(res, 0);
 }
@@ -1446,7 +1430,8 @@ TEST(FilterTest, include_implicit_relative_path) {
   FILE *policy_file = write_policy_to_pipe(implicit_relative_path,
                                            strlen(implicit_relative_path));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   EXPECT_NE(res, 0);
 }
@@ -1458,7 +1443,8 @@ TEST(FilterTest, include_extra_text) {
   FILE *policy_file =
       write_policy_to_pipe(extra_text, strlen(extra_text));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   EXPECT_NE(res, 0);
 }
@@ -1470,7 +1456,8 @@ TEST(FilterTest, include_split_filename) {
   FILE *policy_file =
       write_policy_to_pipe(split_filename, strlen(split_filename));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
   EXPECT_NE(res, 0);
 }
@@ -1483,7 +1470,8 @@ TEST(FilterTest, include_nonexistent_file) {
       write_policy_to_pipe(include_policy, strlen(include_policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
 
   ASSERT_NE(res, 0);
@@ -1507,15 +1495,16 @@ TEST(FilterTest, include) {
 
   FILE *file_plain = write_policy_to_pipe(policy_plain, strlen(policy_plain));
   ASSERT_NE(file_plain, nullptr);
-  int res_plain =
-      compile_filter(file_plain, &compiled_plain, USE_RET_KILL, NO_LOGGING);
+  int res_plain = compile_filter("policy", file_plain, &compiled_plain,
+                                 USE_RET_KILL, NO_LOGGING);
   fclose(file_plain);
 
   FILE *file_with_include =
       write_policy_to_pipe(policy_with_include, strlen(policy_with_include));
   ASSERT_NE(file_with_include, nullptr);
-  int res_with_include = compile_filter(
-      file_with_include, &compiled_with_include, USE_RET_KILL, NO_LOGGING);
+  int res_with_include =
+      compile_filter("policy", file_with_include, &compiled_with_include,
+                     USE_RET_KILL, NO_LOGGING);
   fclose(file_with_include);
 
   /*
@@ -1563,7 +1552,8 @@ TEST(FilterTest, include_same_syscalls) {
       write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
 
   ASSERT_EQ(res, 0);
@@ -1591,7 +1581,8 @@ TEST(FilterTest, include_invalid_policy) {
   ASSERT_NE(included_file, nullptr);
   fclose(included_file);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
 
   ASSERT_NE(res, 0);
@@ -1610,7 +1601,8 @@ TEST(FilterTest, include_nested) {
   ASSERT_NE(included_file, nullptr);
   fclose(included_file);
 
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
 
   ASSERT_NE(res, 0);
@@ -1624,7 +1616,8 @@ TEST(FilterTest, error_cleanup_leak) {
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
-  int res = compile_filter(policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
   fclose(policy_file);
 
   /*
