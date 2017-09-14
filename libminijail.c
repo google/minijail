@@ -187,6 +187,9 @@ struct minijail {
 	size_t preserved_fd_count;
 };
 
+static void run_hooks_or_die(const struct minijail *j,
+			     minijail_hook_event_t event);
+
 /*
  * Strip out flags meant for the parent.
  * We keep things that are not inherited across execve(2) (e.g. capabilities),
@@ -1262,6 +1265,8 @@ static int enter_chroot(const struct minijail *j)
 	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
 		return ret;
 
+	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
+
 	if (chroot(j->chrootdir))
 		return -errno;
 
@@ -1277,6 +1282,8 @@ static int enter_pivot_root(const struct minijail *j)
 
 	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
 		return ret;
+
+	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
 
 	/*
 	 * Keep the fd for both old and new root.
@@ -1698,6 +1705,8 @@ static const char *lookup_hook_name(minijail_hook_event_t event)
 		return "pre-drop-caps";
 	case MINIJAIL_HOOK_EVENT_PRE_EXECVE:
 		return "pre-execve";
+	case MINIJAIL_HOOK_EVENT_PRE_CHROOT:
+		return "pre-chroot";
 	case MINIJAIL_HOOK_EVENT_MAX:
 		/*
 		 * Adding this in favor of a default case to force the
