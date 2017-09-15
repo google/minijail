@@ -28,7 +28,7 @@ class Environment : public ::testing::Environment {
  public:
   ~Environment() override = default;
 
-  void SetUp() {
+  void SetUp() override {
     init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
   }
 };
