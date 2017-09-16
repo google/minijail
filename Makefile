@@ -31,18 +31,22 @@ ifeq ($(USE_EXIT_ON_DIE),yes)
 CPPFLAGS += -DUSE_EXIT_ON_DIE
 endif
 
+# Setting this flag will run more unit tests that need a certain well-known
+# environment to run successfully.
+ifeq ($(USE_RUN_USER_NAMESPACE_TESTS),yes)
+CPPFLAGS += -DRUN_USER_NAMESPACE_TESTS
+endif
+
 CFLAGS += -Wextra -Wno-missing-field-initializers
 CXXFLAGS += -Wextra -Wno-missing-field-initializers
 
 USE_SYSTEM_GTEST ?= no
 ifeq ($(USE_SYSTEM_GTEST),no)
 GTEST_CXXFLAGS := -std=gnu++11
-GTEST_MAIN := gtest_main.a
 GTEST_LIBS := gtest.a
 else
-GTEST_CXXFLAGS := $(gtest-config --cxxflags)
-GTEST_MAIN := -lgtest -lgtest_main
-GTEST_LIBS := $(gtest-config --libs)
+GTEST_CXXFLAGS := $(shell gtest-config --cxxflags)
+GTEST_LIBS := $(shell gtest-config --libs)
 endif
 
 CORE_OBJECT_FILES := libminijail.o syscall_filter.o signal_handler.o \
