@@ -13,7 +13,6 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <linux/capability.h>
-#include <pwd.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -187,6 +186,9 @@ struct minijail {
 	size_t preserved_fd_count;
 };
 
+static void run_hooks_or_die(const struct minijail *j,
+			     minijail_hook_event_t event);
+
 /*
  * Strip out flags meant for the parent.
  * We keep things that are not inherited across execve(2) (e.g. capabilities),
@@ -291,66 +293,26 @@ void API minijail_keep_supplementary_gids(struct minijail *j) {
 
 int API minijail_change_user(struct minijail *j, const char *user)
 {
-	char *buf = NULL;
-	struct passwd pw;
-	struct passwd *ppw = NULL;
-	ssize_t sz = sysconf(_SC_GETPW_R_SIZE_MAX);
-	if (sz == -1)
-		sz = 65536;	/* your guess is as good as mine... */
-
-	/*
-	 * sysconf(_SC_GETPW_R_SIZE_MAX), under glibc, is documented to return
-	 * the maximum needed size of the buffer, so we don't have to search.
-	 */
-	buf = malloc(sz);
-	if (!buf)
-		return -ENOMEM;
-	getpwnam_r(user, &pw, buf, sz, &ppw);
-	/*
-	 * We're safe to free the buffer here. The strings inside |pw| point
-	 * inside |buf|, but we don't use any of them; this leaves the pointers
-	 * dangling but it's safe. |ppw| points at |pw| if getpwnam_r(3)
-	 * succeeded.
-	 */
-	free(buf);
-	/* getpwnam_r(3) does *not* set errno when |ppw| is NULL. */
-	if (!ppw)
-		return -1;
-	minijail_change_uid(j, ppw->pw_uid);
+	uid_t uid;
+	gid_t gid;
+	int rc = lookup_user(user, &uid, &gid);
+	if (rc)
+		return rc;
+	minijail_change_uid(j, uid);
 	j->user = strdup(user);
 	if (!j->user)
 		return -ENOMEM;
-	j->usergid = ppw->pw_gid;
+	j->usergid = gid;
 	return 0;
 }
 
 int API minijail_change_group(struct minijail *j, const char *group)
 {
-	char *buf = NULL;
-	struct group gr;
-	struct group *pgr = NULL;
-	ssize_t sz = sysconf(_SC_GETGR_R_SIZE_MAX);
-	if (sz == -1)
-		sz = 65536;	/* and mine is as good as yours, really */
-
-	/*
-	 * sysconf(_SC_GETGR_R_SIZE_MAX), under glibc, is documented to return
-	 * the maximum needed size of the buffer, so we don't have to search.
-	 */
-	buf = malloc(sz);
-	if (!buf)
-		return -ENOMEM;
-	getgrnam_r(group, &gr, buf, sz, &pgr);
-	/*
-	 * We're safe to free the buffer here. The strings inside gr point
-	 * inside buf, but we don't use any of them; this leaves the pointers
-	 * dangling but it's safe. pgr points at gr if getgrnam_r succeeded.
-	 */
-	free(buf);
-	/* getgrnam_r(3) does *not* set errno when |pgr| is NULL. */
-	if (!pgr)
-		return -1;
-	minijail_change_gid(j, pgr->gr_gid);
+	gid_t gid;
+	int rc = lookup_group(group, &gid);
+	if (rc)
+		return rc;
+	minijail_change_gid(j, gid);
 	return 0;
 }
 
@@ -867,14 +829,16 @@ static int seccomp_should_parse_filters(struct minijail *j)
 	return 1;
 }
 
-static int parse_seccomp_filters(struct minijail *j, FILE *policy_file)
+static int parse_seccomp_filters(struct minijail *j, const char *filename,
+				 FILE *policy_file)
 {
 	struct sock_fprog *fprog = malloc(sizeof(struct sock_fprog));
 	int use_ret_trap =
 	    j->flags.seccomp_filter_tsync || j->flags.seccomp_filter_logging;
 	int allow_logging = j->flags.seccomp_filter_logging;
 
-	if (compile_filter(policy_file, fprog, use_ret_trap, allow_logging)) {
+	if (compile_filter(filename, policy_file, fprog, use_ret_trap,
+			   allow_logging)) {
 		free(fprog);
 		return -1;
 	}
@@ -894,7 +858,7 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 		pdie("failed to open seccomp filter file '%s'", path);
 	}
 
-	if (parse_seccomp_filters(j, file) != 0) {
+	if (parse_seccomp_filters(j, path, file) != 0) {
 		die("failed to compile seccomp filter BPF program in '%s'",
 		    path);
 	}
@@ -903,18 +867,29 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 
 void API minijail_parse_seccomp_filters_from_fd(struct minijail *j, int fd)
 {
+	char *fd_path, *path;
+	FILE *file;
+
 	if (!seccomp_should_parse_filters(j))
 		return;
 
-	FILE *file = fdopen(fd, "r");
+	file = fdopen(fd, "r");
 	if (!file) {
 		pdie("failed to associate stream with fd %d", fd);
 	}
 
-	if (parse_seccomp_filters(j, file) != 0) {
+	if (asprintf(&fd_path, "/proc/self/fd/%d", fd) == -1)
+		pdie("failed to create path for fd %d", fd);
+	path = realpath(fd_path, NULL);
+	if (path == NULL)
+		pwarn("failed to get path of fd %d", fd);
+	free(fd_path);
+
+	if (parse_seccomp_filters(j, path ? path : "<fd>", file) != 0) {
 		die("failed to compile seccomp filter BPF program from fd %d",
 		    fd);
 	}
+	free(path);
 	fclose(file);
 }
 
@@ -1262,6 +1237,8 @@ static int enter_chroot(const struct minijail *j)
 	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
 		return ret;
 
+	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
+
 	if (chroot(j->chrootdir))
 		return -errno;
 
@@ -1277,6 +1254,8 @@ static int enter_pivot_root(const struct minijail *j)
 
 	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
 		return ret;
+
+	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
 
 	/*
 	 * Keep the fd for both old and new root.
@@ -1438,10 +1417,16 @@ static void write_ugid_maps_or_die(const struct minijail *j)
 
 static void enter_user_namespace(const struct minijail *j)
 {
-	if (j->uidmap && setresuid(0, 0, 0))
-		pdie("user_namespaces: setresuid(0, 0, 0) failed");
-	if (j->gidmap && setresgid(0, 0, 0))
-		pdie("user_namespaces: setresgid(0, 0, 0) failed");
+	int uid = j->flags.uid ? j->uid : 0;
+	int gid = j->flags.gid ? j->gid : 0;
+	if (j->gidmap && setresgid(gid, gid, gid)) {
+		pdie("user_namespaces: setresgid(%d, %d, %d) failed", gid, gid,
+		     gid);
+	}
+	if (j->uidmap && setresuid(uid, uid, uid)) {
+		pdie("user_namespaces: setresuid(%d, %d, %d) failed", uid, uid,
+		     uid);
+	}
 }
 
 static void parent_setup_complete(int *pipe_fds)
@@ -1480,10 +1465,12 @@ static void drop_ugid(const struct minijail *j)
 	} else if (j->flags.set_suppl_gids) {
 		if (setgroups(j->suppl_gid_count, j->suppl_gid_list))
 			pdie("setgroups(suppl_gids) failed");
-	} else if (!j->flags.keep_suppl_gids) {
+	} else if (!j->flags.keep_suppl_gids && !j->flags.disable_setgroups) {
 		/*
 		 * Only attempt to clear supplementary groups if we are changing
-		 * users or groups.
+		 * users or groups, and if the caller did not request to disable
+		 * setgroups (used when entering a user namespace as a
+		 * non-privileged user).
 		 */
 		if ((j->flags.uid || j->flags.gid) && setgroups(0, NULL))
 			pdie("setgroups(0, NULL) failed");
@@ -1698,6 +1685,8 @@ static const char *lookup_hook_name(minijail_hook_event_t event)
 		return "pre-drop-caps";
 	case MINIJAIL_HOOK_EVENT_PRE_EXECVE:
 		return "pre-execve";
+	case MINIJAIL_HOOK_EVENT_PRE_CHROOT:
+		return "pre-chroot";
 	case MINIJAIL_HOOK_EVENT_MAX:
 		/*
 		 * Adding this in favor of a default case to force the
@@ -2668,4 +2657,9 @@ void API minijail_destroy(struct minijail *j)
 	for (i = 0; i < j->cgroup_count; ++i)
 		free(j->cgroups[i]);
 	free(j);
+}
+
+void API minijail_log_to_fd(int fd, int min_priority)
+{
+	init_logging(LOG_TO_FD, fd, min_priority);
 }

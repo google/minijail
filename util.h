@@ -9,6 +9,7 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <syslog.h>
@@ -18,29 +19,46 @@
 extern "C" {
 #endif
 
+#if defined(USE_EXIT_ON_DIE)
+#define do_abort() exit(1)
+#else
+#define do_abort() abort()
+#endif
+
 /* clang-format off */
 #define die(_msg, ...) do { \
-	syslog(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__); \
-	abort(); \
+	do_log(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__); \
+	do_abort(); \
 } while (0)
 
 #define pdie(_msg, ...) \
 	die(_msg ": %m", ## __VA_ARGS__)
 
 #define warn(_msg, ...) \
-	syslog(LOG_WARNING, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
+	do_log(LOG_WARNING, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
 
 #define pwarn(_msg, ...) \
 	warn(_msg ": %m", ## __VA_ARGS__)
 
 #define info(_msg, ...) \
-	syslog(LOG_INFO, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
+	do_log(LOG_INFO, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 /* clang-format on */
 
 extern const char *log_syscalls[];
 extern const size_t log_syscalls_len;
+
+enum logging_system_t {
+	/* Log to syslog. This is the default. */
+	LOG_TO_SYSLOG = 0,
+
+	/* Log to a file descriptor. */
+	LOG_TO_FD,
+};
+
+extern void do_log(int priority, const char *format, ...)
+    __attribute__((__format__(__printf__, 2, 3)));
 
 static inline int is_android(void)
 {
@@ -87,6 +105,16 @@ void *consumebytes(size_t length, char **buf, size_t *buflength);
  * Returns a pointer to the base of the string, or NULL for errors.
  */
 char *consumestr(char **buf, size_t *buflength);
+
+/*
+ * init_logging: initializes the module-wide logging.
+ * @logger       The logging system to use.
+ * @fd           The file descriptor to log into. Ignored unless
+ *               @logger = LOG_TO_FD.
+ * @min_priority The minimum priority to display. Corresponds to syslog's
+                 priority parameter. Ignored unless @logger = LOG_TO_FD.
+ */
+void init_logging(enum logging_system_t logger, int fd, int min_priority);
 
 #ifdef __cplusplus
 }; /* extern "C" */

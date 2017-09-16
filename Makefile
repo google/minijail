@@ -18,6 +18,19 @@ ifeq ($(USE_seccomp),no)
 CPPFLAGS += -DUSE_SECCOMP_SOFTFAIL
 endif
 
+ifeq ($(USE_ASAN),yes)
+CPPFLAGS += -fsanitize=address
+LDFLAGS += -fsanitize=address
+USE_EXIT_ON_DIE = yes
+endif
+
+# Setting this flag can be useful for both AddressSanitizer builds and running
+# fuzzing tools, which do not expect crashes on gracefully-handled malformed
+# inputs.
+ifeq ($(USE_EXIT_ON_DIE),yes)
+CPPFLAGS += -DUSE_EXIT_ON_DIE
+endif
+
 CFLAGS += -Wextra -Wno-missing-field-initializers
 CXXFLAGS += -Wextra -Wno-missing-field-initializers
 
@@ -58,11 +71,12 @@ clean: CLEAN(libminijail.so)
 
 CXX_BINARY(libminijail_unittest): CXXFLAGS += -Wno-write-strings \
 						$(GTEST_CXXFLAGS)
-CXX_BINARY(libminijail_unittest): LDLIBS += -lcap $(GTEST_MAIN)
+CXX_BINARY(libminijail_unittest): LDLIBS += -lcap $(GTEST_LIBS)
 ifeq ($(USE_SYSTEM_GTEST),no)
-CXX_BINARY(libminijail_unittest): $(GTEST_MAIN)
+CXX_BINARY(libminijail_unittest): $(GTEST_LIBS)
 endif
-CXX_BINARY(libminijail_unittest): libminijail_unittest.o $(CORE_OBJECT_FILES)
+CXX_BINARY(libminijail_unittest): libminijail_unittest.o $(CORE_OBJECT_FILES) \
+		testrunner.o
 clean: CLEAN(libminijail_unittest)
 
 
@@ -73,22 +87,22 @@ clean: CLEAN(libminijailpreload.so)
 
 CXX_BINARY(syscall_filter_unittest): CXXFLAGS += -Wno-write-strings \
 						$(GTEST_CXXFLAGS)
-CXX_BINARY(syscall_filter_unittest): LDLIBS += -lcap $(GTEST_MAIN)
+CXX_BINARY(syscall_filter_unittest): LDLIBS += -lcap $(GTEST_LIBS)
 ifeq ($(USE_SYSTEM_GTEST),no)
-CXX_BINARY(syscall_filter_unittest): $(GTEST_MAIN)
+CXX_BINARY(syscall_filter_unittest): $(GTEST_LIBS)
 endif
 CXX_BINARY(syscall_filter_unittest): syscall_filter_unittest.o \
-		syscall_filter.o bpf.o util.o libconstants.gen.o \
-		libsyscalls.gen.o
+		$(CORE_OBJECT_FILES) testrunner.o
 clean: CLEAN(syscall_filter_unittest)
 
 
 CXX_BINARY(system_unittest): CXXFLAGS += $(GTEST_CXXFLAGS)
-CXX_BINARY(system_unittest): LDLIBS += $(GTEST_MAIN)
+CXX_BINARY(system_unittest): LDLIBS += -lcap $(GTEST_LIBS)
 ifeq ($(USE_SYSTEM_GTEST),no)
-CXX_BINARY(system_unittest): $(GTEST_MAIN)
+CXX_BINARY(system_unittest): $(GTEST_LIBS)
 endif
-CXX_BINARY(system_unittest): system_unittest.o system.o
+CXX_BINARY(system_unittest): system_unittest.o \
+		$(CORE_OBJECT_FILES) testrunner.o
 clean: CLEAN(system_unittest)
 
 

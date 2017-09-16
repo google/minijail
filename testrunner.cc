@@ -1,5 +1,5 @@
-// parse_seccomp_policy.cc
-// Copyright (C) 2016 The Android Open Source Project
+// testrunner.cpp
+// Copyright (C) 2017 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,35 +12,31 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// Main entrypoint for gtest.
+// Redirects logging to stderr to avoid syslog logspam.
 
 #include <stdio.h>
 
-#include "bpf.h"
-#include "syscall_filter.h"
+#include <gtest/gtest.h>
+
 #include "util.h"
 
-/* TODO(jorgelo): Use libseccomp disassembler here. */
+namespace {
+
+class Environment : public ::testing::Environment {
+ public:
+  ~Environment() override = default;
+
+  void SetUp() override {
+    init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
+  }
+};
+
+}  // namespace
+
 int main(int argc, char **argv) {
-	init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
-
-	if (argc < 2) {
-		fprintf(stderr, "Usage: %s <policy file>\n", argv[0]);
-		return 1;
-	}
-
-	FILE *f = fopen(argv[1], "r");
-	if (!f) {
-		pdie("fopen(%s) failed", argv[1]);
-	}
-
-	struct sock_fprog fp;
-	int res = compile_filter(argv[1], f, &fp, 0, 0);
-	if (res != 0) {
-		die("compile_filter failed");
-	}
-	dump_bpf_prog(&fp);
-
-	free(fp.filter);
-	fclose(f);
-	return 0;
+  testing::InitGoogleTest(&argc, argv);
+  ::testing::AddGlobalTestEnvironment(new Environment());
+  return RUN_ALL_TESTS();
 }

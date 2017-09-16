@@ -51,6 +51,9 @@ typedef enum {
 	/* The hook will run just before calling execve(2). */
 	MINIJAIL_HOOK_EVENT_PRE_EXECVE,
 
+        /* The hook will run just before calling chroot(2) / pivot_root(2). */
+	MINIJAIL_HOOK_EVENT_PRE_CHROOT,
+
 	/* Sentinel for error checking. Must be last. */
 	MINIJAIL_HOOK_EVENT_MAX,
 } minijail_hook_event_t;
@@ -335,6 +338,16 @@ int minijail_wait(struct minijail *j);
  * minijail or not.
  */
 void minijail_destroy(struct minijail *j);
+
+/*
+ * minijail_log_to_fd: redirects the module-wide logging to an FD instead of
+ * syslog.
+ * @fd           FD to log to. Caller must ensure this is available after
+ *               jailing (e.g. with minijail_preserve_fd()).
+ * @min_priority the minimum logging priority. Same as the priority argument
+ *               to syslog(2).
+ */
+void minijail_log_to_fd(int fd, int min_priority);
 
 #ifdef __cplusplus
 }; /* extern "C" */

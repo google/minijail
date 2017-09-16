@@ -8,23 +8,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/capability.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "libminijail.h"
 #include "libsyscalls.h"
 
 #include "elfparse.h"
+#include "system.h"
 #include "util.h"
 
 #define IDMAP_LEN 32U
 
-static void set_user(struct minijail *j, const char *arg)
+static void set_user(struct minijail *j, const char *arg, uid_t *out_uid,
+		     gid_t *out_gid)
 {
 	char *end = NULL;
 	int uid = strtod(arg, &end);
 	if (!*end && *arg) {
+		*out_uid = uid;
 		minijail_change_uid(j, uid);
 		return;
+	}
+
+	if (lookup_user(arg, out_uid, out_gid)) {
+		fprintf(stderr, "Bad user: '%s'\n", arg);
+		exit(1);
 	}
 
 	if (minijail_change_user(j, arg)) {
@@ -33,13 +43,19 @@ static void set_user(struct minijail *j, const char *arg)
 	}
 }
 
-static void set_group(struct minijail *j, const char *arg)
+static void set_group(struct minijail *j, const char *arg, gid_t *out_gid)
 {
 	char *end = NULL;
 	int gid = strtod(arg, &end);
 	if (!*end && *arg) {
+		*out_gid = gid;
 		minijail_change_gid(j, gid);
 		return;
+	}
+
+	if (lookup_group(arg, out_gid)) {
+		fprintf(stderr, "Bad group: '%s'\n", arg);
+		exit(1);
 	}
 
 	if (minijail_change_group(j, arg)) {
@@ -97,8 +113,8 @@ static void add_rlimit(struct minijail *j, char *arg)
 		exit(1);
 	}
 	if (minijail_rlimit(j, atoi(type), atoi(cur), atoi(max))) {
-		fprintf(stderr, "minijail_rlimit '%s,%s,%s' failed.\n",
-			type, cur, max);
+		fprintf(stderr, "minijail_rlimit '%s,%s,%s' failed.\n", type,
+			cur, max);
 		exit(1);
 	}
 }
@@ -133,6 +149,84 @@ static char *build_idmap(id_t id, id_t lowerid)
 		exit(1);
 	}
 	return idmap;
+}
+
+static int has_cap_setgid()
+{
+	cap_t caps;
+	cap_flag_value_t cap_value;
+
+	if (!CAP_IS_SUPPORTED(CAP_SETGID))
+		return 0;
+
+	caps = cap_get_proc();
+	if (!caps) {
+		fprintf(stderr, "Could not get process' capabilities: %m\n");
+		exit(1);
+	}
+
+	if (cap_get_flag(caps, CAP_SETGID, CAP_EFFECTIVE, &cap_value)) {
+		fprintf(stderr, "Could not get the value of CAP_SETGID: %m\n");
+		exit(1);
+	}
+
+	if (cap_free(caps)) {
+		fprintf(stderr, "Could not free capabilities: %m\n");
+		exit(1);
+	}
+
+	return cap_value == CAP_SET;
+}
+
+static void set_ugid_mapping(struct minijail *j, int set_uidmap, uid_t uid,
+			     char *uidmap, int set_gidmap, gid_t gid,
+			     char *gidmap)
+{
+	if (set_uidmap) {
+		minijail_namespace_user(j);
+		minijail_namespace_pids(j);
+
+		if (!uidmap) {
+			/*
+			 * If no map is passed, map the current uid to the
+			 * chosen uid in the target namespace (or root, if none
+			 * was chosen).
+			 */
+			uidmap = build_idmap(uid, getuid());
+		}
+		if (0 != minijail_uidmap(j, uidmap)) {
+			fprintf(stderr, "Could not set uid map.\n");
+			exit(1);
+		}
+		free(uidmap);
+	}
+	if (set_gidmap) {
+		minijail_namespace_user(j);
+		minijail_namespace_pids(j);
+
+		if (!gidmap) {
+			/*
+			 * If no map is passed, map the current gid to the
+			 * chosen gid in the target namespace.
+			 */
+			gidmap = build_idmap(gid, getgid());
+		}
+		if (!has_cap_setgid()) {
+			/*
+			 * This means that we are not running as root,
+			 * so we also have to disable setgroups(2) to
+			 * be able to set the gid map.
+			 * See
+			 * http://man7.org/linux/man-pages/man7/user_namespaces.7.html
+			 */
+			minijail_namespace_user_disable_setgroups(j);
+		}
+		if (0 != minijail_gidmap(j, gidmap)) {
+			fprintf(stderr, "Could not set gid map.\n");
+			exit(1);
+		}
+		free(gidmap);
+	}
 }
 
 static void usage(const char *progn)
@@ -212,7 +306,9 @@ static void usage(const char *progn)
 	       "  -Y:           Synchronize seccomp filters across thread group.\n"
 	       "  -z:           Don't forward signals to jailed process.\n"
 	       "  --ambient:    Raise ambient capabilities. Requires -c.\n"
-	       "  --uts[=name]: Enter a new UTS namespace (and set hostname).\n");
+	       "  --uts[=name]: Enter a new UTS namespace (and set hostname).\n"
+	       "  --logging=<s>:Use <s> as the logging system.\n"
+	       "                <s> must be 'syslog' (default) or 'stderr'.\n");
 	/* clang-format on */
 }
 
@@ -240,9 +336,13 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int caps = 0, ambient_caps = 0;
 	int seccomp = -1;
 	const size_t path_max = 4096;
-	char *map;
+	uid_t uid = 0;
+	gid_t gid = 0;
+	char *uidmap = NULL, *gidmap = NULL;
+	int set_uidmap = 0, set_gidmap = 0;
 	size_t size;
 	const char *filter_path = NULL;
+	int log_to_stderr = 0;
 
 	const char *optstring =
 	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUKwyYz";
@@ -251,6 +351,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	const struct option long_options[] = {
 		{"ambient", no_argument, 0, 128},
 		{"uts", optional_argument, 0, 129},
+		{"logging", required_argument, 0, 130},
 		{0, 0, 0, 0},
 	};
 	/* clang-format on */
@@ -259,17 +360,18 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 				  &longoption_index)) != -1) {
 		switch (opt) {
 		case 'u':
-			set_user(j, optarg);
+			set_user(j, optarg, &uid, &gid);
 			break;
 		case 'g':
-			set_group(j, optarg);
+			set_group(j, optarg, &gid);
 			break;
 		case 'n':
 			minijail_no_new_privs(j);
 			break;
 		case 's':
 			if (seccomp != -1 && seccomp != 1) {
-				fprintf(stderr, "Do not use -s & -S together.\n");
+				fprintf(stderr,
+					"Do not use -s & -S together.\n");
 				exit(1);
 			}
 			seccomp = 1;
@@ -277,7 +379,8 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		case 'S':
 			if (seccomp != -1 && seccomp != 2) {
-				fprintf(stderr, "Do not use -s & -S together.\n");
+				fprintf(stderr,
+					"Do not use -s & -S together.\n");
 				exit(1);
 			}
 			seccomp = 2;
@@ -415,49 +518,22 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			minijail_namespace_pids(j);
 			break;
 		case 'm':
-			minijail_namespace_user(j);
-			minijail_namespace_pids(j);
-
-			if (optarg) {
-				map = strdup(optarg);
-			} else {
-				/*
-				 * If no map is passed, map the current uid to
-				 * root.
-				 */
-				map = build_idmap(0, getuid());
+			set_uidmap = 1;
+			if (uidmap) {
+				free(uidmap);
+				uidmap = NULL;
 			}
-			if (0 != minijail_uidmap(j, map)) {
-				fprintf(stderr, "Could not set uid map.\n");
-				exit(1);
-			}
-			free(map);
+			if (optarg)
+				uidmap = strdup(optarg);
 			break;
 		case 'M':
-			minijail_namespace_user(j);
-			minijail_namespace_pids(j);
-
-			if (optarg) {
-				map = strdup(optarg);
-			} else {
-				/*
-				 * If no map is passed, map the current gid to
-				 * root.
-				 * This means that we're likely *not* running as
-				 * root, so we also have to disable
-				 * setgroups(2) to be able to set the gid map.
-				 * See
-				 * http://man7.org/linux/man-pages/man7/user_namespaces.7.html
-				 */
-				minijail_namespace_user_disable_setgroups(j);
-
-				map = build_idmap(0, getgid());
+			set_gidmap = 1;
+			if (gidmap) {
+				free(gidmap);
+				gidmap = NULL;
 			}
-			if (0 != minijail_gidmap(j, map)) {
-				fprintf(stderr, "Could not set gid map.\n");
-				exit(1);
-			}
-			free(map);
+			if (optarg)
+				gidmap = strdup(optarg);
 			break;
 		case 'a':
 			if (0 != minijail_use_alt_syscall(j, optarg)) {
@@ -499,10 +575,39 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			if (optarg)
 				minijail_namespace_set_hostname(j, optarg);
 			break;
+		case 130: /* Logging. */
+			if (!strcmp(optarg, "syslog"))
+				log_to_stderr = 0;
+			else if (!strcmp(optarg, "stderr")) {
+				log_to_stderr = 1;
+			} else {
+				fprintf(stderr, "--logger must be 'syslog' or "
+						"'stderr'.\n");
+				exit(1);
+			}
+			break;
 		default:
 			usage(argv[0]);
 			exit(1);
 		}
+	}
+
+	if (log_to_stderr) {
+		init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
+		/*
+		 * When logging to stderr, ensure the FD survives the jailing.
+		 */
+		if (0 !=
+		    minijail_preserve_fd(j, STDERR_FILENO, STDERR_FILENO)) {
+			fprintf(stderr, "Could not preserve stderr.\n");
+			exit(1);
+		}
+	}
+
+	/* Set up uid/gid mapping. */
+	if (set_uidmap || set_gidmap) {
+		set_ugid_mapping(j, set_uidmap, uid, uidmap, set_gidmap, gid,
+				 gidmap);
 	}
 
 	/* Can only set ambient caps when using regular caps. */
@@ -625,7 +730,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (exit_immediately) {
-		info("not running init loop, exiting immediately");
+		info("not running init loop, exiting immediately\n");
 		return 0;
 	}
 	int ret = minijail_wait(j);
