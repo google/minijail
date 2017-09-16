@@ -359,9 +359,13 @@ TEST(Test, test_minijail_preserve_fd) {
 }
 
 TEST(Test,
-#if defined(__ANDROID__)
+#if !defined(RUN_USER_NAMESPACE_TESTS)
 // TODO(lhchavez): Android unit tests don't currently support entering user
-// namespaces as unprivileged users.
+// namespaces as unprivileged users due to having an older kernel.
+// Chrome OS unit tests don't support it either due to being in a chroot
+// environment (see man 2 clone for more information about failure modes with
+// the CLONE_NEWUSER flag).
+// Only run this test when explicitly asked to do so.
 DISABLED_test_tmpfs_userns
 #else
 test_tmpfs_userns
