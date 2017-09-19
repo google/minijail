@@ -144,6 +144,7 @@ struct minijail {
 		int pivot_root : 1;
 		int mount_tmp : 1;
 		int do_init : 1;
+		int run_as_init : 1;
 		int pid_file : 1;
 		int cgroups : 1;
 		int alt_syscall : 1;
@@ -202,6 +203,7 @@ void minijail_preenter(struct minijail *j)
 	j->flags.remount_proc_ro = 0;
 	j->flags.pids = 0;
 	j->flags.do_init = 0;
+	j->flags.run_as_init = 0;
 	j->flags.pid_file = 0;
 	j->flags.cgroups = 0;
 	j->flags.forward_signals = 0;
@@ -533,7 +535,7 @@ void API minijail_run_as_init(struct minijail *j)
 	 * Since the jailed program will become 'init' in the new PID namespace,
 	 * Minijail does not need to fork an 'init' process.
 	 */
-	j->flags.do_init = 0;
+	j->flags.run_as_init = 1;
 }
 
 int API minijail_enter_chroot(struct minijail *j, const char *dir)
@@ -2187,7 +2189,11 @@ static int minijail_run_internal(struct minijail *j,
 	int ret;
 	/* We need to remember this across the minijail_preexec() call. */
 	int pid_namespace = j->flags.pids;
-	int do_init = j->flags.do_init;
+	/*
+	 * Create an init process if we are entering a pid namespace, unless the
+	 * user has explicitly opted out by calling minijail_run_as_init().
+	 */
+	int do_init = j->flags.do_init && !j->flags.run_as_init;
 	int use_preload = config->use_preload;
 
 	if (use_preload) {
