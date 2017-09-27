@@ -34,7 +34,7 @@
 #if defined(__ANDROID__)
 const char *log_syscalls[] = {"socket", "connect", "fcntl", "writev"};
 #else
-const char *log_syscalls[] = {"connect", "sendto"};
+const char *log_syscalls[] = {"socket", "connect", "sendto"};
 #endif
 #elif defined(__i386__)
 #if defined(__ANDROID__)
@@ -48,17 +48,17 @@ const char *log_syscalls[] = {"socketcall", "time"};
 const char *log_syscalls[] = {"clock_gettime", "connect", "fcntl64", "socket",
 			      "writev"};
 #else
-const char *log_syscalls[] = {"connect", "gettimeofday", "send"};
+const char *log_syscalls[] = {"socket", "connect", "gettimeofday", "send"};
 #endif
 #elif defined(__aarch64__)
 #if defined(__ANDROID__)
 const char *log_syscalls[] = {"connect", "fcntl", "sendto", "socket", "writev"};
 #else
-const char *log_syscalls[] = {"connect", "send"};
+const char *log_syscalls[] = {"socket", "connect", "send"};
 #endif
 #elif defined(__powerpc__) || defined(__ia64__) || defined(__hppa__) ||        \
       defined(__sparc__) || defined(__mips__)
-const char *log_syscalls[] = {"connect", "send"};
+const char *log_syscalls[] = {"socket", "connect", "send"};
 #else
 #error "Unsupported platform"
 #endif
