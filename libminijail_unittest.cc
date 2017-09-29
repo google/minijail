@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 
@@ -271,6 +272,34 @@ TEST(Test, test_minijail_no_fd_leaks) {
   minijail_destroy(j);
 
   close(dev_null);
+}
+
+TEST(Test, test_minijail_fork) {
+  pid_t mj_fork_ret;
+  int status;
+  int pipe_fds[2];
+  ssize_t pid_size = sizeof(mj_fork_ret);
+
+  struct minijail *j = minijail_new();
+
+  ASSERT_EQ(pipe(pipe_fds), 0);
+
+  mj_fork_ret = minijail_fork(j);
+  ASSERT_GE(mj_fork_ret, 0);
+  if (mj_fork_ret == 0) {
+    pid_t pid_in_parent;
+    // Wait for the parent to tell us the pid in the parent namespace.
+    EXPECT_EQ(read(pipe_fds[0], &pid_in_parent, pid_size), pid_size);
+    EXPECT_EQ(pid_in_parent, getpid());
+    exit(0);
+  }
+
+  EXPECT_EQ(write(pipe_fds[1], &mj_fork_ret, pid_size), pid_size);
+  waitpid(mj_fork_ret, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+
+  minijail_destroy(j);
 }
 
 static int early_exit(void* payload) {

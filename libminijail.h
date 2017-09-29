@@ -263,8 +263,9 @@ int minijail_preserve_fd(struct minijail *j, int parent_fd, int child_fd);
 void minijail_enter(const struct minijail *j);
 
 /*
- * Run the specified command in the given minijail, execve(2)-style. This is
- * required if minijail_namespace_pids() was used.
+ * Run the specified command in the given minijail, execve(2)-style.
+ * If minijail_namespace_pids() or minijail_namespace_user() are used,
+ * this or minijail_fork() is required instead of minijail_enter().
  */
 int minijail_run(struct minijail *j, const char *filename,
 		 char *const argv[]);
@@ -320,6 +321,17 @@ int minijail_run_pid_pipes_no_preload(struct minijail *j, const char *filename,
 				      char *const argv[], pid_t *pchild_pid,
 				      int *pstdin_fd, int *pstdout_fd,
 				      int *pstderr_fd);
+
+/*
+ * Fork, jail the child, and return. This behaves similar to fork(2), except it
+ * puts the child process in a jail before returning.
+ * `minijail_fork` returns in both the parent and the child. The pid of the
+ * child is returned to the parent. Zero is returned in the child. LD_PRELOAD
+ * is not supported.
+ * If minijail_namespace_pids() or minijail_namespace_user() are used,
+ * this or minijail_run*() is required instead of minijail_enter().
+ */
+pid_t minijail_fork(struct minijail *j);
 
 /*
  * Kill the specified minijail. The minijail must have been created with pid
