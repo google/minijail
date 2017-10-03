@@ -377,25 +377,60 @@ TEST(Test, test_minijail_preserve_fd) {
   minijail_destroy(j);
 }
 
-TEST(Test,
-#if !defined(RUN_USER_NAMESPACE_TESTS)
-// TODO(lhchavez): Android unit tests don't currently support entering user
-// namespaces as unprivileged users due to having an older kernel.
-// Chrome OS unit tests don't support it either due to being in a chroot
-// environment (see man 2 clone for more information about failure modes with
-// the CLONE_NEWUSER flag).
-// Only run this test when explicitly asked to do so.
-DISABLED_test_tmpfs_userns
-#else
-test_tmpfs_userns
-#endif
-) {
+namespace {
+
+// Tests that require userns access.
+// Android unit tests don't currently support entering user namespaces as
+// unprivileged users due to having an older kernel.  Chrome OS unit tests
+// don't support it either due to being in a chroot environment (see man 2
+// clone for more information about failure modes with the CLONE_NEWUSER flag).
+class NamespaceTest : public ::testing::Test {
+ protected:
+  static void SetUpTestCase() {
+    userns_supported_ = UsernsSupported();
+  }
+
+  // Whether userns is supported.
+  static bool userns_supported_;
+
+  static bool UsernsSupported() {
+    pid_t pid = fork();
+    if (pid == -1)
+      pdie("could not fork");
+
+    if (pid == 0)
+      _exit(unshare(CLONE_NEWUSER) == 0 ? 0 : 1);
+
+    int status;
+    if (waitpid(pid, &status, 0) < 0)
+      pdie("could not wait");
+
+    if (!WIFEXITED(status))
+      die("child did not exit properly: %#x", status);
+
+    bool ret = WEXITSTATUS(status) == 0;
+    if (!ret)
+      warn("Skipping userns related tests");
+    return ret;
+  }
+};
+
+bool NamespaceTest::userns_supported_;
+
+}  // namespace
+
+TEST_F(NamespaceTest, test_tmpfs_userns) {
   int mj_run_ret;
   int status;
   char *argv[4];
   char uidmap[128], gidmap[128];
   constexpr uid_t kTargetUid = 1000;  // Any non-zero value will do.
   constexpr gid_t kTargetGid = 1000;
+
+  if (!userns_supported_) {
+    SUCCEED();
+    return;
+  }
 
   struct minijail *j = minijail_new();
 
