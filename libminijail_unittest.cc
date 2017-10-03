@@ -43,8 +43,6 @@ const char kCatPath[] = ROOT_PREFIX "/bin/cat";
 }  // namespace
 
 /* Prototypes needed only by test. */
-void *consumebytes(size_t length, char **buf, size_t *buflength);
-char *consumestr(char **buf, size_t *buflength);
 size_t minijail_get_tmpfs_size(const struct minijail *);
 
 /* Silence unused variable warnings. */
