@@ -14,23 +14,25 @@ set -e
 
 if [ $# -ne 1 ] && [ $# -ne 2 ]; then
   echo "Usage: $(basename "$0") OUTFILE"
-  echo "Usage: $(basename "$0") CC OUTFILE"
+  echo "Usage: $(basename "$0") INFILE OUTFILE"
   exit 1
 fi
 
+BUILD="${CC} -dD gen_syscalls.c -E"
+GEN_DEPS=1
+
 if [ $# -eq 2 ]; then
-  CC="$1"
+  BUILD="cat $1"
+  GEN_DEPS=0
   shift
 fi
 OUTFILE="$1"
 
-# Generate a dependency file which helps the build tool to see when it
-# should regenerate ${OUTFILE}.
-echo '#include <asm/unistd.h>' | ${CC} - -E -M -MF "${OUTFILE}.d.tmp"
-# Correct the output filename.
-(echo "${OUTFILE}: \\" ; sed -e 's/^-\.o://' -e 's/^-://' "${OUTFILE}.d.tmp") \
-  > "${OUTFILE}.d"
-rm "${OUTFILE}.d.tmp"
+if [ ${GEN_DEPS} -eq 1 ]; then
+  # Generate a dependency file which helps the build tool to see when it
+  # should regenerate ${OUTFILE}.
+  ${BUILD} -M -MF "${OUTFILE}.d"
+fi
 
 # sed expression which extracts system calls that are
 # defined via asm/unistd.h.  It converts them from:
@@ -49,8 +51,7 @@ cat <<-EOF > "${OUTFILE}"
 #include <asm/unistd.h>
 #include "libsyscalls.h"
 const struct syscall_entry syscall_table[] = {
-$(echo '#include <asm/unistd.h>' | \
-  ${CC} -dD - -E | sed -Ene "${SED_MULTILINE}")
+$(${BUILD} | sed -Ene "${SED_MULTILINE}")
   { NULL, -1 },
 };
 EOF

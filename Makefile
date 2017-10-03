@@ -117,7 +117,7 @@ libsyscalls.gen.o.depends: libsyscalls.gen.c
 # NOTE! This will not detect if the file is not appropriate for the target.
 libsyscalls.gen.c: $(SRC)/Makefile $(SRC)/libsyscalls.h
 	@printf "Generating target-arch specific $@...\n"
-	$(QUIET)$(SRC)/gen_syscalls.sh "$(CC)" "$@"
+	$(QUIET)CC="$(CC)" $(SRC)/gen_syscalls.sh "$@"
 	@printf "$@ done.\n"
 clean: CLEAN(libsyscalls.gen.c)
 
@@ -131,7 +131,7 @@ libconstants.gen.o.depends: libconstants.gen.c
 # NOTE! This will not detect if the file is not appropriate for the target.
 libconstants.gen.c: $(SRC)/Makefile $(SRC)/libconstants.h
 	@printf "Generating target-arch specific $@...\n"
-	$(QUIET)$(SRC)/gen_constants.sh "$(CC)" "$@"
+	$(QUIET)CC="$(CC)" $(SRC)/gen_constants.sh "$@"
 	@printf "$@ done.\n"
 clean: CLEAN(libconstants.gen.c)
 
