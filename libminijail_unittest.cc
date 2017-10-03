@@ -29,15 +29,20 @@
 #include "libminijail-private.h"
 #include "util.h"
 
+namespace {
+
 #if defined(__ANDROID__)
-const char *kShellPath = "/system/bin/sh";
+# define ROOT_PREFIX "/system"
 #else
-const char *kShellPath = "/bin/sh";
+# define ROOT_PREFIX ""
 #endif
 
+const char kShellPath[] = ROOT_PREFIX "/bin/sh";
+const char kCatPath[] = ROOT_PREFIX "/bin/cat";
+
+}  // namespace
+
 /* Prototypes needed only by test. */
-void *consumebytes(size_t length, char **buf, size_t *buflength);
-char *consumestr(char **buf, size_t *buflength);
 size_t minijail_get_tmpfs_size(const struct minijail *);
 
 /* Silence unused variable warnings. */
@@ -167,18 +172,13 @@ TEST(Test, minijail_run_pid_pipes_no_preload) {
   const size_t buf_len = 128;
   char buf[buf_len];
   int status;
-#if defined(__ANDROID__)
-  char filename[] = "/system/bin/cat";
-#else
-  char filename[] = "/bin/cat";
-#endif
   char teststr[] = "test\n";
   size_t teststr_len = strlen(teststr);
   char *argv[4];
 
   struct minijail *j = minijail_new();
 
-  argv[0] = filename;
+  argv[0] = (char*)kCatPath;
   argv[1] = NULL;
   mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv,
                                                  &pid,
@@ -310,11 +310,6 @@ TEST(Test, test_minijail_callback) {
   pid_t pid;
   int mj_run_ret;
   int status;
-#if defined(__ANDROID__)
-  char filename[] = "/system/bin/cat";
-#else
-  char filename[] = "/bin/cat";
-#endif
   char *argv[2];
   int exit_code = 42;
 
@@ -325,7 +320,7 @@ TEST(Test, test_minijail_callback) {
 			MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS);
   EXPECT_EQ(status, 0);
 
-  argv[0] = filename;
+  argv[0] = (char*)kCatPath;
   argv[1] = NULL;
   mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv, &pid, NULL,
 						 NULL, NULL);
@@ -340,11 +335,6 @@ TEST(Test, test_minijail_callback) {
 TEST(Test, test_minijail_preserve_fd) {
   int mj_run_ret;
   int status;
-#if defined(__ANDROID__)
-  char filename[] = "/system/bin/cat";
-#else
-  char filename[] = "/bin/cat";
-#endif
   char *argv[2];
   char teststr[] = "test\n";
   size_t teststr_len = strlen(teststr);
@@ -365,7 +355,7 @@ TEST(Test, test_minijail_preserve_fd) {
   ASSERT_EQ(status, 0);
   minijail_close_open_fds(j);
 
-  argv[0] = filename;
+  argv[0] = (char*)kCatPath;
   argv[1] = NULL;
   mj_run_ret = minijail_run_no_preload(j, argv[0], argv);
   EXPECT_EQ(mj_run_ret, 0);
