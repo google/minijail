@@ -31,12 +31,6 @@ ifeq ($(USE_EXIT_ON_DIE),yes)
 CPPFLAGS += -DUSE_EXIT_ON_DIE
 endif
 
-# Setting this flag will run more unit tests that need a certain well-known
-# environment to run successfully.
-ifeq ($(USE_RUN_USER_NAMESPACE_TESTS),yes)
-CPPFLAGS += -DRUN_USER_NAMESPACE_TESTS
-endif
-
 CFLAGS += -Wextra -Wno-missing-field-initializers
 CXXFLAGS += -Wextra -Wno-missing-field-initializers
 
