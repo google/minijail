@@ -53,6 +53,8 @@ cc_object {
     cflags: [
         "-dD",
         "-E",
+        "-Wall",
+        "-Werror",
     ],
 }
 
@@ -72,6 +74,8 @@ cc_object {
     cflags: [
         "-dD",
         "-E",
+        "-Wall",
+        "-Werror",
     ],
 }
 
