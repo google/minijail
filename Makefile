@@ -37,7 +37,7 @@ CXXFLAGS += $(MJ_COMMON_FLAGS)
 
 USE_SYSTEM_GTEST ?= no
 ifeq ($(USE_SYSTEM_GTEST),no)
-GTEST_CXXFLAGS := -std=gnu++11
+GTEST_CXXFLAGS := -std=gnu++14
 GTEST_LIBS := gtest.a
 else
 GTEST_CXXFLAGS := $(shell gtest-config --cxxflags)
