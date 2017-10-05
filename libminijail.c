@@ -26,6 +26,7 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/wait.h>
@@ -142,6 +143,7 @@ struct minijail {
 		int seccomp_filter_logging : 1;
 		int chroot : 1;
 		int pivot_root : 1;
+		int mount_dev : 1;
 		int mount_tmp : 1;
 		int do_init : 1;
 		int run_as_init : 1;
@@ -605,6 +607,11 @@ char API *minijail_get_original_path(struct minijail *j,
 size_t minijail_get_tmpfs_size(const struct minijail *j)
 {
 	return j->tmpfs_size;
+}
+
+void API minijail_mount_dev(struct minijail *j)
+{
+	j->flags.mount_dev = 1;
 }
 
 void API minijail_mount_tmp(struct minijail *j)
@@ -1183,6 +1190,152 @@ out:
 	return ret;
 }
 
+struct dev_spec {
+	const char *name;
+	mode_t mode;
+	dev_t major, minor;
+};
+
+static const struct dev_spec device_nodes[] = {
+	{
+		"null",
+		S_IFCHR | 0666, 1, 3,
+	},
+	{
+		"zero",
+		S_IFCHR | 0666, 1, 5,
+	},
+	{
+		"full",
+		S_IFCHR | 0666, 1, 7,
+	},
+	{
+		"urandom",
+		S_IFCHR | 0444, 1, 9,
+	},
+	{
+		"tty",
+		S_IFCHR | 0666, 5, 0,
+	},
+};
+
+struct dev_sym_spec {
+	const char *source, *dest;
+};
+
+static const struct dev_sym_spec device_symlinks[] = {
+	{ "ptmx", "pts/ptmx", },
+	{ "fd", "/proc/self/fd", },
+	{ "stdin", "fd/0", },
+	{ "stdout", "fd/1", },
+	{ "stderr", "fd/2", },
+};
+
+/*
+ * Clean up the temporary dev path we had setup previously.  In case of errors,
+ * we don't want to go leaking empty tempdirs.
+ */
+static void mount_dev_cleanup(char *dev_path)
+{
+	umount2(dev_path, MNT_DETACH);
+	rmdir(dev_path);
+	free(dev_path);
+}
+
+/*
+ * Set up the pseudo /dev path at the temporary location.
+ * See mount_dev_finalize for more details.
+ */
+static int mount_dev(char **dev_path_ret)
+{
+	int ret;
+	int dev_fd;
+	size_t i;
+	mode_t mask;
+	char *dev_path;
+
+	/*
+	 * Create a temp path for the /dev init.  We'll relocate this to the
+	 * final location later on in the startup process.
+	 */
+	dev_path = *dev_path_ret = strdup("/tmp/minijail.dev.XXXXXX");
+	if (dev_path == NULL || mkdtemp(dev_path) == NULL)
+		pdie("could not create temp path for /dev");
+
+	/* Set up the empty /dev mount point first. */
+	ret = mount("minijail-devfs", dev_path, "tmpfs",
+	            MS_NOEXEC | MS_NOSUID, "size=5M,mode=755");
+	if (ret) {
+		rmdir(dev_path);
+		return ret;
+	}
+
+	/* We want to set the mode directly from the spec. */
+	mask = umask(0);
+
+	/* Get a handle to the temp dev path for *at funcs below. */
+	dev_fd = open(dev_path, O_DIRECTORY|O_PATH|O_CLOEXEC);
+	if (dev_fd < 0) {
+		ret = 1;
+		goto done;
+	}
+
+	/* Create all the nodes in /dev. */
+	for (i = 0; i < ARRAY_SIZE(device_nodes); ++i) {
+		const struct dev_spec *ds = &device_nodes[i];
+		ret = mknodat(dev_fd, ds->name, ds->mode,
+		              makedev(ds->major, ds->minor));
+		if (ret)
+			goto done;
+	}
+
+	/* Create all the symlinks in /dev. */
+	for (i = 0; i < ARRAY_SIZE(device_symlinks); ++i) {
+		const struct dev_sym_spec *ds = &device_symlinks[i];
+		ret = symlinkat(ds->dest, dev_fd, ds->source);
+		if (ret)
+			goto done;
+	}
+
+	/* Restore old mask. */
+ done:
+	close(dev_fd);
+	umask(mask);
+
+	if (ret)
+		mount_dev_cleanup(dev_path);
+
+	return ret;
+}
+
+/*
+ * Relocate the temporary /dev mount to its final /dev place.
+ * We have to do this two step process so people can bind mount extra
+ * /dev paths like /dev/log.
+ */
+static int mount_dev_finalize(const struct minijail *j, char *dev_path)
+{
+	int ret = -1;
+	char *dest = NULL;
+
+	/* Unmount the /dev mount if possible. */
+	if (umount2("/dev", MNT_DETACH))
+		goto done;
+
+	if (asprintf(&dest, "%s/dev", j->chrootdir ? : "") < 0)
+		goto done;
+
+	if (mount(dev_path, dest, NULL, MS_MOVE, NULL))
+		goto done;
+
+	ret = 0;
+ done:
+	free(dest);
+	mount_dev_cleanup(dev_path);
+
+	return ret;
+}
+
 /*
  * mount_one: Applies mounts from @m for @j, recursing as needed.
  * @j Minijail these mounts are for
@@ -1190,19 +1343,29 @@ out:
  *
  * Returns 0 for success.
  */
-static int mount_one(const struct minijail *j, struct mountpoint *m)
+static int mount_one(const struct minijail *j, struct mountpoint *m,
+		     const char *dev_path)
 {
 	int ret;
 	char *dest;
 	int remount_ro = 0;
 
-	/* |dest| has a leading "/". */
-	if (asprintf(&dest, "%s%s", j->chrootdir, m->dest) < 0)
-		return -ENOMEM;
+	/* We assume |dest| has a leading "/". */
+	if (dev_path && strncmp("/dev/", m->dest, 5) == 0) {
+		/* Since the temp path is rooted at /dev, skip that dest part. */
+		if (asprintf(&dest, "%s%s", dev_path, m->dest + 4) < 0)
+			return -ENOMEM;
+	} else {
+		if (asprintf(&dest, "%s%s", j->chrootdir, m->dest) < 0)
+			return -ENOMEM;
+	}
 
-	if (setup_mount_destination(m->src, dest, j->uid, j->gid,
-				    (m->flags & MS_BIND)))
-		pdie("creating mount target '%s' failed", dest);
+	ret = setup_mount_destination(m->src, dest, j->uid, j->gid,
+				      (m->flags & MS_BIND));
+	if (ret) {
+		pwarn("creating mount target '%s' failed", dest);
+		return ret;
+	}
 
 	/*
 	 * R/O bind mounts have to be remounted since 'bind' and 'ro'
@@ -1215,28 +1378,39 @@ static int mount_one(const struct minijail *j, struct mountpoint *m)
 	}
 
 	ret = mount(m->src, dest, m->type, m->flags, m->data);
-	if (ret)
-		pdie("mount: %s -> %s", m->src, dest);
+	if (ret) {
+		pwarn("mount: %s -> %s", m->src, dest);
+		return ret;
+	}
 
 	if (remount_ro) {
 		m->flags |= MS_RDONLY;
 		ret = mount(m->src, dest, NULL,
 			    m->flags | MS_REMOUNT, m->data);
-		if (ret)
-			pdie("bind ro: %s -> %s", m->src, dest);
+		if (ret) {
+			pwarn("bind ro: %s -> %s", m->src, dest);
+			return ret;
+		}
 	}
 
 	free(dest);
 	if (m->next)
-		return mount_one(j, m->next);
+		return mount_one(j, m->next, dev_path);
 	return ret;
 }
 
-static int enter_chroot(const struct minijail *j)
+static int enter_chroot(const struct minijail *j, char *dev_path)
 {
 	int ret;
 
-	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
+	if (j->mounts_head && (ret = mount_one(j, j->mounts_head, dev_path)))
+		return ret;
+
+	/*
+	 * Once all bind mounts have been processed, but before we chroot,
+	 * move the temp dev to its final /dev home.
+	 */
+	if (j->flags.mount_dev && mount_dev_finalize(j, dev_path))
 		return ret;
 
 	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
@@ -1250,11 +1424,18 @@ static int enter_chroot(const struct minijail *j)
 	return 0;
 }
 
-static int enter_pivot_root(const struct minijail *j)
+static int enter_pivot_root(const struct minijail *j, char *dev_path)
 {
 	int ret, oldroot, newroot;
 
-	if (j->mounts_head && (ret = mount_one(j, j->mounts_head)))
+	if (j->mounts_head && (ret = mount_one(j, j->mounts_head, dev_path)))
+		return ret;
+
+	/*
+	 * Once all bind mounts have been processed, but before we pivot,
+	 * move the temp dev to its final /dev home.
+	 */
+	if (j->flags.mount_dev && mount_dev_finalize(j, dev_path))
 		return ret;
 
 	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
@@ -1789,11 +1970,33 @@ void API minijail_enter(const struct minijail *j)
 			pdie("keyctl(KEYCTL_JOIN_SESSION_KEYRING) failed");
 	}
 
-	if (j->flags.chroot && enter_chroot(j))
-		pdie("chroot");
+	/*
+	 * This has to come before the chroot/pivot_root in case there are
+	 * bind mounts from /dev into the chroot dev.
+	 */
+	char *dev_path = NULL;
+	if (j->flags.mount_dev && mount_dev(&dev_path))
+		pdie("mount_dev");
 
-	if (j->flags.pivot_root && enter_pivot_root(j))
+	if (j->flags.chroot && enter_chroot(j, dev_path)) {
+		if (dev_path)
+			mount_dev_cleanup(dev_path);
+		pdie("chroot");
+	}
+
+	if (j->flags.pivot_root && enter_pivot_root(j, dev_path)) {
+		if (dev_path)
+			mount_dev_cleanup(dev_path);
 		pdie("pivot_root");
+	}
+
+	/*
+	 * If using a chroot or pivot root, we already finalized /dev at
+	 * the right point.  If not, we need to call it ourselves.
+	 */
+	if (j->flags.mount_dev && !j->flags.chroot && !j->flags.pivot_root &&
+	    mount_dev_finalize(j, dev_path))
+		pdie("mount_dev_finalize");
 
 	if (j->flags.mount_tmp && mount_tmp(j))
 		pdie("mount_tmp");
