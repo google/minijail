@@ -351,6 +351,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 	int longoption_index = 0;
 	/* clang-format off */
 	const struct option long_options[] = {
+		{"help", no_argument, 0, 'h'},
 		{"mount-dev", no_argument, 0, 'd'},
 		{"ambient", no_argument, 0, 128},
 		{"uts", optional_argument, 0, 129},
@@ -595,7 +596,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		default:
 			usage(argv[0]);
-			exit(1);
+			exit(opt == 'h' ? 0 : 1);
 		}
 	}
 
