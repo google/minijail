@@ -184,6 +184,13 @@ void minijail_mount_tmp(struct minijail *j);
 void minijail_mount_tmp_size(struct minijail *j, size_t size);
 
 /*
+ * minijail_mount_dev: enables mounting of a tmpfs filesystem on /dev.
+ * It will then be seeded with a basic set of device nodes.  For the exact
+ * list, consult the minijail(0) man page.
+ */
+void minijail_mount_dev(struct minijail *j);
+
+/*
  * minijail_mount_with_data: when entering minijail @j,
  *   mounts @src at @dst with @flags and @data.
  * @j         minijail to bind inside

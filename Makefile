@@ -31,12 +31,13 @@ ifeq ($(USE_EXIT_ON_DIE),yes)
 CPPFLAGS += -DUSE_EXIT_ON_DIE
 endif
 
-CFLAGS += -Wextra -Wno-missing-field-initializers
-CXXFLAGS += -Wextra -Wno-missing-field-initializers
+MJ_COMMON_FLAGS = -Wunused-parameter -Wextra -Wno-missing-field-initializers
+CFLAGS += $(MJ_COMMON_FLAGS)
+CXXFLAGS += $(MJ_COMMON_FLAGS)
 
 USE_SYSTEM_GTEST ?= no
 ifeq ($(USE_SYSTEM_GTEST),no)
-GTEST_CXXFLAGS := -std=gnu++11
+GTEST_CXXFLAGS := -std=gnu++14
 GTEST_LIBS := gtest.a
 else
 GTEST_CXXFLAGS := $(shell gtest-config --cxxflags)
