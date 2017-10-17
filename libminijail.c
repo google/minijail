@@ -77,7 +77,7 @@
 
 #define MAX_RLIMITS 32 /* Currently there are 15 supported by Linux. */
 
-#define MAX_PRESERVED_FDS 10
+#define MAX_PRESERVED_FDS 32U
 
 /* Keyctl commands. */
 #define KEYCTL_JOIN_SESSION_KEYRING 1
