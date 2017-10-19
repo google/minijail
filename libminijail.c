@@ -192,6 +192,21 @@ struct minijail {
 static void run_hooks_or_die(const struct minijail *j,
 			     minijail_hook_event_t event);
 
+static void free_mounts_list(struct minijail *j)
+{
+	while (j->mounts_head) {
+		struct mountpoint *m = j->mounts_head;
+		j->mounts_head = j->mounts_head->next;
+		free(m->data);
+		free(m->type);
+		free(m->dest);
+		free(m->src);
+		free(m);
+	}
+	// No need to clear mounts_head as we know it's NULL after the loop.
+	j->mounts_tail = NULL;
+}
+
 /*
  * Strip out flags meant for the parent.
  * We keep things that are not inherited across execve(2) (e.g. capabilities),
@@ -228,6 +243,7 @@ void minijail_preexec(struct minijail *j)
 	if (j->suppl_gid_list)
 		free(j->suppl_gid_list);
 	j->suppl_gid_list = NULL;
+	free_mounts_list(j);
 	memset(&j->flags, 0, sizeof(j->flags));
 	/* Now restore anything we meant to keep. */
 	j->flags.vfs = vfs;
@@ -1145,15 +1161,7 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 	return 0;
 
 bad_cgroups:
-	while (j->mounts_head) {
-		struct mountpoint *m = j->mounts_head;
-		j->mounts_head = j->mounts_head->next;
-		free(m->data);
-		free(m->type);
-		free(m->dest);
-		free(m->src);
-		free(m);
-	}
+	free_mounts_list(j);
 	for (i = 0; i < j->cgroup_count; ++i)
 		free(j->cgroups[i]);
 bad_mounts:
@@ -1356,7 +1364,7 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 		if (asprintf(&dest, "%s%s", dev_path, m->dest + 4) < 0)
 			return -ENOMEM;
 	} else {
-		if (asprintf(&dest, "%s%s", j->chrootdir, m->dest) < 0)
+		if (asprintf(&dest, "%s%s", j->chrootdir ?: "", m->dest) < 0)
 			return -ENOMEM;
 	}
 
@@ -1399,20 +1407,35 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 	return ret;
 }
 
-static int enter_chroot(const struct minijail *j, char *dev_path)
+static void process_mounts_or_die(const struct minijail *j)
 {
-	int ret;
+	/*
+	 * We have to mount /dev first in case there are bind mounts from
+	 * the original /dev into the new unique tmpfs one.
+	 */
+	char *dev_path = NULL;
+	if (j->flags.mount_dev && mount_dev(&dev_path))
+		pdie("mount_dev failed");
 
-	if (j->mounts_head && (ret = mount_one(j, j->mounts_head, dev_path)))
-		return ret;
+	if (j->mounts_head && mount_one(j, j->mounts_head, dev_path)) {
+		if (dev_path) {
+			int saved_errno = errno;
+			mount_dev_cleanup(dev_path);
+			errno = saved_errno;
+		}
+		pdie("mount_one failed");
+	}
 
 	/*
-	 * Once all bind mounts have been processed, but before we chroot,
-	 * move the temp dev to its final /dev home.
+	 * Once all bind mounts have been processed, move the temp dev to
+	 * its final /dev home.
 	 */
 	if (j->flags.mount_dev && mount_dev_finalize(j, dev_path))
-		return ret;
+		pdie("mount_dev_finalize failed");
+}
 
+static int enter_chroot(const struct minijail *j)
+{
 	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
 
 	if (chroot(j->chrootdir))
@@ -1424,19 +1447,9 @@ static int enter_chroot(const struct minijail *j, char *dev_path)
 	return 0;
 }
 
-static int enter_pivot_root(const struct minijail *j, char *dev_path)
+static int enter_pivot_root(const struct minijail *j)
 {
-	int ret, oldroot, newroot;
-
-	if (j->mounts_head && (ret = mount_one(j, j->mounts_head, dev_path)))
-		return ret;
-
-	/*
-	 * Once all bind mounts have been processed, but before we pivot,
-	 * move the temp dev to its final /dev home.
-	 */
-	if (j->flags.mount_dev && mount_dev_finalize(j, dev_path))
-		return ret;
+	int oldroot, newroot;
 
 	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
 
@@ -1970,33 +1983,14 @@ void API minijail_enter(const struct minijail *j)
 			pdie("keyctl(KEYCTL_JOIN_SESSION_KEYRING) failed");
 	}
 
-	/*
-	 * This has to come before the chroot/pivot_root in case there are
-	 * bind mounts from /dev into the chroot dev.
-	 */
-	char *dev_path = NULL;
-	if (j->flags.mount_dev && mount_dev(&dev_path))
-		pdie("mount_dev");
+	/* We have to process all the mounts before we chroot/pivot_root. */
+	process_mounts_or_die(j);
 
-	if (j->flags.chroot && enter_chroot(j, dev_path)) {
-		if (dev_path)
-			mount_dev_cleanup(dev_path);
+	if (j->flags.chroot && enter_chroot(j))
 		pdie("chroot");
-	}
 
-	if (j->flags.pivot_root && enter_pivot_root(j, dev_path)) {
-		if (dev_path)
-			mount_dev_cleanup(dev_path);
+	if (j->flags.pivot_root && enter_pivot_root(j))
 		pdie("pivot_root");
-	}
-
-	/*
-	 * If using a chroot or pivot root, we already finalized /dev at
-	 * the right point.  If not, we need to call it ourselves.
-	 */
-	if (j->flags.mount_dev && !j->flags.chroot && !j->flags.pivot_root &&
-	    mount_dev_finalize(j, dev_path))
-		pdie("mount_dev_finalize");
 
 	if (j->flags.mount_tmp && mount_tmp(j))
 		pdie("mount_tmp");
@@ -2862,16 +2856,7 @@ void API minijail_destroy(struct minijail *j)
 		free(j->filter_prog->filter);
 		free(j->filter_prog);
 	}
-	while (j->mounts_head) {
-		struct mountpoint *m = j->mounts_head;
-		j->mounts_head = j->mounts_head->next;
-		free(m->data);
-		free(m->type);
-		free(m->dest);
-		free(m->src);
-		free(m);
-	}
-	j->mounts_tail = NULL;
+	free_mounts_list(j);
 	while (j->hooks_head) {
 		struct hook *c = j->hooks_head;
 		j->hooks_head = c->next;
