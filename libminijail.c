@@ -2434,23 +2434,6 @@ static int minijail_run_internal(struct minijail *j,
 		}
 	}
 
-	/*
-	 * Make the process group ID of this process equal to its PID.
-	 * In the non-interactive case (e.g. when the parent process is started
-	 * from init) this ensures the parent process and the jailed process
-	 * can be killed together.
-	 * When the parent process is started from the console this ensures
-	 * the call to setsid(2) in the jailed process succeeds.
-	 *
-	 * Don't fail on EPERM, since setpgid(0, 0) can only EPERM when
-	 * the process is already a process group leader.
-	 */
-	if (setpgid(0 /* use calling PID */, 0 /* make PGID = PID */)) {
-		if (errno != EPERM) {
-			pdie("setpgid(0, 0) failed");
-		}
-	}
-
 	if (use_preload) {
 		/*
 		 * Before we fork(2) and execve(2) the child process, we need
@@ -2727,6 +2710,9 @@ static int minijail_run_internal(struct minijail *j,
 	 * This prevents the jailed process from using the TIOCSTI ioctl
 	 * to push characters into the parent process terminal's input buffer,
 	 * therefore escaping the jail.
+	 *
+	 * Since it has just forked, the child will not be a process group
+	 * leader, and this call to setsid() should always succeed.
 	 */
 	if (isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) ||
 	    isatty(STDERR_FILENO)) {
