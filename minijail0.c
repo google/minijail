@@ -4,6 +4,7 @@
  */
 
 #include <dlfcn.h>
+#include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -712,6 +713,22 @@ int main(int argc, char *argv[])
 	int consumed = parse_args(j, argc, argv, &exit_immediately, &elftype);
 	argc -= consumed;
 	argv += consumed;
+
+	/*
+	 * Make the process group ID of this process equal to its PID.
+	 * In the non-interactive case (e.g. when minijail0 is started from
+	 * init) this ensures the parent process and the jailed process
+	 * can be killed together.
+	 *
+	 * Don't fail on EPERM, since setpgid(0, 0) can only EPERM when
+	 * the process is already a process group leader.
+	 */
+	if (setpgid(0 /* use calling PID */, 0 /* make PGID = PID */)) {
+		if (errno != EPERM) {
+			fprintf(stderr, "setpgid(0, 0) failed\n");
+			exit(1);
+		}
+	}
 
 	if (elftype == ELFSTATIC) {
 		/*
