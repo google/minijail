@@ -256,7 +256,7 @@ static void usage(const char *progn)
 	       "  -P <dir>:     pivot_root(2) to <dir> (implies -v).\n"
 	       "                Not compatible with -C.\n"
 	       "  --mount-dev,  Create a new /dev with a minimal set of device nodes (implies -v).\n"
-	       "           -d:  See the minijail(0) man page for the exact set.\n"
+	       "           -d:  See the minijail0(1) man page for the exact set.\n"
 	       "  -e[file]:     Enter new network namespace, or existing one if |file| is provided.\n"
 	       "  -f <file>:    Write the pid of the jailed process to <file>.\n"
 	       "  -g <group>:   Change gid to <group>.\n"
