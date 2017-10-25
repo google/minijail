@@ -1372,7 +1372,7 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 				      (m->flags & MS_BIND));
 	if (ret) {
 		pwarn("creating mount target '%s' failed", dest);
-		return ret;
+		goto error;
 	}
 
 	/*
@@ -1388,7 +1388,7 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 	ret = mount(m->src, dest, m->type, m->flags, m->data);
 	if (ret) {
 		pwarn("mount: %s -> %s", m->src, dest);
-		return ret;
+		goto error;
 	}
 
 	if (remount_ro) {
@@ -1397,13 +1397,17 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 			    m->flags | MS_REMOUNT, m->data);
 		if (ret) {
 			pwarn("bind ro: %s -> %s", m->src, dest);
-			return ret;
+			goto error;
 		}
 	}
 
 	free(dest);
 	if (m->next)
 		return mount_one(j, m->next, dev_path);
+	return 0;
+
+error:
+	free(dest);
 	return ret;
 }
 
