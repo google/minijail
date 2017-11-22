@@ -3,6 +3,7 @@
  * found in the LICENSE file.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -646,6 +647,14 @@ int compile_file(const char *filename, FILE *policy_file,
 			}
 		}
 		/* Reuse |line| in the next getline() call. */
+	}
+	/* getline(3) returned -1. This can mean EOF or the below errors. */
+	if (errno == EINVAL || errno == ENOMEM) {
+		if (*arg_blocks) {
+			free_block_list(*arg_blocks);
+			*arg_blocks = NULL;
+		}
+		ret = -1;
 	}
 
 free_line:
