@@ -55,7 +55,8 @@ parse_seccomp_policy: CXX_BINARY(parse_seccomp_policy)
 
 tests: TEST(CXX_BINARY(libminijail_unittest)) \
 	TEST(CXX_BINARY(syscall_filter_unittest)) \
-	TEST(CXX_BINARY(system_unittest))
+	TEST(CXX_BINARY(system_unittest)) \
+	TEST(CXX_BINARY(util_unittest)) \
 
 
 CC_BINARY(minijail0): LDLIBS += -lcap -ldl
@@ -103,6 +104,16 @@ endif
 CXX_BINARY(system_unittest): system_unittest.o \
 		$(CORE_OBJECT_FILES) testrunner.o
 clean: CLEAN(system_unittest)
+
+
+CXX_BINARY(util_unittest): CXXFLAGS += $(GTEST_CXXFLAGS)
+CXX_BINARY(util_unittest): LDLIBS += -lcap $(GTEST_LIBS)
+ifeq ($(USE_SYSTEM_GTEST),no)
+CXX_BINARY(util_unittest): $(GTEST_LIBS)
+endif
+CXX_BINARY(util_unittest): util_unittest.o \
+		$(CORE_OBJECT_FILES) testrunner.o
+clean: CLEAN(util_unittest)
 
 
 CXX_BINARY(parse_seccomp_policy): parse_seccomp_policy.o syscall_filter.o \
