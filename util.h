@@ -83,6 +83,18 @@ long int parse_constant(char *constant_str, char **endptr);
 int parse_size(size_t *size, const char *sizespec);
 
 char *strip(char *s);
+
+/*
+ * tokenize: locate the next token in @stringp using the @delim
+ * @stringp A pointer to the string to scan for tokens
+ * @delim   The delimiter to split by
+ *
+ * Note that, unlike strtok, @delim is not a set of characters, but the full
+ * delimiter.  e.g. "a,;b,;c" with a delim of ",;" will yield ["a","b","c"].
+ *
+ * Note that, unlike strtok, this may return an empty token.  e.g. "a,,b" with
+ * strtok will yield ["a","b"], but this will yield ["a","","b"].
+ */
 char *tokenize(char **stringp, const char *delim);
 
 char *path_join(const char *external_path, const char *internal_path);

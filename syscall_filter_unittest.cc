@@ -1261,6 +1261,19 @@ TEST(FilterTest, invalid_arg) {
   ASSERT_NE(res, 0);
 }
 
+TEST(FilterTest, invalid_tokens) {
+  struct sock_fprog actual;
+  const char *policy = "read: arg0 == 1 |||| arg0 == 2\n";
+
+  FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
+  ASSERT_NE(policy_file, nullptr);
+
+  int res =
+      compile_filter("policy", policy_file, &actual, USE_RET_KILL, NO_LOGGING);
+  fclose(policy_file);
+  ASSERT_NE(res, 0);
+}
+
 TEST(FilterTest, nonexistent) {
   struct sock_fprog actual;
   int res = compile_filter("policy", NULL, &actual, USE_RET_KILL, NO_LOGGING);
