@@ -12,6 +12,7 @@
 /minijail0
 /syscall_filter_unittest
 /system_unittest
+/util_unittest
 /parse_seccomp_policy
 
 # common.mk TEST().
