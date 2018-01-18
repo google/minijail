@@ -257,8 +257,8 @@ char *tokenize(char **stringp, const char *delim)
 {
 	char *ret = NULL;
 
-	/* If the string is NULL or empty, there are no tokens to be found. */
-	if (stringp == NULL || *stringp == NULL || **stringp == '\0')
+	/* If the string is NULL, there are no tokens to be found. */
+	if (stringp == NULL || *stringp == NULL)
 		return NULL;
 
 	/*
@@ -271,33 +271,19 @@ char *tokenize(char **stringp, const char *delim)
 		return ret;
 	}
 
-	char *found;
-	while (**stringp != '\0') {
-		found = strstr(*stringp, delim);
-
-		if (!found) {
-			/*
-			 * The delimiter was not found, so the full string
-			 * makes up the only token, and we're done.
-			 */
-			ret = *stringp;
-			*stringp = NULL;
-			break;
-		}
-
-		if (found != *stringp) {
-			/* There's a non-empty token before the delimiter. */
-			*found = '\0';
-			ret = *stringp;
-			*stringp = found + strlen(delim);
-			break;
-		}
-
+	char *found = strstr(*stringp, delim);
+	if (!found) {
 		/*
-		 * The delimiter was found at the start of the string,
-		 * skip it and keep looking for a non-empty token.
+		 * The delimiter was not found, so the full string
+		 * makes up the only token, and we're done.
 		 */
-		*stringp += strlen(delim);
+		ret = *stringp;
+		*stringp = NULL;
+	} else {
+		/* There's a token here, possibly empty.  That's OK. */
+		*found = '\0';
+		ret = *stringp;
+		*stringp = found + strlen(delim);
 	}
 
 	return ret;
