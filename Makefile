@@ -60,7 +60,8 @@ tests: TEST(CXX_BINARY(libminijail_unittest)) \
 
 
 CC_BINARY(minijail0): LDLIBS += -lcap -ldl
-CC_BINARY(minijail0): $(CORE_OBJECT_FILES) elfparse.o minijail0.o
+CC_BINARY(minijail0): $(CORE_OBJECT_FILES) \
+	elfparse.o minijail0.o minijail0_cli.o
 clean: CLEAN(minijail0)
 
 
