@@ -3,6 +3,13 @@
  * found in the LICENSE file.
  */
 
+#include <elf.h>
+#include <endian.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 #include "elfparse.h"
 
 int is_elf_magic (const uint8_t *buf)

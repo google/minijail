@@ -9,13 +9,7 @@
 #ifndef _ELFPARSE_H_
 #define _ELFPARSE_H_
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <elf.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <endian.h>
-#include <string.h>
 
 /*
  * These structs come from elf.h
