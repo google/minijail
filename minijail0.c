@@ -92,14 +92,18 @@ static void use_caps(struct minijail *j, const char *arg)
 
 static void add_binding(struct minijail *j, char *arg)
 {
-	char *src = strtok(arg, ",");
-	char *dest = strtok(NULL, ",");
-	char *flags = strtok(NULL, ",");
-	if (!src || !dest) {
+	char *src = tokenize(&arg, ",");
+	char *dest = tokenize(&arg, ",");
+	char *flags = tokenize(&arg, ",");
+	if (!src || src[0] == '\0' || arg != NULL) {
 		fprintf(stderr, "Bad binding: %s %s\n", src, dest);
 		exit(1);
 	}
-	if (minijail_bind(j, src, dest, flags ? atoi(flags) : 0)) {
+	if (dest == NULL || dest[0] == '\0')
+		dest = src;
+	if (flags == NULL || flags[0] == '\0')
+		flags = "0";
+	if (minijail_bind(j, src, dest, atoi(flags))) {
 		fprintf(stderr, "minijail_bind failed.\n");
 		exit(1);
 	}
@@ -107,10 +111,11 @@ static void add_binding(struct minijail *j, char *arg)
 
 static void add_rlimit(struct minijail *j, char *arg)
 {
-	char *type = strtok(arg, ",");
-	char *cur = strtok(NULL, ",");
-	char *max = strtok(NULL, ",");
-	if (!type || !cur || !max) {
+	char *type = tokenize(&arg, ",");
+	char *cur = tokenize(&arg, ",");
+	char *max = tokenize(&arg, ",");
+	if (!type || type[0] == '\0' || !cur || cur[0] == '\0' ||
+	    !max || max[0] == '\0' || arg != NULL) {
 		fprintf(stderr, "Bad rlimit '%s'.\n", arg);
 		exit(1);
 	}
@@ -123,12 +128,13 @@ static void add_rlimit(struct minijail *j, char *arg)
 
 static void add_mount(struct minijail *j, char *arg)
 {
-	char *src = strtok(arg, ",");
-	char *dest = strtok(NULL, ",");
-	char *type = strtok(NULL, ",");
-	char *flags = strtok(NULL, ",");
-	char *data = strtok(NULL, ",");
-	if (!src || !dest || !type) {
+	char *src = tokenize(&arg, ",");
+	char *dest = tokenize(&arg, ",");
+	char *type = tokenize(&arg, ",");
+	char *flags = tokenize(&arg, ",");
+	char *data = tokenize(&arg, ",");
+	if (!src || src[0] == '\0' || !dest || dest[0] == '\0' ||
+	    !type || type[0] == '\0' || arg != NULL) {
 		fprintf(stderr, "Bad mount: %s %s %s\n", src, dest, type);
 		exit(1);
 	}
@@ -294,7 +300,7 @@ static void usage(const char *progn)
 	/* clang-format off */
 	printf("Usage: %s [-dGhHiIKlLnNprRstUvyYz]\n"
 	       "  [-a <table>]\n"
-	       "  [-b <src>,<dest>[,<writeable>]] [-k <src>,<dest>,<type>[,<flags>][,<data>]]\n"
+	       "  [-b <src>[,<dest>[,<writeable>]]] [-k <src>,<dest>,<type>[,<flags>[,<data>]]]\n"
 	       "  [-c <caps>] [-C <dir>] [-P <dir>] [-e[file]] [-f <file>] [-g <group>]\n"
 	       "  [-m[<uid> <loweruid> <count>]*] [-M[<gid> <lowergid> <count>]*] [--profile <name>]\n"
 	       "  [-R <type,cur,max>] [-S <file>] [-t[size]] [-T <type>] [-u <user>] [-V <file>]\n"

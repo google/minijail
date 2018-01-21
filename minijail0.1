@@ -12,9 +12,10 @@ Runs PROGRAM inside a sandbox.
 Run using the alternate syscall table named \fItable\fR. Only available on kernels
 and architectures that support the \fBPR_ALT_SYSCALL\fR option of \fBprctl\fR(2).
 .TP
-\fB-b <src>,<dest>[,<writeable>]
+\fB-b <src>[,<dest>[,<writeable>]]
 Bind-mount \fIsrc\fR into the chroot directory at \fIdest\fR, optionally writeable.
 The \fIsrc\fR path must be an absolute path.
+If \fIdest\fR is not specified, it will default to \fIsrc\fR.
 If the destination does not exist, it will be created as a file or directory
 based on the \fIsrc\fR type.
 .TP
@@ -58,13 +59,14 @@ Print a help message.
 \fB-H\fR
 Print a help message detailing supported system call names for seccomp_filter.
 (Other direct numbers may be specified if minijail0 is not in sync with the
- host kernel or something like 32/64-bit compatibility issues exist.)
+host kernel or something like 32/64-bit compatibility issues exist.)
 .TP
 \fB-I\fR
 Run \fIprogram\fR as init (pid 1) inside a new pid namespace (implies \fB-p\fR).
 .TP
-\fB-k <src>,<dest>,<type>[,<flags>]\fR
-Mount \fIsrc\fR, a \fItype\fR filesystem, into the chroot directory at \fIdest\fR, with optional \fIflags\fR.
+\fB-k <src>,<dest>,<type>[,<flags>[,<data>]]\fR
+Mount \fIsrc\fR, a \fItype\fR filesystem, into the chroot directory at \fIdest\fR,
+with optional \fIflags\fR and optional \fIdata\fR (see \fBmount\fR(2)).
 If the mount is not a pseudo filesystem (e.g. proc or sysfs), \fIsrc\fR path
 must be an absolute path (e.g. \fI/dev/sda1\fR and not \fIsda1\fR).
 If the destination does not exist, it will be created as a directory.
