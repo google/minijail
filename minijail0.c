@@ -567,7 +567,7 @@ static int parse_args(struct minijail *j, int argc, char *argv[],
 			break;
 		case 'H':
 			seccomp_filter_usage(argv[0]);
-			exit(1);
+			exit(0);
 		case 'I':
 			minijail_namespace_pids(j);
 			minijail_run_as_init(j);
