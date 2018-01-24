@@ -25,7 +25,7 @@ ElfType parseElf ## bit(FILE *elf_file, uint8_t *pHead, int little_endian)   \
 {                                                                            \
 	ElfType                      ret          = ELFSTATIC;               \
 	Minijail_Elf ## bit ## _Ehdr *pHeader     = NULL;                    \
-	Minijail_Elf ## bit ## _Phdr pheader      = { 0 };                   \
+	Minijail_Elf ## bit ## _Phdr pheader;                                \
 	uint32_t                     i            = 0;                       \
 	                                                                     \
 	if (!elf_file || !pHead)                                             \
