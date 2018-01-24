@@ -65,10 +65,22 @@ host kernel or something like 32/64-bit compatibility issues exist.)
 Run \fIprogram\fR as init (pid 1) inside a new pid namespace (implies \fB-p\fR).
 .TP
 \fB-k <src>,<dest>,<type>[,<flags>[,<data>]]\fR
-Mount \fIsrc\fR, a \fItype\fR filesystem, into the chroot directory at \fIdest\fR,
-with optional \fIflags\fR and optional \fIdata\fR (see \fBmount\fR(2)).
+Mount \fIsrc\fR, a \fItype\fR filesystem, at \fIdest\fR.  If a chroot or pivot
+root is active, \fIdest\fR will automatically be placed below that path.
+
+The \fIflags\fR field is optional and is a hex constant.  These represent the
+\fIMS_XXX\fR settings (see \fBmount\fR(2) for details).  Their values can be
+looked up in the sys/mount.h header file.  \fI0xe\fR is a common value here
+(a writable mount with nodev/nosuid/noexec bits set), and it is strongly
+recommended that all mounts have these three bits set whenever possible.
+
+The \fIdata\fR field is optional and is a comma delimited string (see
+\fBmount\fR(2) for details).  It is passed directly to the kernel, so all
+fields here are filesystem specific.
+
 If the mount is not a pseudo filesystem (e.g. proc or sysfs), \fIsrc\fR path
 must be an absolute path (e.g. \fI/dev/sda1\fR and not \fIsda1\fR).
+
 If the destination does not exist, it will be created as a directory.
 .TP
 \fB-K\fR

@@ -391,6 +391,10 @@ TEST_F(CliTest, valid_mount) {
   // Flags are optional.
   argv[2] = "none,/,none,,mode=755";
   ASSERT_TRUE(parse_args_(argv));
+
+  // Multiple data options to the kernel.
+  argv[2] = "none,/,none,0xe,mode=755,uid=0,gid=10";
+  ASSERT_TRUE(parse_args_(argv));
 }
 
 // Invalid calls to the mount option.
