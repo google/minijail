@@ -3,6 +3,13 @@
  * found in the LICENSE file.
  */
 
+#include <elf.h>
+#include <endian.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 #include "elfparse.h"
 
 int is_elf_magic (const uint8_t *buf)
@@ -18,7 +25,7 @@ ElfType parseElf ## bit(FILE *elf_file, uint8_t *pHead, int little_endian)   \
 {                                                                            \
 	ElfType                      ret          = ELFSTATIC;               \
 	Minijail_Elf ## bit ## _Ehdr *pHeader     = NULL;                    \
-	Minijail_Elf ## bit ## _Phdr pheader      = { 0 };                   \
+	Minijail_Elf ## bit ## _Phdr pheader;                                \
 	uint32_t                     i            = 0;                       \
 	                                                                     \
 	if (!elf_file || !pHead)                                             \

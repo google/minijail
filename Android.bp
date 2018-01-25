@@ -312,6 +312,7 @@ cc_binary {
     srcs: [
         "elfparse.c",
         "minijail0.c",
+        "minijail0_cli.c",
     ],
 
     static_libs: ["libminijail_generated"],
