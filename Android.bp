@@ -210,13 +210,13 @@ cc_test {
 // System functionality unit tests using gtest.
 //
 // For a device, run with:
-// adb shell /data/nativetest/system_unittest_gtest/system_unittest_gtest
+// adb shell /data/nativetest/mj_system_unittest_gtest/mj_system_unittest_gtest
 //
 // For host, run with:
-// out/host/linux-x86/nativetest(64)/system_unittest_gtest/system_unittest_gtest
+// out/host/linux-x86/nativetest(64)/mj_system_unittest_gtest/mj_system_unittest_gtest
 // =========================================================
 cc_test {
-    name: "system_unittest_gtest",
+    name: "mj_system_unittest_gtest",
     defaults: ["libminijail_flags"],
     host_supported: true,
 
@@ -239,13 +239,13 @@ cc_test {
 // Utility functionality unit tests using gtest.
 //
 // For a device, run with:
-// adb shell /data/nativetest/util_unittest_gtest/util_unittest_gtest
+// adb shell /data/nativetest/mj_util_unittest_gtest/mj_util_unittest_gtest
 //
 // For host, run with:
-// out/host/linux-x86/nativetest(64)/util_unittest_gtest/util_unittest_gtest
+// out/host/linux-x86/nativetest(64)/mj_util_unittest_gtest/mj_util_unittest_gtest
 // =========================================================
 cc_test {
-    name: "util_unittest_gtest",
+    name: "mj_util_unittest_gtest",
     defaults: ["libminijail_flags"],
     host_supported: true,
 
