@@ -54,6 +54,7 @@ all: CC_BINARY(minijail0) CC_LIBRARY(libminijail.so) \
 parse_seccomp_policy: CXX_BINARY(parse_seccomp_policy)
 
 tests: TEST(CXX_BINARY(libminijail_unittest)) \
+	TEST(CXX_BINARY(minijail0_cli_unittest)) \
 	TEST(CXX_BINARY(syscall_filter_unittest)) \
 	TEST(CXX_BINARY(system_unittest)) \
 	TEST(CXX_BINARY(util_unittest)) \
@@ -84,6 +85,16 @@ clean: CLEAN(libminijail_unittest)
 CC_LIBRARY(libminijailpreload.so): LDLIBS += -lcap -ldl
 CC_LIBRARY(libminijailpreload.so): libminijailpreload.o $(CORE_OBJECT_FILES)
 clean: CLEAN(libminijailpreload.so)
+
+
+CXX_BINARY(minijail0_cli_unittest): CXXFLAGS += $(GTEST_CXXFLAGS)
+CXX_BINARY(minijail0_cli_unittest): LDLIBS += -lcap $(GTEST_LIBS)
+ifeq ($(USE_SYSTEM_GTEST),no)
+CXX_BINARY(minijail0_cli_unittest): $(GTEST_LIBS)
+endif
+CXX_BINARY(minijail0_cli_unittest): minijail0_cli_unittest.o \
+		$(CORE_OBJECT_FILES) minijail0_cli.o elfparse.o testrunner.o
+clean: CLEAN(minijail0_cli_unittest)
 
 
 CXX_BINARY(syscall_filter_unittest): CXXFLAGS += -Wno-write-strings \
