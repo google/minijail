@@ -306,7 +306,6 @@ cc_binary {
     defaults: ["libminijail_flags"],
 
     cflags: [
-        "-Wno-missing-field-initializers",
         "-DPRELOADPATH=\"/invalidminijailpreload.so\"",
     ],
     srcs: [
