@@ -264,6 +264,38 @@ cc_test {
     },
 }
 
+// Utility functionality unit tests using gtest.
+//
+// For a device, run with:
+// adb shell /data/nativetest/minijail0_cli_unittest_gtest/minijail0_cli_unittest_gtest
+//
+// For host, run with:
+// out/host/linux-x86/nativetest(64)/minijail0_cli_unittest_gtest/minijail0_cli_unittest_gtest
+// =========================================================
+cc_test {
+    name: "minijail0_cli_unittest_gtest",
+    defaults: ["libminijail_flags"],
+    host_supported: true,
+
+    cflags: [
+        "-DPRELOADPATH=\"/invalid\"",
+    ],
+    srcs: libminijailSrcFiles + [
+        "elfparse.c",
+        "minijail0_cli.c",
+        "minijail0_cli_unittest.cc",
+    ] + unittestSrcFiles,
+
+    static_libs: ["libminijail_generated"],
+    shared_libs: minijailCommonLibraries,
+
+    target: {
+        android: {
+            test_suites: ["device-tests"],
+        },
+    },
+}
+
 // libminijail_test executable for brillo_Minijail test.
 // =========================================================
 cc_test {
