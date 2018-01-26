@@ -272,6 +272,8 @@ static void use_pivot_root(struct minijail *j, const char *path,
 static void use_profile(struct minijail *j, const char *profile,
 			int *pivot_root, int chroot, size_t *tmp_size)
 {
+	/* Note: New profiles should be added in minijail0_cli_unittest.cc. */
+
 	if (!strcmp(profile, "minimalistic-mountns")) {
 		minijail_namespace_vfs(j);
 		if (minijail_bind(j, "/", "/", 0)) {
