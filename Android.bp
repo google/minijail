@@ -210,13 +210,13 @@ cc_test {
 // System functionality unit tests using gtest.
 //
 // For a device, run with:
-// adb shell /data/nativetest/system_unittest_gtest/system_unittest_gtest
+// adb shell /data/nativetest/mj_system_unittest_gtest/mj_system_unittest_gtest
 //
 // For host, run with:
-// out/host/linux-x86/nativetest(64)/system_unittest_gtest/system_unittest_gtest
+// out/host/linux-x86/nativetest(64)/mj_system_unittest_gtest/mj_system_unittest_gtest
 // =========================================================
 cc_test {
-    name: "system_unittest_gtest",
+    name: "mj_system_unittest_gtest",
     defaults: ["libminijail_flags"],
     host_supported: true,
 
@@ -239,19 +239,51 @@ cc_test {
 // Utility functionality unit tests using gtest.
 //
 // For a device, run with:
-// adb shell /data/nativetest/util_unittest_gtest/util_unittest_gtest
+// adb shell /data/nativetest/mj_util_unittest_gtest/mj_util_unittest_gtest
 //
 // For host, run with:
-// out/host/linux-x86/nativetest(64)/util_unittest_gtest/util_unittest_gtest
+// out/host/linux-x86/nativetest(64)/mj_util_unittest_gtest/mj_util_unittest_gtest
 // =========================================================
 cc_test {
-    name: "util_unittest_gtest",
+    name: "mj_util_unittest_gtest",
     defaults: ["libminijail_flags"],
     host_supported: true,
 
     srcs: [
         "util.c",
         "util_unittest.cc",
+    ] + unittestSrcFiles,
+
+    static_libs: ["libminijail_generated"],
+    shared_libs: minijailCommonLibraries,
+
+    target: {
+        android: {
+            test_suites: ["device-tests"],
+        },
+    },
+}
+
+// Utility functionality unit tests using gtest.
+//
+// For a device, run with:
+// adb shell /data/nativetest/minijail0_cli_unittest_gtest/minijail0_cli_unittest_gtest
+//
+// For host, run with:
+// out/host/linux-x86/nativetest(64)/minijail0_cli_unittest_gtest/minijail0_cli_unittest_gtest
+// =========================================================
+cc_test {
+    name: "minijail0_cli_unittest_gtest",
+    defaults: ["libminijail_flags"],
+    host_supported: true,
+
+    cflags: [
+        "-DPRELOADPATH=\"/invalid\"",
+    ],
+    srcs: libminijailSrcFiles + [
+        "elfparse.c",
+        "minijail0_cli.c",
+        "minijail0_cli_unittest.cc",
     ] + unittestSrcFiles,
 
     static_libs: ["libminijail_generated"],
@@ -306,7 +338,6 @@ cc_binary {
     defaults: ["libminijail_flags"],
 
     cflags: [
-        "-Wno-missing-field-initializers",
         "-DPRELOADPATH=\"/invalidminijailpreload.so\"",
     ],
     srcs: [
