@@ -115,12 +115,35 @@ static void add_rlimit(struct minijail *j, char *arg)
 	char *type = tokenize(&arg, ",");
 	char *cur = tokenize(&arg, ",");
 	char *max = tokenize(&arg, ",");
+	char *end;
 	if (!type || type[0] == '\0' || !cur || cur[0] == '\0' ||
 	    !max || max[0] == '\0' || arg != NULL) {
 		fprintf(stderr, "Bad rlimit '%s'.\n", arg);
 		exit(1);
 	}
-	if (minijail_rlimit(j, atoi(type), atoi(cur), atoi(max))) {
+	rlim_t cur_rlim;
+	rlim_t max_rlim;
+	if (!strcmp(cur, "unlimited")) {
+		cur_rlim = RLIM_INFINITY;
+	} else {
+		end = NULL;
+		cur_rlim = strtoul(cur, &end, 10);
+		if (*end) {
+			fprintf(stderr, "Bad soft limit: '%s'.\n", cur);
+			exit(1);
+		}
+	}
+	if (!strcmp(max, "unlimited")) {
+		max_rlim = RLIM_INFINITY;
+	} else {
+		end = NULL;
+		max_rlim = strtoul(max, &end, 10);
+		if (*end) {
+			fprintf(stderr, "Bad hard limit: '%s'.\n", max);
+			exit(1);
+		}
+	}
+	if (minijail_rlimit(j, atoi(type), cur_rlim, max_rlim)) {
 		fprintf(stderr, "minijail_rlimit '%s,%s,%s' failed.\n", type,
 			cur, max);
 		exit(1);
