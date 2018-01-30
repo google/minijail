@@ -215,6 +215,12 @@ TEST_F(CliTest, valid_rlimit) {
 
   argv[1] = "0,1,2";
   ASSERT_TRUE(parse_args_(argv));
+
+  argv[1] = "1,1,unlimited";
+  ASSERT_TRUE(parse_args_(argv));
+
+  argv[1] = "2,unlimited,2";
+  ASSERT_TRUE(parse_args_(argv));
 }
 
 // Invalid calls to the rlimit option.
@@ -234,8 +240,12 @@ TEST_F(CliTest, invalid_rlimit) {
   argv[1] = "0,0,0,0";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 
-  // TODO: We probably should reject non-numbers, but the current CLI ignores
-  // them and converts them to zeros.  Oops.
+  // Non-numeric limits
+  argv[1] = "0,0,invalid-limit";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  argv[1] = "0,0,0j";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
 
 // Valid calls to the profile option.
