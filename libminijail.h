@@ -16,6 +16,7 @@
 #define _LIBMINIJAIL_H_
 
 #include <stdint.h>
+#include <sys/resource.h>
 #include <sys/types.h>
 
 #ifdef __cplusplus
@@ -128,7 +129,7 @@ void minijail_inherit_usergroups(struct minijail *j);
 int minijail_use_alt_syscall(struct minijail *j, const char *table);
 
 /* Sets the given runtime limit. See getrlimit(2). */
-int minijail_rlimit(struct minijail *j, int type, uint32_t cur, uint32_t max);
+int minijail_rlimit(struct minijail *j, int type, rlim_t cur, rlim_t max);
 
 /*
  * Adds the jailed process to the cgroup given by |path|.  |path| should be the
