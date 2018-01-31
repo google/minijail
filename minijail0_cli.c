@@ -158,10 +158,25 @@ static void add_mount(struct minijail *j, char *arg)
 	char *flags = tokenize(&arg, ",");
 	char *data = tokenize(&arg, ",");
 	if (!src || src[0] == '\0' || !dest || dest[0] == '\0' ||
-	    !type || type[0] == '\0' || arg != NULL) {
+	    !type || type[0] == '\0') {
 		fprintf(stderr, "Bad mount: %s %s %s\n", src, dest, type);
 		exit(1);
 	}
+
+	/*
+	 * Fun edge case: the data option itself is comma delimited.  If there
+	 * were no more options, then arg would be set to NULL.  But if we had
+	 * more pending, it'll be pointing to the next token.  Back up and undo
+	 * the null byte so it'll be merged back.
+	 * An example:
+	 *   none,/tmp,tmpfs,0xe,mode=0755,uid=10,gid=10
+	 * The tokenize calls above will turn this memory into:
+	 *   none\0/tmp\0tmpfs\00xe\0mode=0755\0uid=10,gid=10
+	 * With data pointing at mode=0755 and arg pointing at uid=10,gid=10.
+	 */
+	if (arg != NULL)
+		arg[-1] = ',';
+
 	if (minijail_mount_with_data(j, src, dest, type,
 				     flags ? strtoul(flags, NULL, 16) : 0,
 				     data)) {
