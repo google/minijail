@@ -42,8 +42,10 @@ class CliTest : public ::testing::Test {
   // as it parses things (which is normally permissible with argv).
   int parse_args_(const std::vector<std::string>& argv, int *exit_immediately,
                   ElfType *elftype) {
-    // Make sure we reset the getopts state when scanning a new argv.
-    optind = 1;
+    // Make sure we reset the getopts state when scanning a new argv.  Setting
+    // this to 0 is a GNU extension, but AOSP/BSD also checks this (as an alias
+    // to their "optreset").
+    optind = 0;
 
     std::vector<const char *> pargv;
     pargv.push_back("minijail0");
