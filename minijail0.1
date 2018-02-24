@@ -17,7 +17,7 @@ Bind-mount \fIsrc\fR into the chroot directory at \fIdest\fR, optionally writeab
 The \fIsrc\fR path must be an absolute path.
 If \fIdest\fR is not specified, it will default to \fIsrc\fR.
 If the destination does not exist, it will be created as a file or directory
-based on the \fIsrc\fR type.
+based on the \fIsrc\fR type (including missing parent directories).
 .TP
 \fB-c <caps>\fR
 Restrict capabilities to \fIcaps\fR. When used in conjunction with \fB-u\fR and
@@ -81,7 +81,8 @@ fields here are filesystem specific.
 If the mount is not a pseudo filesystem (e.g. proc or sysfs), \fIsrc\fR path
 must be an absolute path (e.g. \fI/dev/sda1\fR and not \fIsda1\fR).
 
-If the destination does not exist, it will be created as a directory.
+If the destination does not exist, it will be created as a directory (including
+missing parent directories).
 .TP
 \fB-K\fR
 Don't mark all existing mounts as MS_PRIVATE.
