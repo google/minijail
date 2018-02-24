@@ -51,6 +51,8 @@ int setup_and_dupe_pipe_end(int fds[2], size_t index, int fd);
 int write_pid_to_path(pid_t pid, const char *path);
 int write_proc_file(pid_t pid, const char *content, const char *basename);
 
+int mkdir_p(const char *path, mode_t mode, bool isdir);
+
 int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 			    uid_t gid, bool bind);
 
