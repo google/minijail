@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/capability.h>
+#include <sys/mount.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -335,6 +336,24 @@ static void use_profile(struct minijail *j, const char *profile,
 	}
 }
 
+static void set_remount_mode(struct minijail *j, const char *mode)
+{
+	unsigned long msmode;
+	if (!strcmp(mode, "shared"))
+		msmode = MS_SHARED;
+	else if (!strcmp(mode, "private"))
+		msmode = MS_PRIVATE;
+	else if (!strcmp(mode, "slave"))
+		msmode = MS_SLAVE;
+	else if (!strcmp(mode, "unbindable"))
+		msmode = MS_UNBINDABLE;
+	else {
+		fprintf(stderr, "Unknown remount mode: '%s'\n", mode);
+		exit(1);
+	}
+	minijail_remount_mode(j, msmode);
+}
+
 static void usage(const char *progn)
 {
 	size_t i;
@@ -373,7 +392,8 @@ static void usage(const char *progn)
 	       "  -H:           Seccomp filter help message.\n"
 	       "  -i:           Exit immediately after fork (do not act as init).\n"
 	       "  -I:           Run <program> as init (pid 1) inside a new pid namespace (implies -p).\n"
-	       "  -K:           Don't mark all existing mounts as MS_PRIVATE.\n"
+	       "  -K:           Do not change share mode of any existing mounts.\n"
+	       "  -K<mode>:     Mark all existing mounts as <mode> instead of MS_PRIVATE.\n"
 	       "  -l:           Enter new IPC namespace.\n"
 	       "  -L:           Report blocked syscalls to syslog when using seccomp filter.\n"
 	       "                Forces the following syscalls to be allowed:\n"
@@ -457,7 +477,7 @@ int parse_args(struct minijail *j, int argc, char * const argv[],
 	int log_to_stderr = 0;
 
 	const char *optstring =
-	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUKwyYzd";
+	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUK::wyYzd";
 	/* clang-format off */
 	const struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
@@ -535,7 +555,10 @@ int parse_args(struct minijail *j, int argc, char * const argv[],
 			add_mount(j, optarg);
 			break;
 		case 'K':
-			minijail_skip_remount_private(j);
+			if (optarg)
+				set_remount_mode(j, optarg);
+			else
+				minijail_skip_remount_private(j);
 			skip_remount = 1;
 			break;
 		case 'P':

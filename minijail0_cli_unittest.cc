@@ -415,3 +415,34 @@ TEST_F(CliTest, invalid_mount) {
   argv[2] = "none,/";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
+
+// Valid calls to the remount mode option.
+TEST_F(CliTest, valid_remount_mode) {
+  std::vector<std::string> argv = {"-v", "", "/bin/sh"};
+
+  // Mode is optional.
+  argv[1] = "-K";
+  ASSERT_TRUE(parse_args_(argv));
+
+  // This should list all valid modes.
+  const std::vector<std::string> modes = {
+    "shared",
+    "private",
+    "slave",
+    "unbindable",
+  };
+
+  for (const auto& mode : modes) {
+    argv[1] = "-K" + mode;
+    ASSERT_TRUE(parse_args_(argv));
+  }
+}
+
+// Invalid calls to the remount mode option.
+TEST_F(CliTest, invalid_remount_mode) {
+  std::vector<std::string> argv = {"-v", "", "/bin/sh"};
+
+  // Unknown mode.
+  argv[1] = "-Kfoo";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+}
