@@ -84,10 +84,28 @@ must be an absolute path (e.g. \fI/dev/sda1\fR and not \fIsda1\fR).
 If the destination does not exist, it will be created as a directory (including
 missing parent directories).
 .TP
-\fB-K\fR
+\fB-K[mode]\fR
 Don't mark all existing mounts as MS_PRIVATE.
 This option is \fBdangerous\fR as it negates most of the functionality of \fB-v\fR.
 You very likely don't need this.
+
+You may specify a mount propagation mode in which case, that will be used
+instead of the default MS_PRIVATE.  See the \fBmount\fR(2) man page and the
+kernel docs \fIDocumentation/filesystems/sharedsubtree.txt\fR for more
+technical details, but a brief guide:
+
+.IP
+\[bu] \fBslave\fR Changes in the parent mount namespace will propagate in, but
+changes in this mount namespace will not propagate back out.  This is usually
+what people want to use.
+.IP
+\[bu] \fBprivate\fR No changes in either mount namespace will propagate.
+This is the default behavior if you don't specify \fB-K\fR.
+.IP
+\[bu] \fBshared\fR Changes in the parent and this mount namespace will freely
+propagate back and forth.  This is not recommended.
+.IP
+\[bu] \fBunbindable\fR Mark all mounts as unbindable.
 .TP
 \fB-l\fR
 Run inside a new IPC namespace. This option makes the program's System V IPC

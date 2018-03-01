@@ -101,6 +101,7 @@ void minijail_skip_setting_securebits(struct minijail *j,
  * minijail_namespace_vfs(). You very likely don't need this.
  */
 void minijail_skip_remount_private(struct minijail *j);
+void minijail_remount_mode(struct minijail *j, unsigned long mode);
 void minijail_namespace_ipc(struct minijail *j);
 void minijail_namespace_uts(struct minijail *j);
 int minijail_namespace_set_hostname(struct minijail *j, const char *name);
