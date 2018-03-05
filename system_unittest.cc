@@ -5,6 +5,7 @@
  * Test system.[ch] module code using gtest.
  */
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -200,6 +201,8 @@ TEST(setup_mount_destination, create_pseudo_fs) {
   EXPECT_EQ(0, setup_mount_destination("none", path, -1, -1, false));
   // We check it's a directory by deleting it as such.
   EXPECT_EQ(0, rmdir(path));
+  // Confirm that a bad uid/gid fails the function as expected.
+  EXPECT_NE(0, setup_mount_destination("none", path, UINT_MAX / 2, UINT_MAX / 2, false));
 
   free(path);
 }
