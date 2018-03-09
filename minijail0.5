@@ -66,10 +66,11 @@ geteuid versus geteuid32.  On process death due to a seccomp filter
 rule, the offending system call number will be supplied with a best
 guess of the ABI defined name.  This information may be used to produce
 working baseline policies.  However, if the process being contained has
-a fairly tight working domain, using \fBstrace -e raw=all <program>\fR
-can generate the list of system calls that are needed. Note that when
-using libminijail or minijail with preloading, supporting initial
-process setup calls will not be required.  Be conservative.
+a fairly tight working domain, using \fBtools/generate_seccomp_policy.py\fR
+with the output of \fBstrace -f -e raw=all <program>\fR can generate the list
+of system calls that are needed.  Note that when using libminijail or minijail
+with preloading, supporting initial process setup calls will not be required.
+Be conservative.
 
 It's also possible to analyze the binary checking for all non-dead
 functions and determining if any of them issue system calls.  There is
