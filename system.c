@@ -221,17 +221,23 @@ int write_pid_to_path(pid_t pid, const char *path)
  */
 int mkdir_p(const char *path, mode_t mode, bool isdir)
 {
+	int rc;
 	char *dir = strdup(path);
-	if (!dir)
-		return -errno;
+	if (!dir) {
+		rc = errno;
+		pwarn("strdup(%s) failed", path);
+		return -rc;
+	}
 
 	/* Starting from the root, work our way out to the end. */
 	char *p = strchr(dir + 1, '/');
 	while (p) {
 		*p = '\0';
 		if (mkdir(dir, mode) && errno != EEXIST) {
+			rc = errno;
+			pwarn("mkdir(%s, 0%o) failed", dir, mode);
 			free(dir);
-			return -errno;
+			return -rc;
 		}
 		*p = '/';
 		p = strchr(p + 1, '/');
@@ -242,8 +248,11 @@ int mkdir_p(const char *path, mode_t mode, bool isdir)
 	 * of trailing slashes.
 	 */
 	free(dir);
-	if (isdir && mkdir(path, mode) && errno != EEXIST)
-		return -errno;
+	if (isdir && mkdir(path, mode) && errno != EEXIST) {
+		rc = errno;
+		pwarn("mkdir(%s, 0%o) failed", path, mode);
+		return -rc;
+	}
 	return 0;
 }
 
@@ -273,8 +282,11 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 	if (source[0] == '/') {
 		/* The source is an absolute path -- it better exist! */
 		rc = stat(source, &st_buf);
-		if (rc)
-			return -errno;
+		if (rc) {
+			rc = errno;
+			pwarn("stat(%s) failed", source);
+			return -rc;
+		}
 
 		/*
 		 * If bind mounting, we only create a directory if the source
@@ -294,8 +306,11 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 		/* The source is a relative path -- assume it's a pseudo fs. */
 
 		/* Disallow relative bind mounts. */
-		if (bind)
+		if (bind) {
+			warn("relative bind-mounts are not allowed: source=%s",
+			     source);
 			return -EINVAL;
+		}
 
 		domkdir = true;
 	}
@@ -307,16 +322,23 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 	 * the actual mount will set those perms/ownership on the mount point
 	 * which is all people should need to access it.
 	 */
-	if (mkdir_p(dest, 0755, domkdir))
-		return -errno;
+	rc = mkdir_p(dest, 0755, domkdir);
+	if (rc)
+		return rc;
 	if (!domkdir) {
 		int fd = open(dest, O_RDWR | O_CREAT | O_CLOEXEC, 0700);
-		if (fd < 0)
-			return -errno;
+		if (fd < 0) {
+			rc = errno;
+			pwarn("open(%s) failed", dest);
+			return -rc;
+		}
 		close(fd);
 	}
-	if (chown(dest, uid, gid))
-		return -errno;
+	if (chown(dest, uid, gid)) {
+		rc = errno;
+		pwarn("chown(%s, %u, %u) failed", dest, uid, gid);
+		return -rc;
+	}
 	return 0;
 }
 
