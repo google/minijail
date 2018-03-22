@@ -1375,7 +1375,7 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 	ret = setup_mount_destination(m->src, dest, j->uid, j->gid,
 				      (m->flags & MS_BIND));
 	if (ret) {
-		pwarn("creating mount target '%s' failed", dest);
+		warn("creating mount target '%s' failed", dest);
 		goto error;
 	}
 
