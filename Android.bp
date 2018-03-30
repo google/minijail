@@ -114,7 +114,12 @@ cc_library_static {
 // =========================================================
 cc_library {
     name: "libminijail",
+
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
+
     defaults: ["libminijail_flags"],
 
     srcs: libminijailSrcFiles,
