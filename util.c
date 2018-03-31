@@ -34,7 +34,7 @@
 #if defined(__ANDROID__)
 const char *log_syscalls[] = {"socket", "connect", "fcntl", "writev"};
 #else
-const char *log_syscalls[] = {"socket", "connect", "sendto"};
+const char *log_syscalls[] = {"socket", "connect", "sendto", "writev"};
 #endif
 #elif defined(__i386__)
 #if defined(__ANDROID__)
