@@ -367,6 +367,32 @@ TEST(Test, test_minijail_preserve_fd) {
   minijail_destroy(j);
 }
 
+TEST(Test, test_minijail_reset_signal_handlers) {
+  struct minijail *j = minijail_new();
+
+  ASSERT_EQ(SIG_DFL, signal(SIGUSR1, SIG_DFL));
+  ASSERT_EQ(SIG_DFL, signal(SIGUSR1, SIG_IGN));
+  ASSERT_EQ(SIG_IGN, signal(SIGUSR1, SIG_IGN));
+
+  minijail_reset_signal_handlers(j);
+
+  pid_t mj_fork_ret = minijail_fork(j);
+  ASSERT_GE(mj_fork_ret, 0);
+  if (mj_fork_ret == 0) {
+    ASSERT_EQ(SIG_DFL, signal(SIGUSR1, SIG_DFL));
+    exit(0);
+  }
+
+  ASSERT_NE(SIG_ERR, signal(SIGUSR1, SIG_DFL));
+
+  int status;
+  waitpid(mj_fork_ret, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+
+  minijail_destroy(j);
+}
+
 namespace {
 
 // Tests that require userns access.
