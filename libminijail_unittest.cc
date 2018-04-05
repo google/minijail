@@ -279,8 +279,8 @@ TEST(Test, test_minijail_fork) {
   if (mj_fork_ret == 0) {
     pid_t pid_in_parent;
     // Wait for the parent to tell us the pid in the parent namespace.
-    EXPECT_EQ(read(pipe_fds[0], &pid_in_parent, pid_size), pid_size);
-    EXPECT_EQ(pid_in_parent, getpid());
+    ASSERT_EQ(read(pipe_fds[0], &pid_in_parent, pid_size), pid_size);
+    ASSERT_EQ(pid_in_parent, getpid());
     exit(0);
   }
 
@@ -363,6 +363,38 @@ TEST(Test, test_minijail_preserve_fd) {
 
   status = minijail_wait(j);
   EXPECT_EQ(status, 0);
+
+  minijail_destroy(j);
+}
+
+TEST(Test, test_minijail_reset_signal_mask) {
+  struct minijail *j = minijail_new();
+
+  sigset_t original_signal_mask;
+  {
+    sigset_t signal_mask;
+    ASSERT_EQ(0, sigemptyset(&signal_mask));
+    ASSERT_EQ(0, sigaddset(&signal_mask, SIGUSR1));
+    ASSERT_EQ(0, sigprocmask(SIG_SETMASK, &signal_mask, &original_signal_mask));
+  }
+
+  minijail_reset_signal_mask(j);
+
+  pid_t mj_fork_ret = minijail_fork(j);
+  ASSERT_GE(mj_fork_ret, 0);
+  if (mj_fork_ret == 0) {
+    sigset_t signal_mask;
+    ASSERT_EQ(0, sigprocmask(SIG_SETMASK, NULL, &signal_mask));
+    ASSERT_EQ(0, sigismember(&signal_mask, SIGUSR1));
+    exit(0);
+  }
+
+  ASSERT_EQ(0, sigprocmask(SIG_SETMASK, &original_signal_mask, NULL));
+
+  int status;
+  waitpid(mj_fork_ret, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
 
   minijail_destroy(j);
 }
