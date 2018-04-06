@@ -90,6 +90,7 @@ void minijail_capbset_drop(struct minijail *j, uint64_t capmask);
 /* 'minijail_set_ambient_caps' requires 'minijail_use_caps'. */
 void minijail_set_ambient_caps(struct minijail *j);
 void minijail_reset_signal_mask(struct minijail *j);
+void minijail_reset_signal_handlers(struct minijail *j);
 void minijail_namespace_vfs(struct minijail *j);
 void minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path);
 void minijail_new_session_keyring(struct minijail *j);
