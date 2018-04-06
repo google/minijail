@@ -40,7 +40,7 @@ ALLOW = "%s: 1"
 
 # This ignores any leading PID tag and extracts the syscall name and the
 # argument list.
-LINE_RE = re.compile(r'^\s*(?:\[[^]]*\]\s*)?([a-zA-Z0-9_]+)\(([^)]*)')
+LINE_RE = re.compile(r'^\s*(?:\[[^]]*\]|\d+)?\s*([a-zA-Z0-9_]+)\(([^)]*)')
 
 SOCKETCALLS = ["accept", "bind", "connect", "getpeername", "getsockname",
                "getsockopt", "listen", "recv", "recvfrom", "recvmsg", "send",
