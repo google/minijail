@@ -150,6 +150,7 @@ struct minijail {
 		int cgroups : 1;
 		int alt_syscall : 1;
 		int reset_signal_mask : 1;
+		int reset_signal_handlers : 1;
 		int close_open_fds : 1;
 		int new_session_keyring : 1;
 		int forward_signals : 1;
@@ -413,6 +414,11 @@ void API minijail_set_ambient_caps(struct minijail *j)
 void API minijail_reset_signal_mask(struct minijail *j)
 {
 	j->flags.reset_signal_mask = 1;
+}
+
+void API minijail_reset_signal_handlers(struct minijail *j)
+{
+	j->flags.reset_signal_handlers = 1;
 }
 
 void API minijail_namespace_vfs(struct minijail *j)
@@ -2635,6 +2641,21 @@ static int minijail_run_internal(struct minijail *j,
 			pdie("sigemptyset failed");
 		if (sigprocmask(SIG_SETMASK, &signal_mask, NULL) != 0)
 			pdie("sigprocmask failed");
+	}
+
+	if (j->flags.reset_signal_handlers) {
+		int signum;
+		for (signum = 0; signum <= SIGRTMAX; signum++) {
+			/*
+			 * Ignore EINVAL since some signal numbers in the range
+			 * might not be valid.
+			 */
+			if (signal(signum, SIG_DFL) == SIG_ERR &&
+			    errno != EINVAL) {
+				pdie("failed to reset signal %d disposition",
+				     signum);
+			}
+		}
 	}
 
 	if (j->flags.close_open_fds) {
