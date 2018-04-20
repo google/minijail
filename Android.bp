@@ -114,6 +114,7 @@ cc_library_static {
 // =========================================================
 cc_library {
     name: "libminijail",
+    host_supported: true,
 
     vendor_available: true,
     vndk: {
@@ -132,6 +133,14 @@ cc_library {
         shared_libs: minijailCommonLibraries,
     },
     export_include_dirs: ["."],
+
+    target: {
+        host: {
+            cflags: [
+                "-DPRELOADPATH=\"/invalidminijailpreload.so\"",
+            ],
+        },
+    },
 }
 
 // Example ASan-ified libminijail shared library for target.
@@ -341,6 +350,7 @@ cc_binary {
 cc_binary {
     name: "minijail0",
     defaults: ["libminijail_flags"],
+    host_supported: true,
 
     cflags: [
         "-DPRELOADPATH=\"/invalidminijailpreload.so\"",
