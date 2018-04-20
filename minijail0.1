@@ -19,13 +19,25 @@ If \fIdest\fR is not specified, it will default to \fIsrc\fR.
 If the destination does not exist, it will be created as a file or directory
 based on the \fIsrc\fR type (including missing parent directories).
 .TP
+\fB-B <mask>\fR
+Skip setting securebits in \fImask\fR when restricting capabilities (\fB-c\fR).
+\fImask\fR is a hex constant that represents the mask of securebits that will
+be preserved.  See \fBcapabilities\fR(7) for the complete list.  By default,
+\fBSECURE_NOROOT\fR, \fBSECURE_NO_SETUID_FIXUP\fR, and \fBSECURE_KEEP_CAPS\fR
+(together with their respective locks) are set.
+\fBSECBIT_NO_CAP_AMBIENT_RAISE\fR (and its respective lock) is never set
+because the permitted and inheritable capability sets have already been set
+through \fB-c\fR.
+.TP
 \fB-c <caps>\fR
-Restrict capabilities to \fIcaps\fR. When used in conjunction with \fB-u\fR and
-\fB-g\fR, this allows a program to have access to only certain parts of root's
-default privileges while running as another user and group ID altogether. Note
-that these capabilities are not inherited by subprocesses of the process given
-capabilities unless those subprocesses have POSIX file capabilities. See
-\fBcapabilities\fR(7).
+Restrict capabilities to \fIcaps\fR, which is a hex constant that represents
+the capability mask that will be used as the permitted, effective, and
+inheritable sets.  When used in conjunction with \fB-u\fR and \fB-g\fR, this
+allows a program to have access to only certain parts of root's default
+privileges while running as another user and group ID altogether.  Note that
+these capabilities are not inherited by subprocesses of the process given
+capabilities unless those subprocesses have POSIX file capabilities or the
+\fB--ambient\fR flag is also passed.  See \fBcapabilities\fR(7).
 .TP
 \fB-C <dir>\fR
 Change root (using \fBchroot\fR(2)) to \fIdir\fR.
@@ -60,6 +72,10 @@ Print a help message.
 Print a help message detailing supported system call names for seccomp_filter.
 (Other direct numbers may be specified if minijail0 is not in sync with the
 host kernel or something like 32/64-bit compatibility issues exist.)
+.TP
+\fB-i\fR
+Exit immediately after \fBfork\fR(2).  The jailed process will keep running in
+the background.
 .TP
 \fB-I\fR
 Run \fIprogram\fR as init (pid 1) inside a new pid namespace (implies \fB-p\fR).
@@ -204,6 +220,17 @@ Keep the current user's supplementary groups.
 .TP
 \fB-Y\fR
 Synchronize seccomp filters across thread group.
+.TP
+\fB-z\fR
+Don't forward any signals to the jailed process.  For example, when not using
+\fB-i\fR, sending \fBSIGINT\fR (e.g., CTRL-C on the terminal), will kill the
+minijail0 process, not the jailed process.
+.TP
+\fB--ambient\fR
+Raise ambient capabilities to match the mask specified by \fB-c\fR.  Since
+ambient capabilities are preserved across \fBexecve\fR(2), this allows for
+process trees to have a restricted set of capabilities, even if they are
+capability-dumb binaries.  See \fBcapabilities\fR(7).
 .TP
 \fB--uts[=hostname]\fR
 Create a new UTS/hostname namespace, and optionally set the hostname in the new
