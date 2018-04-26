@@ -371,6 +371,7 @@ static void usage(const char *progn)
 	       "  -B <mask>:    Skip setting securebits in <mask> when restricting capabilities (-c).\n"
 	       "                By default, SECURE_NOROOT, SECURE_NO_SETUID_FIXUP, and \n"
 	       "                SECURE_KEEP_CAPS (together with their respective locks) are set.\n"
+	       "                There are eight securebits in total.\n"
 	       "  -k <...>:     Mount <src> at <dest> in chroot.\n"
 	       "                <flags> and <data> can be specified as in mount(2).\n"
 	       "                Multiple instances allowed.\n"

@@ -43,6 +43,12 @@
 _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 #endif
 
+int secure_noroot_set_and_locked(uint64_t mask)
+{
+	return (mask & (SECBIT_NOROOT | SECBIT_NOROOT_LOCKED)) ==
+	       (SECBIT_NOROOT | SECBIT_NOROOT_LOCKED);
+}
+
 int lock_securebits(uint64_t skip_mask)
 {
 	/*
@@ -54,6 +60,7 @@ int lock_securebits(uint64_t skip_mask)
 	unsigned long securebits =
 	    (SECURE_BITS_NO_AMBIENT | SECURE_LOCKS_NO_AMBIENT) & ~skip_mask;
 	if (!securebits) {
+		warn("not locking any securebits");
 		return 0;
 	}
 	int securebits_ret = prctl(PR_SET_SECUREBITS, securebits);

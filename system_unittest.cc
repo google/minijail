@@ -6,6 +6,7 @@
  */
 
 #include <limits.h>
+#include <linux/securebits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,6 +63,22 @@ char *get_temp_path() {
 }
 
 }  // namespace
+
+TEST(secure_noroot_set_and_locked, zero_mask) {
+  ASSERT_EQ(secure_noroot_set_and_locked(0), 0);
+}
+
+TEST(secure_noroot_set_and_locked, set) {
+  ASSERT_EQ(secure_noroot_set_and_locked(issecure_mask(SECURE_NOROOT) |
+                                         issecure_mask(SECURE_NOROOT_LOCKED)),
+            1);
+}
+
+TEST(secure_noroot_set_and_locked, not_set) {
+  ASSERT_EQ(secure_noroot_set_and_locked(issecure_mask(SECURE_KEEP_CAPS) |
+                                         issecure_mask(SECURE_NOROOT_LOCKED)),
+            0);
+}
 
 // Sanity check for the cap range.
 TEST(get_last_valid_cap, basic) {
