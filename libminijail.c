@@ -1736,12 +1736,28 @@ static void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 		die("can't apply initial cleaned capset");
 
 	/*
-	 * Instead of dropping bounding set first, do it here in case
+	 * Instead of dropping the bounding set first, do it here in case
 	 * the caller had a more permissive bounding set which could
 	 * have been used above to raise a capability that wasn't already
 	 * present. This requires CAP_SETPCAP, so we raised/kept it above.
+	 *
+	 * However, if we're asked to skip setting *and* locking the
+	 * SECURE_NOROOT securebit, also skip dropping the bounding set.
+	 * If the caller wants to regain all capabilities when executing a
+	 * set-user-ID-root program, allow them to do so. The default behavior
+	 * (i.e. the behavior without |securebits_skip_mask| set) will still put
+	 * the jailed process tree in a capabilities-only environment.
+	 *
+	 * We check the negated skip mask for SECURE_NOROOT and
+	 * SECURE_NOROOT_LOCKED. If the bits are set in the negated mask they
+	 * will *not* be skipped in lock_securebits(), and therefore we should
+	 * drop the bounding set.
 	 */
-	drop_capbset(j->caps, last_valid_cap);
+	if (secure_noroot_set_and_locked(~j->securebits_skip_mask)) {
+		drop_capbset(j->caps, last_valid_cap);
+	} else {
+		warn("SECURE_NOROOT not set, not dropping bounding set");
+	}
 
 	/* If CAP_SETPCAP wasn't specifically requested, now we remove it. */
 	if ((j->caps & (one << CAP_SETPCAP)) == 0) {

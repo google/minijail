@@ -38,6 +38,7 @@ extern "C" {
 #define PR_CAP_AMBIENT_CLEAR_ALL 4
 #endif
 
+int secure_noroot_set_and_locked(uint64_t mask);
 int lock_securebits(uint64_t skip_mask);
 
 unsigned int get_last_valid_cap(void);
