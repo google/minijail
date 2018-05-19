@@ -41,20 +41,21 @@ const char *log_syscalls[] = {"socket", "connect", "sendto", "writev"};
 const char *log_syscalls[] = {"socketcall", "writev", "fcntl64",
 			      "clock_gettime"};
 #else
-const char *log_syscalls[] = {"socketcall", "time"};
+const char *log_syscalls[] = {"socketcall", "time", "writev"};
 #endif
 #elif defined(__arm__)
 #if defined(__ANDROID__)
 const char *log_syscalls[] = {"clock_gettime", "connect", "fcntl64", "socket",
 			      "writev"};
 #else
-const char *log_syscalls[] = {"socket", "connect", "gettimeofday", "send"};
+const char *log_syscalls[] = {"socket", "connect", "gettimeofday", "send",
+			      "writev"};
 #endif
 #elif defined(__aarch64__)
 #if defined(__ANDROID__)
 const char *log_syscalls[] = {"connect", "fcntl", "sendto", "socket", "writev"};
 #else
-const char *log_syscalls[] = {"socket", "connect", "send"};
+const char *log_syscalls[] = {"socket", "connect", "send", "writev"};
 #endif
 #elif defined(__powerpc__) || defined(__ia64__) || defined(__hppa__) ||        \
       defined(__sparc__) || defined(__mips__)
