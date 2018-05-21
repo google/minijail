@@ -27,15 +27,11 @@ constexpr char kValidGid[] = "100";
 class CliTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    j_ = minijail_new();
-
     // Most tests do not care about this logic.  For the few that do, make
     // them opt into it so they can validate specifically.
     elftype_ = ELFDYNAMIC;
   }
-  virtual void TearDown() {
-    minijail_destroy(j_);
-  }
+  virtual void TearDown() {}
 
   // We use a vector of strings rather than const char * pointers because we
   // need the backing memory to be writable.  The CLI might mutate the strings
@@ -47,6 +43,10 @@ class CliTest : public ::testing::Test {
     // to their "optreset").
     optind = 0;
 
+    // We create & destroy this for every parse_args call because some API
+    // calls can dupe memory which confuses LSAN.  https://crbug.com/844615
+    struct minijail *j = minijail_new();
+
     std::vector<const char *> pargv;
     pargv.push_back("minijail0");
     for (const std::string& arg : argv)
@@ -55,10 +55,12 @@ class CliTest : public ::testing::Test {
     // We grab stdout from parse_args itself as it might dump things we don't
     // usually care about like help output.
     testing::internal::CaptureStdout();
-    int ret = parse_args(j_, pargv.size(),
+    int ret = parse_args(j, pargv.size(),
                          const_cast<char* const*>(pargv.data()),
                          exit_immediately, elftype);
     testing::internal::GetCapturedStdout();
+
+    minijail_destroy(j);
 
     return ret;
   }
@@ -67,7 +69,6 @@ class CliTest : public ::testing::Test {
     return parse_args_(argv, &exit_immediately_, &elftype_);
   }
 
-  struct minijail *j_;
   ElfType elftype_;
   int exit_immediately_;
 };
