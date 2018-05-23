@@ -167,9 +167,13 @@ that even if the process has write access to a system config knob in /proc
 (e.g., in /sys/kernel), it cannot change the value.
 .TP
 \fB-R <rlim_type>,<rlim_cur>,<rlim_max>\fR
-Set an rlimit value, see \fBgetrlimit\fR(2) for allowed values. The string
-\fBunlimited\fR can be used for \fBrlim_cur\fR and \fBrlim_max\fR, which will
-translate to \fBRLIM_INFINITY\fR.
+Set an rlimit value, see \fBgetrlimit\fR(2) for more details.
+
+\fIrlim_type\fR may be specified using symbolic constants like \fIRLIMIT_AS\fR.
+
+\fIrlim_cur\fR and \fIrlim_max\fR are specified either with a number (decimal or
+hex starting with \fI0x\fR), or with the string \fIunlimited\fR (which will
+translate to \fIRLIM_INFINITY\fR).
 .TP
 \fB-s\fR
 Enable \fBseccomp\fR(2) in mode 1, which restricts the child process to a very
