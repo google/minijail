@@ -166,6 +166,7 @@ static void add_mount(struct minijail *j, char *arg)
 	char *type = tokenize(&arg, ",");
 	char *flags = tokenize(&arg, ",");
 	char *data = tokenize(&arg, ",");
+	char *end;
 	if (!src || src[0] == '\0' || !dest || dest[0] == '\0' ||
 	    !type || type[0] == '\0') {
 		fprintf(stderr, "Bad mount: %s %s %s\n", src, dest, type);
@@ -186,9 +187,20 @@ static void add_mount(struct minijail *j, char *arg)
 	if (arg != NULL)
 		arg[-1] = ',';
 
+	unsigned long mountflags;
+	if (flags == NULL || flags[0] == '\0') {
+		mountflags = 0;
+	} else {
+		end = NULL;
+		mountflags = parse_constant(flags, &end);
+		if (flags == end) {
+			fprintf(stderr, "Bad mount flags: %s\n", flags);
+			exit(1);
+		}
+	}
+
 	if (minijail_mount_with_data(j, src, dest, type,
-				     flags ? strtoul(flags, NULL, 16) : 0,
-				     data)) {
+				     mountflags, data)) {
 		fprintf(stderr, "minijail_mount failed.\n");
 		exit(1);
 	}
