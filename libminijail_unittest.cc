@@ -281,6 +281,7 @@ TEST(Test, test_minijail_fork) {
     // Wait for the parent to tell us the pid in the parent namespace.
     ASSERT_EQ(read(pipe_fds[0], &pid_in_parent, pid_size), pid_size);
     ASSERT_EQ(pid_in_parent, getpid());
+    minijail_destroy(j);
     exit(0);
   }
 
@@ -386,6 +387,7 @@ TEST(Test, test_minijail_reset_signal_mask) {
     sigset_t signal_mask;
     ASSERT_EQ(0, sigprocmask(SIG_SETMASK, NULL, &signal_mask));
     ASSERT_EQ(0, sigismember(&signal_mask, SIGUSR1));
+    minijail_destroy(j);
     exit(0);
   }
 
@@ -412,6 +414,7 @@ TEST(Test, test_minijail_reset_signal_handlers) {
   ASSERT_GE(mj_fork_ret, 0);
   if (mj_fork_ret == 0) {
     ASSERT_EQ(SIG_DFL, signal(SIGUSR1, SIG_DFL));
+    minijail_destroy(j);
     exit(0);
   }
 
