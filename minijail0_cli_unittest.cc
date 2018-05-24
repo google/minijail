@@ -413,6 +413,18 @@ TEST_F(CliTest, valid_mount) {
   // Multiple data options to the kernel.
   argv[2] = "none,/,none,0xe,mode=755,uid=0,gid=10";
   ASSERT_TRUE(parse_args_(argv));
+
+  // Single MS constant.
+  argv[2] = "none,/,none,MS_NODEV,mode=755";
+  ASSERT_TRUE(parse_args_(argv));
+
+  // Multiple MS constants.
+  argv[2] = "none,/,none,MS_NODEV|MS_NOEXEC,mode=755";
+  ASSERT_TRUE(parse_args_(argv));
+
+  // Mixed constant & number.
+  argv[2] = "none,/,none,MS_NODEV|0xf,mode=755";
+  ASSERT_TRUE(parse_args_(argv));
 }
 
 // Invalid calls to the mount option.
@@ -429,6 +441,10 @@ TEST_F(CliTest, invalid_mount) {
 
   // Missing type.
   argv[2] = "none,/";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  // Unknown MS constant.
+  argv[2] = "none,/,none,MS_WHOOPS";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
 
