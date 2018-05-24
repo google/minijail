@@ -219,10 +219,16 @@ TEST_F(CliTest, valid_rlimit) {
   argv[1] = "0,1,2";
   ASSERT_TRUE(parse_args_(argv));
 
+  argv[1] = "0,0x100,4";
+  ASSERT_TRUE(parse_args_(argv));
+
   argv[1] = "1,1,unlimited";
   ASSERT_TRUE(parse_args_(argv));
 
   argv[1] = "2,unlimited,2";
+  ASSERT_TRUE(parse_args_(argv));
+
+  argv[1] = "RLIMIT_AS,unlimited,unlimited";
   ASSERT_TRUE(parse_args_(argv));
 }
 
@@ -247,7 +253,16 @@ TEST_F(CliTest, invalid_rlimit) {
   argv[1] = "0,0,invalid-limit";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 
+  // Invalid number.
   argv[1] = "0,0,0j";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  // Invalid hex number.
+  argv[1] = "0,0x1jf,0";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  // Invalid rlimit constant.
+  argv[1] = "RLIMIT_GOGOOGOG,0,0";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
 

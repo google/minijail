@@ -128,7 +128,7 @@ static void add_rlimit(struct minijail *j, char *arg)
 		cur_rlim = RLIM_INFINITY;
 	} else {
 		end = NULL;
-		cur_rlim = strtoul(cur, &end, 10);
+		cur_rlim = strtoul(cur, &end, 0);
 		if (*end) {
 			fprintf(stderr, "Bad soft limit: '%s'.\n", cur);
 			exit(1);
@@ -138,13 +138,21 @@ static void add_rlimit(struct minijail *j, char *arg)
 		max_rlim = RLIM_INFINITY;
 	} else {
 		end = NULL;
-		max_rlim = strtoul(max, &end, 10);
+		max_rlim = strtoul(max, &end, 0);
 		if (*end) {
 			fprintf(stderr, "Bad hard limit: '%s'.\n", max);
 			exit(1);
 		}
 	}
-	if (minijail_rlimit(j, atoi(type), cur_rlim, max_rlim)) {
+
+	end = NULL;
+	int resource = parse_single_constant(type, &end);
+	if (type == end) {
+		fprintf(stderr, "Bad rlimit: '%s'.\n", type);
+		exit(1);
+	}
+
+	if (minijail_rlimit(j, resource, cur_rlim, max_rlim)) {
 		fprintf(stderr, "minijail_rlimit '%s,%s,%s' failed.\n", type,
 			cur, max);
 		exit(1);
