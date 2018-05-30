@@ -19,6 +19,39 @@
 extern "C" {
 #endif
 
+/*
+ * Silence compiler warnings for unused variables/functions.
+ *
+ * If the definition is actually used, the attribute should be removed, but if
+ * it's forgotten or left in place, it doesn't cause a problem.
+ *
+ * If the definition is actually unused, the compiler is free to remove it from
+ * the output so as to save size.  If you want to make sure the definition is
+ * kept (e.g. for ABI compatibility), look at the "used" attribute instead.
+ */
+#define attribute_unused __attribute__((__unused__))
+
+/*
+ * Mark the symbol as "weak" in the ELF output.  This provides a fallback symbol
+ * that may be overriden at link time.  See this page for more details:
+ * https://en.wikipedia.org/wiki/Weak_symbol
+ */
+#define attribute_weak __attribute__((__weak__))
+
+/*
+ * Mark the function as a printf-style function.
+ * @format_idx The index in the function argument list where the format string
+ *             is passed (where the first argument is "1").
+ * @check_idx The index in the function argument list where the first argument
+ *            used in the format string is passed.
+ * Some examples:
+ *   foo([1] const char *format, [2] ...): format=1 check=2
+ *   foo([1] int, [2] const char *format, [3] ...): format=2 check=3
+ *   foo([1] const char *format, [2] const char *, [3] ...): format=1 check=3
+ */
+#define attribute_printf(format_idx, check_idx) \
+	__attribute__((__format__(__printf__, format_idx, check_idx)))
+
 #if defined(USE_EXIT_ON_DIE)
 #define do_abort() exit(1)
 #else
@@ -58,7 +91,7 @@ enum logging_system_t {
 };
 
 extern void do_log(int priority, const char *format, ...)
-    __attribute__((__format__(__printf__, 2, 3)));
+    attribute_printf(2, 3);
 
 static inline int is_android(void)
 {
@@ -69,7 +102,7 @@ static inline int is_android(void)
 #endif
 }
 
-void __asan_init(void) __attribute__((weak));
+void __asan_init(void) attribute_weak;
 
 static inline int running_with_asan(void)
 {
