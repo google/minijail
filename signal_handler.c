@@ -26,7 +26,7 @@ struct local_sigsys {
 	unsigned int	arch;
 };
 
-void log_sigsys_handler(int nr, siginfo_t *info,
+void log_sigsys_handler(int sig attribute_unused, siginfo_t *info,
 			void *void_context attribute_unused)
 {
 	struct local_sigsys sigsys;
@@ -37,7 +37,7 @@ void log_sigsys_handler(int nr, siginfo_t *info,
 	if (syscall_name)
 		die("blocked syscall: %s", syscall_name);
 	else
-		die("blocked syscall: %d", nr);
+		die("blocked syscall: %d", sigsys.nr);
 
 	/*
 	 * We trapped on a syscall that should have killed the process.

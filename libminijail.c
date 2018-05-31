@@ -1870,12 +1870,12 @@ static void set_seccomp_filter(const struct minijail *j)
 
 static pid_t forward_pid = -1;
 
-static void forward_signal(int nr,
+static void forward_signal(int sig,
 			   siginfo_t *siginfo attribute_unused,
 			   void *void_context attribute_unused)
 {
 	if (forward_pid != -1) {
-		kill(forward_pid, nr);
+		kill(forward_pid, sig);
 	}
 }
 
@@ -1888,19 +1888,19 @@ static void install_signal_handlers(void)
 	act.sa_flags = SA_SIGINFO | SA_RESTART;
 
 	/* Handle all signals, except SIGCHLD. */
-	for (int nr = 1; nr < NSIG; nr++) {
+	for (int sig = 1; sig < NSIG; sig++) {
 		/*
 		 * We don't care if we get EINVAL: that just means that we
 		 * can't handle this signal, so let's skip it and continue.
 		 */
-		sigaction(nr, &act, NULL);
+		sigaction(sig, &act, NULL);
 	}
 	/* Reset SIGCHLD's handler. */
 	signal(SIGCHLD, SIG_DFL);
 
 	/* Handle real-time signals. */
-	for (int nr = SIGRTMIN; nr <= SIGRTMAX; nr++) {
-		sigaction(nr, &act, NULL);
+	for (int sig = SIGRTMIN; sig <= SIGRTMAX; sig++) {
+		sigaction(sig, &act, NULL);
 	}
 }
 
