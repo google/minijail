@@ -1870,9 +1870,9 @@ static void set_seccomp_filter(const struct minijail *j)
 
 static pid_t forward_pid = -1;
 
-static void forward_signal(__attribute__((unused)) int nr,
-			   __attribute__((unused)) siginfo_t *siginfo,
-			   __attribute__((unused)) void *void_context)
+static void forward_signal(int nr,
+			   siginfo_t *siginfo attribute_unused,
+			   void *void_context attribute_unused)
 {
 	if (forward_pid != -1) {
 		kill(forward_pid, nr);
@@ -2100,7 +2100,7 @@ void API minijail_enter(const struct minijail *j)
 /* TODO(wad): will visibility affect this variable? */
 static int init_exitstatus = 0;
 
-void init_term(int __attribute__ ((unused)) sig)
+void init_term(int sig attribute_unused)
 {
 	_exit(init_exitstatus);
 }
