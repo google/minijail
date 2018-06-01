@@ -3,41 +3,51 @@
  * found in the LICENSE file.
  */
 
-/* These header files need to be included before asm/siginfo.h such that
- * pid_t, timer_t, and clock_t are defined. */
-#include <stdlib.h>
-#include <unistd.h>
-
-#include <asm/siginfo.h>
-#define __have_siginfo_t 1
-#define __have_sigval_t 1
-#define __have_sigevent_t 1
-
 #include <signal.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "signal_handler.h"
 
 #include "util.h"
 
-struct local_sigsys {
-	void		*ip;
-	int		nr;
-	unsigned int	arch;
-};
+/*
+ * si_syscall was added in glibc-2.17+, but Android still uses glibc-2.15
+ * for its prebuilt binary host toolchains.  Add a compat hack for it.
+ */
+static int get_si_syscall(const siginfo_t *info)
+{
+#if defined(si_syscall)
+	return info->si_syscall;
+#endif
+
+	typedef struct {
+		void		*ip;
+		int		nr;
+		unsigned int	arch;
+	} local_siginfo_t;
+
+	union {
+		const siginfo_t *info;
+		const local_siginfo_t *local_info;
+	} local_info = {
+		.info = info,
+	};
+	return local_info.local_info->nr;
+}
 
 void log_sigsys_handler(int sig attribute_unused, siginfo_t *info,
 			void *void_context attribute_unused)
 {
-	struct local_sigsys sigsys;
 	const char *syscall_name;
-	memcpy(&sigsys, &info->_sifields, sizeof(sigsys));
-	syscall_name = lookup_syscall_name(sigsys.nr);
+	int nr = get_si_syscall(info);
+	syscall_name = lookup_syscall_name(nr);
 
 	if (syscall_name)
 		die("blocked syscall: %s", syscall_name);
 	else
-		die("blocked syscall: %d", sigsys.nr);
+		die("blocked syscall: %d", nr);
 
 	/*
 	 * We trapped on a syscall that should have killed the process.
