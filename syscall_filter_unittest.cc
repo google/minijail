@@ -1182,7 +1182,7 @@ TEST(FilterTest, seccomp_read_write) {
 
 TEST(FilterTest, misplaced_whitespace) {
   struct sock_fprog actual;
-  const char *policy = "open :1\n";
+  const char *policy = "read :1\n";
 
   FILE *policy_file = write_policy_to_pipe(policy, strlen(policy));
   ASSERT_NE(policy_file, nullptr);
