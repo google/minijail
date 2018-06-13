@@ -38,9 +38,9 @@ NOTICE = """# Copyright (C) 2018 The Android Open Source Project
 
 ALLOW = "%s: 1"
 
-# This ignores any leading PID tag and extracts the syscall name and the
-# argument list.
-LINE_RE = re.compile(r'^\s*(?:\[[^]]*\]|\d+)?\s*([a-zA-Z0-9_]+)\(([^)]*)')
+# This ignores any leading PID tag and trailing <unfinished ...>, and extracts
+# the syscall name and the argument list.
+LINE_RE = re.compile(r'^\s*(?:\[[^]]*\]|\d+)?\s*([a-zA-Z0-9_]+)\(([^)<]*)')
 
 SOCKETCALLS = ["accept", "bind", "connect", "getpeername", "getsockname",
                "getsockopt", "listen", "recv", "recvfrom", "recvmsg", "send",
@@ -95,7 +95,10 @@ def main(traces):
     arg_inspection = {
         "socket": ArgInspectionEntry(0, set([])),   # int domain
         "ioctl": ArgInspectionEntry(1, set([])),    # int request
-        "prctl": ArgInspectionEntry(0, set([]))     # int option
+        "prctl": ArgInspectionEntry(0, set([])),    # int option
+        "mmap": ArgInspectionEntry(2, set([])),     # int prot
+        "mmap2": ArgInspectionEntry(2, set([])),    # int prot
+        "mprotect": ArgInspectionEntry(2, set([])), # int prot
     }
 
     for syscall_list in syscall_set_list:
