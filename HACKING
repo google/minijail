@@ -1,8 +1,0 @@
-Hacking on Minijail:
-
--Minijail uses kernel coding style: http://lxr.free-electrons.com/source/Documentation/CodingStyle
-
--Utility functions with no side-effects should go in util.{h|c}.
-
--Functions with side effects or with dependencies on operating system details,
-but that don't take a 'struct minijail' argument, should go in system.{h|c}.
