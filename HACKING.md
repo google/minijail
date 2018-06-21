@@ -1,6 +1,47 @@
 # Hacking on Minijail
 
-## Source
+## Dependencies
+
+You'll need these to build the source:
+* [libcap]
+* Linux kernel headers
+
+You'll need to install the relevant packages from your distro.
+
+## Building
+
+For local experimentation (using Minijail libraries from the source directory):
+
+```
+$ make LIBDIR=`pwd`
+$ sudo ./minijail0 -u jorgelo -g 5000 /usr/bin/id
+```
+
+For system-wide usage, change `LIBDIR` to the final location of the libraries:
+
+```
+$ make LIBDIR=/lib64
+```
+
+Then install `libminijail.so` and `libminijailpreload.so` to `/lib64` and
+`minijail0` to your PATH (e.g. `/usr/bin`).
+
+## Testing
+
+We use [Google Test] (i.e. `gtest` & `gmock`) for unit tests.
+You can download a suitable copy of Google Test using the
+[get_googletest.sh](./get_googletest.sh) script.
+
+```
+$ ./get_googletest.sh
+googletest-release-1.8.0/
+...
+$ make LIBDIR=`pwd` tests
+```
+
+Building the tests will automatically execute them.
+
+## Source Style
 
 *   Minijail uses kernel coding style:
     https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/coding-style.rst
@@ -18,16 +59,22 @@ We follow the [Google Markdown style guide].
 
 ### Man Pages
 
-For users of minijail (e.g. `minijail0`), we use man pages.
-We don't have style guides for this currently.
-Just try to follow existing practice in them.
+For users of Minijail (e.g. `minijail0`), we use man pages.
+For style guides, check out the [Linux man-pages project] for general guidance.
+It has a number of useful references for syntax and such.
+
+* [man-pages(7)](http://man7.org/linux/man-pages/man7/man-pages.7.html)
+* [groff-man(7)](http://man7.org/linux/man-pages/man7/groff_man.7.html)
+* [groff(7)](http://man7.org/linux/man-pages/man7/groff.7.html)
 
 [minijail0.1] documents the command line interface.
 Please keep it in sync with [minijail0_cli.c].
 
 [minijail0.5] documents the syntax of config files (e.g. seccomp filters).
 
+[libcap]: https://git.kernel.org/pub/scm/linux/kernel/git/morgan/libcap.git/
 [minijail0.1]: ./minijail0.1
 [minijail0.5]: ./minijail0.5
 [minijail0_cli.c]: ./minijail0_cli.c
 [Google Markdown style guide]: https://github.com/google/styleguide/blob/gh-pages/docguide/style.md
+[Google Test]: https://github.com/google/googletest
