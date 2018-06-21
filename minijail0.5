@@ -46,8 +46,8 @@ CONFIG_FTRACE_SYSCALLS.  For example, we can allow a process to open any
 file read only and mmap PROT_READ only:
 
   # open with O_LARGEFILE|O_RDONLY|O_NONBLOCK or some combination
-  open: flags == 32768 || flags == 0 || flags == 34816 || flags == 2048
-  mmap2: prot == 0x0
+  open: arg1 == 32768 || arg1 == 0 || arg1 == 34816 || arg1 == 2048
+  mmap2: arg2 == 0x0
   munmap: 1
   close: 1
 
@@ -57,6 +57,63 @@ non-numeric comparison may be subject to time-of-check-time-of-use
 attacks and cannot be considered safe.
 
 \fBexecve\fR may only be used when invoking with CAP_SYS_ADMIN privileges.
+
+.SH SECCOMP_FILTER SYNTAX
+More formally, the expression after the colon can be an expression in
+Disjunctive Normal Form (DNF): a disjunction ("or", \fI||\fR) of
+conjunctions ("and", \fI&&\fR) of atoms.
+
+.SS "Atom Syntax"
+Atoms are of the form \fIarg{DNUM} {OP} {NUM}\fR where:
+.IP
+\[bu] \fIDNUM\fR is a decimal number
+
+\[bu] \fIOP\fR is an operator:
+\fI==\fR, \fI!=\fR, \fI&\fR (flags set), or \fIin\fR (inclusion)
+
+\[bu] \fINUM\fR is an octal, decimal, or hexadecimal number
+.RE
+
+\fI==\fR and \fI!=\fR should be pretty self explanatory.
+
+\fI&\fR will test for a flag being set, for example, O_RDONLY for
+.BR open (2):
+
+  open: arg1 & O_RDONLY
+
+Minijail supports most common named constants, like O_RDONLY.
+It's preferable to use named constants rather than numeric values as not all
+architectures use the same numeric value.
+
+When the possible combinations of allowed flags grow, specifying them all can
+be cumbersome.
+This is where the \fIin\fR operator comes handy.
+The system call will be allowed iff the flags set in the argument are included
+(as a set) in the flags in the policy:
+
+  mmap: arg3 in MAP_PRIVATE|MAP_ANONYMOUS
+
+This will allow \fBmmap\fR(2) as long as \fIarg3\fR (flags) has any combination
+of MAP_PRIVATE and MAP_ANONYMOUS, but nothing else.
+
+.SS "Return Values"
+
+By default, blocked syscalls call the process to be killed.
+The \fIreturn {NUM}\fR syntax can be used to force a specific errno to be
+returned instead.
+
+  read: return EBADF
+
+This expression will block the \fBread\fR(2) syscall, make it return -1, and set
+\fBerrno\fR to EBADF (9 on x86 platforms).
+
+An expression can also include an optional \fIreturn <errno>\fR clause,
+separated by a semicolon:
+
+  read: arg0 == 0; return EBADF
+
+This is, if the first argument to read is 0, then allow the syscall;
+else, block the syscall, return -1, and set \fBerrno\fR to EBADF.
 
 .SH SECCOMP_FILTER POLICY WRITING
 
