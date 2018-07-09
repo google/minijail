@@ -87,10 +87,23 @@ static struct logging_config_t {
 #define do_abort() abort()
 #endif
 
+#if defined(__clang__)
+#define attribute_no_optimize __attribute__((optnone))
+#else
+#define attribute_no_optimize __attribute__((__optimize__(0)))
+#endif
+
+/* Forces the compiler to perform no optimizations on |var|. */
+static void attribute_no_optimize alias(const void *var)
+{
+	(void)var;
+}
+
 void do_fatal_log(int priority, const char *format, ...)
 {
-	va_list args;
+	va_list args, stack_args;
 	va_start(args, format);
+	va_copy(stack_args, args);
 	if (logging_config.logger == LOG_TO_SYSLOG) {
 		vsyslog(priority, format, args);
 	} else {
@@ -98,6 +111,18 @@ void do_fatal_log(int priority, const char *format, ...)
 		dprintf(logging_config.fd, "\n");
 	}
 	va_end(args);
+
+	/*
+	 * Write another copy of the first few characters of the message into a
+	 * stack-based buffer so that it can appear in minidumps. Choosing a
+	 * small-ish buffer size since breakpad will only pick up the first few
+	 * kilobytes of each stack, so that will prevent this buffer from
+	 * kicking out other stack frames.
+	 */
+	char log_line[512];
+	vsnprintf(log_line, sizeof(log_line), format, stack_args);
+	va_end(stack_args);
+	alias(log_line);
 	do_abort();
 }
 
