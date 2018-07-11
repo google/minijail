@@ -82,6 +82,14 @@
 /* Keyctl commands. */
 #define KEYCTL_JOIN_SESSION_KEYRING 1
 
+/*
+ * The userspace equivalent of MNT_USER_SETTABLE_MASK, which is the mask of all
+ * flags that can be modified by MS_REMOUNT.
+ */
+#define MS_USER_SETTABLE_MASK                                                  \
+	(MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_NOATIME | MS_NODIRATIME |       \
+	 MS_RELATIME | MS_RDONLY)
+
 struct minijail_rlimit {
 	int type;
 	rlim_t cur;
@@ -1366,7 +1374,8 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 {
 	int ret;
 	char *dest;
-	int remount_ro = 0;
+	int remount = 0;
+	unsigned long original_mnt_flags = 0;
 
 	/* We assume |dest| has a leading "/". */
 	if (dev_path && strncmp("/dev/", m->dest, 5) == 0) {
@@ -1378,35 +1387,44 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 			return -ENOMEM;
 	}
 
-	ret = setup_mount_destination(m->src, dest, j->uid, j->gid,
-				      (m->flags & MS_BIND));
+	ret =
+	    setup_mount_destination(m->src, dest, j->uid, j->gid,
+				    (m->flags & MS_BIND), &original_mnt_flags);
 	if (ret) {
 		warn("creating mount target '%s' failed", dest);
 		goto error;
 	}
 
 	/*
-	 * R/O bind mounts have to be remounted since 'bind' and 'ro'
-	 * can't both be specified in the original bind mount.
-	 * Remount R/O after the initial mount.
+	 * Bind mounts that change the 'ro' flag have to be remounted since
+	 * 'bind' and other flags can't both be specified in the same command.
+	 * Remount after the initial mount.
 	 */
-	if ((m->flags & MS_BIND) && (m->flags & MS_RDONLY)) {
-		remount_ro = 1;
-		m->flags &= ~MS_RDONLY;
+	if ((m->flags & MS_BIND) &&
+	    ((m->flags & MS_RDONLY) != (original_mnt_flags & MS_RDONLY))) {
+		remount = 1;
+		/*
+		 * Restrict the mount flags to those that are user-settable in a
+		 * MS_REMOUNT request, but excluding MS_RDONLY. The
+		 * user-requested mount flags will dictate whether the remount
+		 * will have that flag or not.
+		 */
+		original_mnt_flags &= (MS_USER_SETTABLE_MASK & ~MS_RDONLY);
 	}
 
 	ret = mount(m->src, dest, m->type, m->flags, m->data);
 	if (ret) {
-		pwarn("mount: %s -> %s", m->src, dest);
+		pwarn("bind: %s -> %s flags=%#lx", m->src, dest, m->flags);
 		goto error;
 	}
 
-	if (remount_ro) {
-		m->flags |= MS_RDONLY;
-		ret = mount(m->src, dest, NULL,
-			    m->flags | MS_REMOUNT, m->data);
+	if (remount) {
+		ret =
+		    mount(m->src, dest, NULL,
+			  m->flags | original_mnt_flags | MS_REMOUNT, m->data);
 		if (ret) {
-			pwarn("bind ro: %s -> %s", m->src, dest);
+			pwarn("bind remount: %s -> %s flags=%#lx", m->src, dest,
+			      m->flags | original_mnt_flags | MS_REMOUNT);
 			goto error;
 		}
 	}
