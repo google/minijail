@@ -52,17 +52,9 @@ extern "C" {
 #define attribute_printf(format_idx, check_idx) \
 	__attribute__((__format__(__printf__, format_idx, check_idx)))
 
-#if defined(USE_EXIT_ON_DIE)
-#define do_abort() exit(1)
-#else
-#define do_abort() abort()
-#endif
-
 /* clang-format off */
-#define die(_msg, ...) do { \
-	do_log(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__); \
-	do_abort(); \
-} while (0)
+#define die(_msg, ...) \
+	do_fatal_log(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)
 
 #define pdie(_msg, ...) \
 	die(_msg ": %m", ## __VA_ARGS__)
@@ -89,6 +81,17 @@ enum logging_system_t {
 	/* Log to a file descriptor. */
 	LOG_TO_FD,
 };
+
+/*
+ * Even though this function internally calls abort(2)/exit(2), it is
+ * intentionally not marked with the noreturn attribute. When marked as
+ * noreturn, clang coalesces several of the do_fatal_log() calls in methods that
+ * have a large number of such calls (like minijail_enter()), making it
+ * impossible for breakpad to correctly identify the line where it was called,
+ * making the backtrace somewhat useless.
+ */
+extern void do_fatal_log(int priority, const char *format, ...)
+    attribute_printf(2, 3);
 
 extern void do_log(int priority, const char *format, ...)
     attribute_printf(2, 3);
