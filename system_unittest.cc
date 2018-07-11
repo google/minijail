@@ -15,6 +15,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "system.h"
 
 namespace {
@@ -40,8 +42,8 @@ inline bool is_android() {
 }
 
 // Return a temp filename that this test can manipulate.
-// It will not exist when it returns, and the user has to free the memory.
-char *get_temp_path() {
+// It will not exist when it returns.
+std::string get_temp_path() {
   char *path = nullptr;
   if (is_android()) {
     path = strdup("/data/local/tmp/minijail.tests.XXXXXX");
@@ -50,12 +52,12 @@ char *get_temp_path() {
   }
 
   if (!path)
-    return nullptr;
+    return std::string();
 
   // Just create the temp path.
   int fd = mkstemp(path);
   if (fd < 0)
-    return nullptr;
+    return std::string();
   close(fd);
   unlink(path);
 
@@ -142,19 +144,17 @@ TEST(write_pid_to_path, bad_path) {
 
 // Make sure we can write a pid to the file.
 TEST(write_pid_to_path, basic) {
-  char *path = get_temp_path();
-  ASSERT_NE(nullptr, path);
+  std::string path = get_temp_path();
+  ASSERT_NE(std::string(), path);
 
-  EXPECT_EQ(0, write_pid_to_path(1234, path));
-  FILE *fp = fopen(path, "re");
-  unlink(path);
+  EXPECT_EQ(0, write_pid_to_path(1234, path.c_str()));
+  FILE *fp = fopen(path.c_str(), "re");
+  unlink(path.c_str());
   EXPECT_NE(nullptr, fp);
   char data[6] = {};
   EXPECT_EQ(5u, fread(data, 1, sizeof(data), fp));
   fclose(fp);
   EXPECT_EQ(0, strcmp(data, "1234\n"));
-
-  free(path);
 }
 
 // If the destination exists, there's nothing to do.
@@ -170,13 +170,12 @@ TEST(mkdir_p, dest_exists) {
 
 // Create a directory tree that doesn't exist.
 TEST(mkdir_p, create_tree) {
-  char *path = get_temp_path();
-  ASSERT_NE(nullptr, path);
-  unlink(path);
+  std::string path = get_temp_path();
+  ASSERT_NE(std::string(), path);
 
   // Run `mkdir -p <path>/a/b/c`.
   char *path_a, *path_a_b, *path_a_b_c;
-  ASSERT_NE(-1, asprintf(&path_a, "%s/a", path));
+  ASSERT_NE(-1, asprintf(&path_a, "%s/a", path.c_str()));
   ASSERT_NE(-1, asprintf(&path_a_b, "%s/b", path_a));
   ASSERT_NE(-1, asprintf(&path_a_b_c, "%s/c", path_a_b));
 
@@ -200,12 +199,11 @@ TEST(mkdir_p, create_tree) {
   ASSERT_EQ(0, rmdir(path_a_b_c));
   ASSERT_EQ(0, rmdir(path_a_b));
   ASSERT_EQ(0, rmdir(path_a));
-  ASSERT_EQ(0, rmdir(path));
+  ASSERT_EQ(0, rmdir(path.c_str()));
 
   free(path_a_b_c);
   free(path_a_b);
   free(path_a);
-  free(path);
 }
 
 // If the destination exists, there's nothing to do.
@@ -225,24 +223,22 @@ TEST(setup_mount_destination, reject_relative_bind) {
 
 // A mount of a pseudo filesystem should make the destination dir.
 TEST(setup_mount_destination, create_pseudo_fs) {
-  char *path = get_temp_path();
-  ASSERT_NE(nullptr, path);
+  std::string path = get_temp_path();
+  ASSERT_NE(std::string(), path);
 
   // Passing -1 for user ID/group ID tells chown to make no changes.
-  EXPECT_EQ(0, setup_mount_destination("none", path, -1, -1, false));
+  EXPECT_EQ(0, setup_mount_destination("none", path.c_str(), -1, -1, false));
   // We check it's a directory by deleting it as such.
-  EXPECT_EQ(0, rmdir(path));
+  EXPECT_EQ(0, rmdir(path.c_str()));
 
   // Confirm that a bad user ID/group ID fails the function as expected.
   // On Android, Bionic manages user IDs directly: there is no /etc/passwd file.
   // This results in most user IDs being valid. Instead of trying to find an
   // invalid user ID, just skip this check.
   if (!is_android()) {
-    EXPECT_NE(0, setup_mount_destination("none", path,
+    EXPECT_NE(0, setup_mount_destination("none", path.c_str(),
                                          UINT_MAX / 2, UINT_MAX / 2, false));
   }
-
-  free(path);
 }
 
 // If the source path does not exist, we should error out.
@@ -254,39 +250,33 @@ TEST(setup_mount_destination, missing_source) {
 
 // A bind mount of a directory should create the destination dir.
 TEST(setup_mount_destination, create_bind_dir) {
-  char *path = get_temp_path();
-  ASSERT_NE(nullptr, path);
+  std::string path = get_temp_path();
+  ASSERT_NE(std::string(), path);
 
   // Passing -1 for user ID/group ID tells chown to make no changes.
-  EXPECT_EQ(0, setup_mount_destination(kValidDir, path, -1, -1, true));
+  EXPECT_EQ(0, setup_mount_destination(kValidDir, path.c_str(), -1, -1, true));
   // We check it's a directory by deleting it as such.
-  EXPECT_EQ(0, rmdir(path));
-
-  free(path);
+  EXPECT_EQ(0, rmdir(path.c_str()));
 }
 
 // A bind mount of a file should create the destination file.
 TEST(setup_mount_destination, create_bind_file) {
-  char *path = get_temp_path();
-  ASSERT_NE(nullptr, path);
+  std::string path = get_temp_path();
+  ASSERT_NE(std::string(), path);
 
   // Passing -1 for user ID/group ID tells chown to make no changes.
-  EXPECT_EQ(0, setup_mount_destination(kValidFile, path, -1, -1, true));
+  EXPECT_EQ(0, setup_mount_destination(kValidFile, path.c_str(), -1, -1, true));
   // We check it's a file by deleting it as such.
-  EXPECT_EQ(0, unlink(path));
-
-  free(path);
+  EXPECT_EQ(0, unlink(path.c_str()));
 }
 
 // A mount of a character device should create the destination char.
 TEST(setup_mount_destination, create_char_dev) {
-  char *path = get_temp_path();
-  ASSERT_NE(nullptr, path);
+  std::string path = get_temp_path();
+  ASSERT_NE(std::string(), path);
 
   // Passing -1 for user ID/group ID tells chown to make no changes.
-  EXPECT_EQ(0, setup_mount_destination(kValidCharDev, path, -1, -1, false));
+  EXPECT_EQ(0, setup_mount_destination(kValidCharDev, path.c_str(), -1, -1, false));
   // We check it's a directory by deleting it as such.
-  EXPECT_EQ(0, rmdir(path));
-
-  free(path);
+  EXPECT_EQ(0, rmdir(path.c_str()));
 }
