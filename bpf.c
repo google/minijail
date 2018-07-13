@@ -182,25 +182,6 @@ size_t bpf_arg_comp(struct sock_filter **pfilter, int op, int argidx,
 	return curr_block - filter;
 }
 
-void dump_bpf_filter(struct sock_filter *filter, unsigned short len)
-{
-	int i = 0;
-
-	printf("len == %d\n", len);
-	printf("filter:\n");
-	for (i = 0; i < len; i++) {
-		printf("%d: \t{ code=%#x, jt=%u, jf=%u, k=%#x \t}\n", i,
-		       filter[i].code, filter[i].jt, filter[i].jf, filter[i].k);
-	}
-}
-
-void dump_bpf_prog(struct sock_fprog *fprog)
-{
-	struct sock_filter *filter = fprog->filter;
-	unsigned short len = fprog->len;
-	dump_bpf_filter(filter, len);
-}
-
 int bpf_resolve_jumps(struct bpf_labels *labels, struct sock_filter *filter,
 		      size_t len)
 {
