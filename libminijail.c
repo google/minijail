@@ -896,7 +896,7 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 	if (!seccomp_should_parse_filters(j))
 		return;
 
-	FILE *file = fopen(path, "r");
+	FILE *file = fopen(path, "re");
 	if (!file) {
 		pdie("failed to open seccomp filter file '%s'", path);
 	}

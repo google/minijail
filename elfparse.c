@@ -70,7 +70,7 @@ ElfType get_elf_linkage(const char *path)
 	FILE *elf_file = NULL;
 	uint8_t pHeader[HEADERSIZE] = "";
 
-	elf_file = fopen(path, "r");
+	elf_file = fopen(path, "re");
 	if (elf_file) {
 		if (fread(pHeader, 1, HEADERSIZE, elf_file) == HEADERSIZE) {
 			if (is_elf_magic(pHeader)) {
