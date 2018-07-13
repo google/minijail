@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	FILE *f = fopen(argv[1], "r");
+	FILE *f = fopen(argv[1], "re");
 	if (!f) {
 		pdie("fopen(%s) failed", argv[1]);
 	}
