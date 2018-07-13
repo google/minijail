@@ -1580,7 +1580,7 @@ TEST(FilterTest, include_invalid_policy) {
   ASSERT_NE(policy_file, nullptr);
 
   /* Ensure the included (invalid) policy file exists. */
-  FILE *included_file = fopen("./test/invalid_syscall_name.policy", "r");
+  FILE *included_file = fopen("./test/invalid_syscall_name.policy", "re");
   ASSERT_NE(included_file, nullptr);
   fclose(included_file);
 
@@ -1600,7 +1600,7 @@ TEST(FilterTest, include_nested) {
   ASSERT_NE(policy_file, nullptr);
 
   /* Ensure the policy file exists. */
-  FILE *included_file = fopen("./test/nested.policy", "r");
+  FILE *included_file = fopen("./test/nested.policy", "re");
   ASSERT_NE(included_file, nullptr);
   fclose(included_file);
 
