@@ -121,8 +121,15 @@ size_t bpf_comp_jgt64(struct sock_filter *filter, uint64_t c, unsigned char jt,
 	struct sock_filter *curr_block = filter;
 
 	/* bpf_load_arg leaves |hi| in A. */
-	curr_block += bpf_comp_jgt32(curr_block, hi, SKIPN(3) + jt, NEXT);
-	curr_block += bpf_comp_jeq32(curr_block, hi, NEXT, SKIPN(2) + jf);
+	if (hi == 0) {
+		curr_block +=
+		    bpf_comp_jgt32(curr_block, hi, SKIPN(2) + jt, NEXT);
+	} else {
+		curr_block +=
+		    bpf_comp_jgt32(curr_block, hi, SKIPN(3) + jt, NEXT);
+		curr_block +=
+		    bpf_comp_jeq32(curr_block, hi, NEXT, SKIPN(2) + jf);
+	}
 	set_bpf_stmt(curr_block++, BPF_LD + BPF_MEM, 0); /* swap in |lo| */
 	curr_block += bpf_comp_jgt32(curr_block, lo, jt, jf);
 
@@ -138,8 +145,15 @@ size_t bpf_comp_jge64(struct sock_filter *filter, uint64_t c, unsigned char jt,
 	struct sock_filter *curr_block = filter;
 
 	/* bpf_load_arg leaves |hi| in A. */
-	curr_block += bpf_comp_jgt32(curr_block, hi, SKIPN(3) + jt, NEXT);
-	curr_block += bpf_comp_jeq32(curr_block, hi, NEXT, SKIPN(2) + jf);
+	if (hi == 0) {
+		curr_block +=
+		    bpf_comp_jgt32(curr_block, hi, SKIPN(2) + jt, NEXT);
+	} else {
+		curr_block +=
+		    bpf_comp_jgt32(curr_block, hi, SKIPN(3) + jt, NEXT);
+		curr_block +=
+		    bpf_comp_jeq32(curr_block, hi, NEXT, SKIPN(2) + jf);
+	}
 	set_bpf_stmt(curr_block++, BPF_LD + BPF_MEM, 0); /* swap in |lo| */
 	curr_block += bpf_comp_jge32(curr_block, lo, jt, jf);
 
@@ -190,7 +204,7 @@ size_t bpf_comp_jin(struct sock_filter *filter, unsigned long mask,
 	return bpf_comp_jset(filter, negative_mask, jf, jt);
 }
 
-static size_t bpf_arg_comp_len(int op)
+static size_t bpf_arg_comp_len(int op, unsigned long c attribute_unused)
 {
 	/* The comparisons that use gt/ge internally may have extra opcodes. */
 	switch (op) {
@@ -198,6 +212,13 @@ static size_t bpf_arg_comp_len(int op)
 	case LE:
 	case GT:
 	case GE:
+#if defined(BITS64)
+		/*
+		 * |c| can only have a high 32-bit part when running on 64 bits.
+		 */
+		if ((c >> 32) == 0)
+			return BPF_ARG_SHORT_GT_GE_COMP_LEN + 1;
+#endif
 		return BPF_ARG_GT_GE_COMP_LEN + 1;
 	default:
 		return BPF_ARG_COMP_LEN + 1;
@@ -207,7 +228,7 @@ static size_t bpf_arg_comp_len(int op)
 size_t bpf_arg_comp(struct sock_filter **pfilter, int op, int argidx,
 		    unsigned long c, unsigned int label_id)
 {
-	size_t filter_len = bpf_arg_comp_len(op);
+	size_t filter_len = bpf_arg_comp_len(op, c);
 	struct sock_filter *filter =
 	    calloc(filter_len, sizeof(struct sock_filter));
 	struct sock_filter *curr_block = filter;
