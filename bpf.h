@@ -68,10 +68,12 @@ struct seccomp_data {
  * On 32 bits, comparisons take 2 instructions: 1 for loading the argument,
  * 1 for the actual comparison.
  */
-#define BPF_LOAD_ARG_LEN	1U
-#define BPF_COMP_LEN		1U
-#define BPF_GT_GE_COMP_LEN	1U
+#define BPF_LOAD_ARG_LEN		1U
+#define BPF_COMP_LEN			1U
+#define BPF_SHORT_GT_GE_COMP_LEN	1U
+#define BPF_GT_GE_COMP_LEN		1U
 #define BPF_ARG_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_COMP_LEN)
+#define BPF_ARG_SHORT_GT_GE_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_SHORT_GT_GE_COMP_LEN)
 #define BPF_ARG_GT_GE_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_GT_GE_COMP_LEN)
 
 #define bpf_comp_jeq bpf_comp_jeq32
@@ -86,10 +88,12 @@ struct seccomp_data {
  * On 64 bits, comparisons take 7-8 instructions: 4 for loading the argument,
  * and 3-4 for the actual comparison.
  */
-#define BPF_LOAD_ARG_LEN	4U
-#define BPF_COMP_LEN		3U
-#define BPF_GT_GE_COMP_LEN	4U
+#define BPF_LOAD_ARG_LEN		4U
+#define BPF_COMP_LEN			3U
+#define BPF_SHORT_GT_GE_COMP_LEN	3U
+#define BPF_GT_GE_COMP_LEN		4U
 #define BPF_ARG_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_COMP_LEN)
+#define BPF_ARG_SHORT_GT_GE_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_SHORT_GT_GE_COMP_LEN)
 #define BPF_ARG_GT_GE_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_GT_GE_COMP_LEN)
 
 #define bpf_comp_jeq bpf_comp_jeq64
