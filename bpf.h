@@ -70,23 +70,31 @@ struct seccomp_data {
  */
 #define BPF_LOAD_ARG_LEN	1U
 #define BPF_COMP_LEN		1U
+#define BPF_GT_GE_COMP_LEN	1U
 #define BPF_ARG_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_COMP_LEN)
+#define BPF_ARG_GT_GE_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_GT_GE_COMP_LEN)
 
 #define bpf_comp_jeq bpf_comp_jeq32
+#define bpf_comp_jgt bpf_comp_jgt32
+#define bpf_comp_jge bpf_comp_jge32
 #define bpf_comp_jset bpf_comp_jset32
 
 #define LO_ARG(idx) offsetof(struct seccomp_data, args[(idx)])
 
 #elif defined(BITS64)
 /*
- * On 64 bits, comparisons take 7 instructions: 4 for loading the argument,
- * and 3 for the actual comparison.
+ * On 64 bits, comparisons take 7-8 instructions: 4 for loading the argument,
+ * and 3-4 for the actual comparison.
  */
 #define BPF_LOAD_ARG_LEN	4U
 #define BPF_COMP_LEN		3U
+#define BPF_GT_GE_COMP_LEN	4U
 #define BPF_ARG_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_COMP_LEN)
+#define BPF_ARG_GT_GE_COMP_LEN (BPF_LOAD_ARG_LEN + BPF_GT_GE_COMP_LEN)
 
 #define bpf_comp_jeq bpf_comp_jeq64
+#define bpf_comp_jgt bpf_comp_jgt64
+#define bpf_comp_jge bpf_comp_jge64
 #define bpf_comp_jset bpf_comp_jset64
 
 /* Ensure that we load the logically correct offset. */
@@ -175,6 +183,10 @@ void free_label_strings(struct bpf_labels *labels);
 /* BPF helper functions. */
 size_t bpf_load_arg(struct sock_filter *filter, int argidx);
 size_t bpf_comp_jeq(struct sock_filter *filter, unsigned long c,
+		    unsigned char jt, unsigned char jf);
+size_t bpf_comp_jgt(struct sock_filter *filter, unsigned long c,
+		    unsigned char jt, unsigned char jf);
+size_t bpf_comp_jge(struct sock_filter *filter, unsigned long c,
 		    unsigned char jt, unsigned char jf);
 size_t bpf_comp_jset(struct sock_filter *filter, unsigned long mask,
 		     unsigned char jt, unsigned char jf);
