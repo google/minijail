@@ -68,13 +68,15 @@ Atoms are of the form \fIarg{DNUM} {OP} {NUM}\fR where:
 .IP
 \[bu] \fIDNUM\fR is a decimal number
 
-\[bu] \fIOP\fR is an operator:
-\fI==\fR, \fI!=\fR, \fI&\fR (flags set), or \fIin\fR (inclusion)
+\[bu] \fIOP\fR is an unsigned comparison operator:
+\fI==\fR, \fI!=\fR, \fI<\fR, \fI<=\fR, \fI>\fR, \fI>=\fR, \fI&\fR (flags set),
+or \fIin\fR (inclusion)
 
 \[bu] \fINUM\fR is an octal, decimal, or hexadecimal number
 .RE
 
-\fI==\fR and \fI!=\fR should be pretty self explanatory.
+\fI==\fR, \fI!=\fR, \fI<\fR, \fI<=\fR, \fI>\fR, and \fI>=\fR should be pretty
+self explanatory.
 
 \fI&\fR will test for a flag being set, for example, O_RDONLY for
 .BR open (2):
