@@ -5,6 +5,7 @@
 
 #include <getopt.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <string>
 
@@ -29,7 +30,10 @@ void DumpBpfProg(struct sock_fprog* fprog) {
 void Usage(const char* progn, int status) {
   // clang-format off
   fprintf(status ? stderr : stdout,
-          "Usage: %s [--dump[=<output.bpf>]] <policy file>\n"
+          "Usage: %s [--dump[=<output.bpf>]] [<policy file>]\n"
+          "\n"
+          "With no <policy file>, or when <policy file> is -, reads from standard input.\n"
+          "\n"
           " --dump[=<output>]:  Dump the BPF program into stdout (or <output>,\n"
           "      -d[<output>]:  if provided). Useful if you want to inspect it\n"
           "                     with libseccomp's scmp_bpf_disasm.\n",
@@ -66,12 +70,11 @@ int main(int argc, char** argv) {
     }
   }
 
-  // There should be at least one additional unparsed argument: the
+  FILE* f = stdin;
+  // If there is at least one additional unparsed argument, treat it as the
   // policy script.
-  if (argc == optind)
-    Usage(argv[0], 1);
-
-  FILE* f = fopen(argv[optind], "re");
+  if (argc > optind && strcmp(argv[optind], "-") != 0)
+    f = fopen(argv[optind], "re");
   if (!f)
     pdie("fopen(%s) failed", argv[1]);
 
