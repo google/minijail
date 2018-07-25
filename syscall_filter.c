@@ -40,6 +40,14 @@ int str_to_op(const char *op_str)
 		return EQ;
 	} else if (!strcmp(op_str, "!=")) {
 		return NE;
+	} else if (!strcmp(op_str, "<")) {
+		return LT;
+	} else if (!strcmp(op_str, "<=")) {
+		return LE;
+	} else if (!strcmp(op_str, ">")) {
+		return GT;
+	} else if (!strcmp(op_str, ">=")) {
+		return GE;
 	} else if (!strcmp(op_str, "&")) {
 		return SET;
 	} else if (!strcmp(op_str, "in")) {
