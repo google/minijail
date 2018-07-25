@@ -27,6 +27,12 @@ do {	\
 	EXPECT_EQ((_block)->instrs->code, BPF_LD+BPF_W+BPF_ABS);	\
 } while (0)
 
+#define EXPECT_GT_GE_COMP(_block) \
+do {	\
+	EXPECT_EQ((_block)->len, BPF_ARG_GT_GE_COMP_LEN + 1);		\
+	EXPECT_EQ((_block)->instrs->code, BPF_LD+BPF_W+BPF_ABS);	\
+} while (0)
+
 #define EXPECT_LBL(_block) \
 do {	\
 	EXPECT_TRUE((_block)->code == (BPF_JMP+BPF_JA));	\
