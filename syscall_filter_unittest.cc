@@ -410,9 +410,52 @@ TEST_F(ArgFilterTest, arg0_equals) {
   free_block_list(block);
 }
 
-TEST_F(ArgFilterTest, arg0_gt_ge_comparisons) {
+TEST_F(ArgFilterTest, arg0_short_gt_ge_comparisons) {
   for (const char* fragment :
        {"arg1 < 0xff", "arg1 <= 0xff", "arg1 > 0xff", "arg1 >= 0xff"}) {
+    struct filter_block* block =
+        compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+
+    ASSERT_NE(block, nullptr);
+    size_t exp_total_len = 1 + (BPF_ARG_SHORT_GT_GE_COMP_LEN + 1) + 2 + 1 + 2;
+    EXPECT_EQ(block->total_len, exp_total_len);
+
+    // First block is a label.
+    struct filter_block* curr_block = block;
+    ASSERT_NE(curr_block, nullptr);
+    EXPECT_EQ(curr_block->len, 1U);
+    EXPECT_LBL(curr_block->instrs);
+
+    // Second block is a short gt/ge comparison.
+    curr_block = curr_block->next;
+    EXPECT_SHORT_GT_GE_COMP(curr_block);
+
+    // Third block is a jump and a label (end of AND group).
+    curr_block = curr_block->next;
+    ASSERT_NE(curr_block, nullptr);
+    EXPECT_GROUP_END(curr_block);
+
+    // Fourth block is SECCOMP_RET_KILL.
+    curr_block = curr_block->next;
+    ASSERT_NE(curr_block, nullptr);
+    EXPECT_KILL(curr_block);
+
+    // Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW.
+    curr_block = curr_block->next;
+    ASSERT_NE(curr_block, nullptr);
+    EXPECT_ALLOW(curr_block);
+
+    EXPECT_EQ(curr_block->next, nullptr);
+
+    free_block_list(block);
+  }
+}
+
+#if defined(BITS64)
+TEST_F(ArgFilterTest, arg0_long_gt_ge_comparisons) {
+  for (const char* fragment :
+       {"arg1 < 0xbadc0ffee0ddf00d", "arg1 <= 0xbadc0ffee0ddf00d",
+        "arg1 > 0xbadc0ffee0ddf00d", "arg1 >= 0xbadc0ffee0ddf00d"}) {
     struct filter_block* block =
         compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
 
@@ -450,6 +493,7 @@ TEST_F(ArgFilterTest, arg0_gt_ge_comparisons) {
     free_block_list(block);
   }
 }
+#endif
 
 TEST_F(ArgFilterTest, arg0_mask) {
   const char *fragment = "arg1 & O_RDWR";
