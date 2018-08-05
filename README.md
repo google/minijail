@@ -1,6 +1,6 @@
 # Minijail
 
-The Minijail homepage & main repo is
+The Minijail homepage and main repo is
 https://android.googlesource.com/platform/external/minijail/.
 
 There might be other copies floating around, but this is the official one!
@@ -9,13 +9,13 @@ There might be other copies floating around, but this is the official one!
 
 ## What is it?
 
-Minijail is a sandboxing and containment tool used in Chrome OS, and Android.
+Minijail is a sandboxing and containment tool used in Chrome OS and Android.
 It provides an executable that can be used to launch and sandbox other programs,
 and a library that can be used by code to sandbox itself.
 
-## Getting The Code
+## Getting the code
 
-You're one git clone away from happiness.
+You're one `git clone` away from happiness.
 
 ```
 $ git clone https://android.googlesource.com/platform/external/minijail
@@ -29,7 +29,7 @@ https://android.googlesource.com/platform/external/minijail/+refs
 
 See the [HACKING.md](./HACKING.md) document for more details.
 
-## Release Process
+## Release process
 
 See the [RELEASE.md](./RELEASE.md) document for more details.
 
@@ -51,14 +51,14 @@ We've got a couple of contact points.
 [crbug.com/new]: https://bugs.chromium.org/p/chromium/issues/entry?components=OS>Systems>Minijail
 [AOSP Gerrit]: https://android-review.googlesource.com/q/project:platform/external/minijail
 
-## Talks and Presentations
+## Talks and presentations
 
 The following talk serves as a good introduction to Minijail and how it can be used.
 
 [Video](https://drive.google.com/file/d/0BwPS_JpKyELWZTFBcTVsa1hhYjA/preview),
 [slides](https://docs.google.com/presentation/d/1r6LpvDZtYrsl7ryOV4HtpUR-phfCLRL6PA-chcL1Kno/present).
 
-## Example Usage
+## Example usage
 
 The Chromium OS project has a comprehensive
 [sandboxing](https://chromium.googlesource.com/chromiumos/docs/+/master/sandboxing.md)
