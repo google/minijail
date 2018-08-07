@@ -44,6 +44,14 @@
 _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 #endif
 
+int secure_keep_caps_locked(void)
+{
+	int bits = prctl(PR_GET_SECUREBITS);
+	if (bits < 0)
+		return 0;
+	return bits & SECBIT_KEEP_CAPS_LOCKED;
+}
+
 int secure_noroot_set_and_locked(uint64_t mask)
 {
 	return (mask & (SECBIT_NOROOT | SECBIT_NOROOT_LOCKED)) ==
