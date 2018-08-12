@@ -205,6 +205,7 @@ void minijail_mount_dev(struct minijail *j);
  *
  * This may be called multiple times; all mounts will be applied in the order
  * of minijail_mount() calls.
+ * If @flags is 0, then MS_NODEV | MS_NOEXEC | MS_NOSUID will be used instead.
  */
 int minijail_mount_with_data(struct minijail *j, const char *src,
 			     const char *dest, const char *type,

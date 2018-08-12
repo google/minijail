@@ -732,9 +732,13 @@ int API minijail_mount_with_data(struct minijail *j, const char *src,
 			goto error;
 		m->has_data = 1;
 	}
+
+	/* If they don't specify any flags, default to secure ones. */
+	if (flags == 0)
+		flags = MS_NODEV | MS_NOEXEC | MS_NOSUID;
 	m->flags = flags;
 
-	info("mount %s -> %s type '%s'", src, dest, type);
+	info("mount '%s' -> '%s' type '%s' flags %#lx", src, dest, type, flags);
 
 	/*
 	 * Force vfs namespacing so the mounts don't leak out into the
