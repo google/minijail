@@ -19,6 +19,17 @@
 
 namespace {
 
+// TODO(jorgelo): Android unit tests don't currently support data files.
+// Re-enable by creating a temporary policy file at runtime.
+#if !defined(__ANDROID__)
+
+std::string source_path(std::string file) {
+  std::string srcdir = getenv("SRC") ? : ".";
+  return srcdir + "/" + file;
+}
+
+#endif
+
 // Simple C++ -> C wrappers to simplify test code.
 
 enum ret_trap {
@@ -1618,7 +1629,8 @@ TEST(FilterTest, include) {
                                  USE_RET_KILL);
   fclose(file_plain);
 
-  std::string policy_with_include = "@include ./test/seccomp.policy\n";
+  std::string policy_with_include =
+      "@include " + source_path("test/seccomp.policy") + "\n";
 
   FILE* file_with_include = write_policy_to_pipe(policy_with_include);
   ASSERT_NE(file_with_include, nullptr);
@@ -1666,7 +1678,7 @@ TEST(FilterTest, include_same_syscalls) {
       "write: 1\n"
       "rt_sigreturn: 1\n"
       "exit: 1\n"
-      "@include ./test/seccomp.policy\n";
+      "@include " + source_path("test/seccomp.policy") + "\n";
 
   FILE* policy_file = write_policy_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
@@ -1694,7 +1706,8 @@ TEST(FilterTest, include_invalid_policy) {
   ASSERT_NE(policy_file, nullptr);
 
   /* Ensure the included (invalid) policy file exists. */
-  FILE* included_file = fopen("./test/invalid_syscall_name.policy", "re");
+  FILE* included_file = fopen(
+      source_path("test/invalid_syscall_name.policy").c_str(), "re");
   ASSERT_NE(included_file, nullptr);
   fclose(included_file);
 
@@ -1712,7 +1725,7 @@ TEST(FilterTest, include_nested) {
   ASSERT_NE(policy_file, nullptr);
 
   /* Ensure the policy file exists. */
-  FILE* included_file = fopen("./test/nested.policy", "re");
+  FILE* included_file = fopen(source_path("test/nested.policy").c_str(), "re");
   ASSERT_NE(included_file, nullptr);
   fclose(included_file);
 

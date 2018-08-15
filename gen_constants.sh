@@ -17,7 +17,7 @@ if [ $# -ne 1 ] && [ $# -ne 2 ]; then
   exit 1
 fi
 
-BUILD="${CC} -dD gen_constants.c -E"
+BUILD="${CC} -dD ${SRC:-.}/gen_constants.c -E"
 GEN_DEPS=1
 
 if [ $# -eq 2 ]; then
