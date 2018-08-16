@@ -342,7 +342,7 @@ TEST_F(ArgFilterTest, empty_atom) {
   const char* fragment = "";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -350,7 +350,7 @@ TEST_F(ArgFilterTest, whitespace_atom) {
   const char* fragment = "\t    ";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -358,7 +358,7 @@ TEST_F(ArgFilterTest, no_comparison) {
   const char* fragment = "arg0";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -366,7 +366,7 @@ TEST_F(ArgFilterTest, no_constant) {
   const char* fragment = "arg0 ==";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -374,7 +374,7 @@ TEST_F(ArgFilterTest, arg0_equals) {
   const char *fragment = "arg0 == 0";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -414,7 +414,8 @@ TEST_F(ArgFilterTest, arg0_short_gt_ge_comparisons) {
   for (const char* fragment :
        {"arg1 < 0xff", "arg1 <= 0xff", "arg1 > 0xff", "arg1 >= 0xff"}) {
     struct filter_block* block =
-        compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+        compile_policy_line(&state_, nr_, fragment, id_, &labels_,
+                            USE_RET_KILL);
 
     ASSERT_NE(block, nullptr);
     size_t exp_total_len = 1 + (BPF_ARG_SHORT_GT_GE_COMP_LEN + 1) + 2 + 1 + 2;
@@ -457,7 +458,8 @@ TEST_F(ArgFilterTest, arg0_long_gt_ge_comparisons) {
        {"arg1 < 0xbadc0ffee0ddf00d", "arg1 <= 0xbadc0ffee0ddf00d",
         "arg1 > 0xbadc0ffee0ddf00d", "arg1 >= 0xbadc0ffee0ddf00d"}) {
     struct filter_block* block =
-        compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+        compile_policy_line(&state_, nr_, fragment, id_, &labels_,
+                            USE_RET_KILL);
 
     ASSERT_NE(block, nullptr);
     size_t exp_total_len = 1 + (BPF_ARG_GT_GE_COMP_LEN + 1) + 2 + 1 + 2;
@@ -499,7 +501,7 @@ TEST_F(ArgFilterTest, arg0_mask) {
   const char *fragment = "arg1 & O_RDWR";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -539,7 +541,7 @@ TEST_F(ArgFilterTest, arg0_flag_set_inclusion) {
   const char *fragment = "arg0 in O_RDONLY|O_CREAT";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -580,7 +582,7 @@ TEST_F(ArgFilterTest, arg0_eq_mask) {
   const char *fragment = "arg1 == O_WRONLY|O_CREAT";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -623,7 +625,7 @@ TEST_F(ArgFilterTest, and_or) {
   const char *fragment = "arg0 == 0 && arg1 == 0 || arg0 == 1";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + 3 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -678,7 +680,7 @@ TEST_F(ArgFilterTest, ret_errno) {
   const char *fragment = "arg0 == 0 || arg0 == 1; return 1";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + 2 * (BPF_ARG_COMP_LEN + 1) + 2 + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -731,7 +733,7 @@ TEST_F(ArgFilterTest, unconditional_errno) {
   const char *fragment = "return 1";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -759,7 +761,7 @@ TEST_F(ArgFilterTest, invalid_arg_token) {
   const char *fragment = "org0 == 0";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -767,7 +769,7 @@ TEST_F(ArgFilterTest, invalid_arg_number) {
   const char *fragment = "argnn == 0";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -775,7 +777,7 @@ TEST_F(ArgFilterTest, extra_chars_in_arg_token) {
   const char* fragment = "arg0n == 0";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -783,7 +785,7 @@ TEST_F(ArgFilterTest, invalid_operator) {
   const char* fragment = "arg0 invalidop 0";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -791,7 +793,7 @@ TEST_F(ArgFilterTest, invalid_constant) {
   const char *fragment = "arg0 == INVALIDCONSTANT";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -799,7 +801,7 @@ TEST_F(ArgFilterTest, extra_tokens) {
   const char* fragment = "arg0 == 0 EXTRATOKEN";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -807,7 +809,7 @@ TEST_F(ArgFilterTest, invalid_errno) {
   const char *fragment = "arg0 == 0 && arg1 == 1; return errno";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_EQ(block, nullptr);
 }
 
@@ -815,7 +817,7 @@ TEST_F(ArgFilterTest, log_no_ret_error) {
   const char *fragment = "arg0 == 0";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_TRAP);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -856,7 +858,7 @@ TEST_F(ArgFilterTest, log_bad_ret_error) {
   const char *fragment = "arg0 == 0; return";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, NO_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_KILL);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -898,7 +900,7 @@ TEST_F(ArgFilterTest, no_log_bad_ret_error) {
   const char *fragment = "arg0 == 0; return";
 
   struct filter_block* block =
-      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_LOGGING);
+      compile_policy_line(&state_, nr_, fragment, id_, &labels_, USE_RET_TRAP);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
