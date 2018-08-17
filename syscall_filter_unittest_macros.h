@@ -3,12 +3,6 @@
  * found in the LICENSE file.
  */
 
-#define USE_RET_KILL 0
-#define USE_RET_TRAP 1
-
-#define NO_LOGGING  0
-#define USE_LOGGING 1
-
 /* BPF testing macros. */
 #define EXPECT_EQ_BLOCK(_block, _code, _k, _jt, _jf)	\
 do {	\
