@@ -106,10 +106,11 @@ static inline int is_android(void)
 }
 
 void __asan_init(void) attribute_weak;
+void __hwasan_init(void) attribute_weak;
 
-static inline int running_with_asan(void)
+static inline int running_with_asan_or_hwasan(void)
 {
-	return &__asan_init != 0;
+	return &__asan_init != 0 || &__hwasan_init != 0;
 }
 
 int lookup_syscall(const char *name);
