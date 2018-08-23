@@ -93,7 +93,9 @@ all three, then specify something like \fIMS_SILENT\fR.
 
 The \fIdata\fR field is optional and is a comma delimited string (see
 \fBmount\fR(2) for details).  It is passed directly to the kernel, so all
-fields here are filesystem specific.
+fields here are filesystem specific.  For \fItmpfs\fR, if no data is specified,
+we will default to \fImode=0755,size=10M\fR.  If you want other settings, you
+will need to specify them explicitly yourself.
 
 If the mount is not a pseudo filesystem (e.g. proc or sysfs), \fIsrc\fR path
 must be an absolute path (e.g. \fI/dev/sda1\fR and not \fIsda1\fR).
