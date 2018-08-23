@@ -13,8 +13,6 @@
 #include "util.h"
 
 /* clang-format off */
-#define MAX_POLICY_LINE_LENGTH	1024
-
 #define ONE_INSTR	1
 #define TWO_INSTRS	2
 
@@ -349,12 +347,8 @@ struct filter_block *compile_policy_line(struct parser_state *state, int nr,
 		return NULL;
 	}
 
-	/* Checks for overly long policy lines. */
-	if (strlen(policy_line) >= MAX_POLICY_LINE_LENGTH)
-		return NULL;
-
 	/* We will modify |policy_line|, so let's make a copy. */
-	char *line = strndup(policy_line, MAX_POLICY_LINE_LENGTH);
+	char *line = strdup(policy_line);
 	if (!line)
 		return NULL;
 
