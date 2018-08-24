@@ -1841,7 +1841,7 @@ static void set_seccomp_filter(const struct minijail *j)
 	 * build time, so this cannot be used by an attacker to skip setting
 	 * seccomp filter.
 	 */
-	if (j->flags.seccomp_filter && running_with_asan_or_hwasan()) {
+	if (j->flags.seccomp_filter && running_with_asan()) {
 		warn("running with (HW)ASan, not setting seccomp filter");
 		return;
 	}
