@@ -86,9 +86,10 @@ root is active, \fIdest\fR will automatically be placed below that path.
 
 The \fIflags\fR field is optional and may be a mix of \fIMS_XXX\fR or hex
 constants separated by \fI|\fR characters.  See \fBmount\fR(2) for details.
-\fIMS_NODEV|MS_NOSUID|MS_NOEXEC\fR is a common value here (a writable mount
+\fIMS_NODEV|MS_NOSUID|MS_NOEXEC\fR is the default value (a writable mount
 with nodev/nosuid/noexec bits set), and it is strongly recommended that all
-mounts have these three bits set whenever possible.
+mounts have these three bits set whenever possible.  If you need to disable
+all three, then specify something like \fIMS_SILENT\fR.
 
 The \fIdata\fR field is optional and is a comma delimited string (see
 \fBmount\fR(2) for details).  It is passed directly to the kernel, so all
