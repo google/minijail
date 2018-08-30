@@ -1867,7 +1867,6 @@ static void set_seccomp_filter(const struct minijail *j)
 			 */
 			if (signal(SIGSYS, SIG_DFL) == SIG_ERR)
 				pdie("failed to reset SIGSYS disposition");
-			info("reset SIGSYS disposition");
 		}
 	}
 
