@@ -30,10 +30,11 @@ because the permitted and inheritable capability sets have already been set
 through \fB-c\fR.
 .TP
 \fB-c <caps>\fR
-Restrict capabilities to \fIcaps\fR, which is a hex constant that represents
-the capability mask that will be used as the permitted, effective, and
-inheritable sets.  When used in conjunction with \fB-u\fR and \fB-g\fR, this
-allows a program to have access to only certain parts of root's default
+Restrict capabilities to \fIcaps\fR, which is either a hex constant or a string
+that will be passed to \fBcap_from_text\fR(3) (only the effective capability
+mask will be considered).  The value will be used as the permitted, effective,
+and inheritable sets.  When used in conjunction with \fB-u\fR and \fB-g\fR,
+this allows a program to have access to only certain parts of root's default
 privileges while running as another user and group ID altogether.  Note that
 these capabilities are not inherited by subprocesses of the process given
 capabilities unless those subprocesses have POSIX file capabilities or the
