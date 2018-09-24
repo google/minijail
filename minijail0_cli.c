@@ -94,6 +94,14 @@ static void use_caps(struct minijail *j, const char *arg)
 		for (i = 0; i <= last_valid_cap; ++i) {
 			if (cap_get_flag(parsed_caps, i, CAP_EFFECTIVE,
 					 &cap_value)) {
+				if (errno == EINVAL) {
+					/*
+					 * Some versions of libcap reject any
+					 * capabilities they were not compiled
+					 * with by returning EINVAL.
+					 */
+					continue;
+				}
 				fprintf(stderr,
 					"Could not get the value of "
 					"the %d-th capability: %m\n",
