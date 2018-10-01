@@ -18,6 +18,12 @@ ifeq ($(USE_seccomp),no)
 CPPFLAGS += -DUSE_SECCOMP_SOFTFAIL
 endif
 
+# Allow people to use -L and related flags.
+ALLOW_DEBUG_LOGGING ?= yes
+ifeq ($(ALLOW_DEBUG_LOGGING),yes)
+CPPFLAGS += -DALLOW_DEBUG_LOGGING
+endif
+
 ifeq ($(USE_ASAN),yes)
 CPPFLAGS += -fsanitize=address
 LDFLAGS += -fsanitize=address
