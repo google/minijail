@@ -33,6 +33,7 @@ minijailCommonLibraries = ["libcap"]
 cc_defaults {
     name: "libminijail_flags",
     cflags: [
+        "-DALLOW_DEBUG_LOGGING",
         "-DHAVE_SECUREBITS_H",
         "-Wall",
         "-Werror",
