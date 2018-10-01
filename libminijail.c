@@ -375,7 +375,11 @@ void API minijail_log_seccomp_filter_failures(struct minijail *j)
 		die("minijail_log_seccomp_filter_failures() must be called "
 		    "before minijail_parse_seccomp_filters()");
 	}
+#ifdef ALLOW_DEBUG_LOGGING
 	j->flags.seccomp_filter_logging = 1;
+#else
+	warn("non-debug build: ignoring request to enable seccomp logging");
+#endif
 }
 
 void API minijail_use_caps(struct minijail *j, uint64_t capmask)
