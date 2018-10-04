@@ -105,7 +105,7 @@ int write_proc_file(pid_t pid, const char *content, const char *basename)
 	written = write(fd, content, len);
 	if (written < 0) {
 		pwarn("failed to write '%s'", filename);
-		return -1;
+		return -errno;
 	}
 
 	if ((size_t)written < len) {
