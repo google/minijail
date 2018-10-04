@@ -77,9 +77,32 @@ host kernel or something like 32/64-bit compatibility issues exist.)
 \fB-i\fR
 Exit immediately after \fBfork\fR(2).  The jailed process will keep running in
 the background.
+
+Normally minijail will fork+exec the specified \fIprogram\fR so that it can set
+up the right security settings in the new child process. The initial minijail
+process will stay resident and wait for the \fIprogram\fR to exit so the script
+that ran minijail will correctly block (e.g. standalone scripts). Specifying
+\fB-i\fR makes that initial process exit immediately and free up the resources.
+
+This option is recommended for daemons and init services when you want to
+background the long running \fIprogram\fR.
 .TP
 \fB-I\fR
 Run \fIprogram\fR as init (pid 1) inside a new pid namespace (implies \fB-p\fR).
+
+Most programs don't expect to run as an init which is why minijail will do it
+for you by default. Basically, the \fIprogram\fR needs to reap any processes it
+forks to avoid leaving zombies behind. Signal handling needs care since the
+kernel will mask all signals that don't have handlers registered (all default
+handlers are ignored and cannot be changed).
+
+This means a minijail process (acting as init) will remain resident by default.
+While using \fB-I\fR is recommended when possible, strict review is required to
+make sure the \fIprogram\fR continues to work as expected.
+
+\fB-i\fR and \fB-I\fR may be safely used together. The \fB-i\fR option controls
+the first minijail process outside of the pid namespace while the \fB-I\fR
+option controls the minijail process inside of the pid namespace.
 .TP
 \fB-k <src>,<dest>,<type>[,<flags>[,<data>]]\fR
 Mount \fIsrc\fR, a \fItype\fR filesystem, at \fIdest\fR.  If a chroot or pivot
@@ -160,6 +183,12 @@ Run inside a new PID namespace. This option will make it impossible for the
 program to see or affect processes that are not its descendants. This implies
 \fB-v\fR and \fB-r\fR, since otherwise the process can see outside its namespace
 by inspecting /proc.
+
+If the \fIprogram\fR exits, all of its children will be killed immediately by
+the kernel. If you need to daemonize or background things, use the \fB-i\fR
+option.
+
+See \fBpid_namespaces\fR(7) for more info.
 .TP
 \fB-P <dir>\fR
 Set \fIdir\fR as the root fs using \fBpivot_root\fR. Implies \fB-v\fR, not
