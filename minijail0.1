@@ -290,17 +290,40 @@ Set up a minimalistic mount namespace.  Equivalent to \fB-v -P /var/empty
 -b /,/ -b /proc,/proc -t -r --mount-dev\fR.
 .SH IMPLEMENTATION
 This program is broken up into two parts: \fBminijail0\fR (the frontend) and a helper
-library called \fBlibminijailpreload\fR. Some jailings can only be achieved from
-the process to which they will actually apply - specifically capability use
-(since capabilities are not inherited to an exec'd process unless the exec'd
-process has POSIX file capabilities), seccomp (since we can't exec() once we're
-seccomp'd), and ptrace-disable (which is always cleared on exec()).
+library called \fBlibminijailpreload\fR.  Some jailings can only be achieved
+from the process to which they will actually apply:
+
+.IP
+\[bu] capability use (without using ambient capabilities): non-ambient
+capabilities are not inherited across \fBexecve\fR(2) unless the file being
+executed has POSIX file capabilities.  Ambient capabilities (the
+\fB--ambient\fR flag) fix capability inheritance across \fBexecve\fR(2) to
+avoid the need for file capabilities.
+
+\[bu] seccomp: a meaningful seccomp filter policy should disallow
+\fBexecve\fR(2), to prevent a compromised process from executing a different
+binary.  However, this would prevent the seccomp policy from being applied
+before \fBexecve\fR(2).
+.RE
 
 To this end, \fBlibminijailpreload\fR is forcibly loaded into all
-dynamically-linked target programs if any of these restrictions are in effect;
-we pass the specific restrictions in an environment variable which the preloaded
-library looks for. The forcibly-loaded library then applies the restrictions
-to the newly-loaded program.
+dynamically-linked target programs by default; we pass the specific
+restrictions in an environment variable which the preloaded library looks for.
+The forcibly-loaded library then applies the restrictions to the newly-loaded
+program.
+
+This behavior can be disabled by the use of the \fB-T static\fR flag.  There
+are other cases in which the use of this flag might be useful:
+
+.IP
+\[bu] When \fIprogram\fR is linked against a different version of \fBlibc.so\fR
+than \fBlibminijailpreload.so\fR.
+
+\[bu] When \fBexecve\fR(2) has side-effects that interact badly with the
+jailing process.  If the system uses SELinux, \fBexecve\fR(2) can cause an
+automatic domain transition, which would then require that the target domain
+allows the operations to jail \fIprogram\fR.
+.RE
 
 .SH AUTHOR
 The Chromium OS Authors <chromiumos-dev@chromium.org>
