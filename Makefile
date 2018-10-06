@@ -5,9 +5,9 @@
 BASE_VER=0
 include common.mk
 
-LIBDIR ?= lib
+LIBDIR ?= /lib
 PRELOADNAME = libminijailpreload.so
-PRELOADPATH = \"/$(LIBDIR)/$(PRELOADNAME)\"
+PRELOADPATH = \"$(LIBDIR)/$(PRELOADNAME)\"
 CPPFLAGS += -DPRELOADPATH="$(PRELOADPATH)"
 
 ifneq ($(HAVE_SECUREBITS_H),no)
