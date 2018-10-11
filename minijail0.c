@@ -19,9 +19,11 @@ int main(int argc, char *argv[])
 {
 	struct minijail *j = minijail_new();
 	const char *dl_mesg = NULL;
+	const char *preload_path = PRELOADPATH;
 	int exit_immediately = 0;
 	ElfType elftype = ELFERROR;
-	int consumed = parse_args(j, argc, argv, &exit_immediately, &elftype);
+	int consumed = parse_args(j, argc, argv, &exit_immediately, &elftype,
+				  &preload_path);
 	argc -= consumed;
 	argv += consumed;
 
@@ -54,7 +56,7 @@ int main(int argc, char *argv[])
 		 */
 
 		/* Check that we can dlopen() libminijailpreload.so. */
-		if (!dlopen(PRELOADPATH, RTLD_LAZY | RTLD_LOCAL)) {
+		if (!dlopen(preload_path, RTLD_LAZY | RTLD_LOCAL)) {
 			dl_mesg = dlerror();
 			fprintf(stderr, "dlopen(): %s\n", dl_mesg);
 			return 1;

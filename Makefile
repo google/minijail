@@ -87,6 +87,8 @@ CXX_BINARY(libminijail_unittest): libminijail_unittest.o $(CORE_OBJECT_FILES) \
 		testrunner.o
 clean: CLEAN(libminijail_unittest)
 
+TEST(CXX_BINARY(libminijail_unittest)): CC_LIBRARY(libminijailpreload.so)
+
 
 CC_LIBRARY(libminijailpreload.so): LDLIBS += -lcap -ldl
 CC_LIBRARY(libminijailpreload.so): libminijailpreload.o $(CORE_OBJECT_FILES)
