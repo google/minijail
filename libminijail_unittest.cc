@@ -637,9 +637,8 @@ TEST_F(NamespaceTest, test_namespaces) {
   char gidmap[kBufferSize];
   snprintf(gidmap, sizeof(gidmap), "0 %d 1", getgid());
 
-  // TODO: Figure out how to also make "net", "cgroup", "uts" be in the same
-  // namespace.
-  const std::vector<std::string> namespace_names = {"pid", "mnt", "user"};
+  const std::vector<std::string> namespace_names = {"pid", "mnt",    "user",
+                                                    "net", "cgroup", "uts"};
   // Grab the set of namespaces outside the container.
   std::map<std::string, std::string> init_namespaces =
       GetNamespaces(getpid(), namespace_names);
