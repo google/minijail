@@ -13,18 +13,13 @@ You'll need to install the relevant packages from your distro.
 For local experimentation (using Minijail libraries from the source directory):
 
 ```
-$ make LIBDIR=`pwd`
-$ sudo ./minijail0 -u jorgelo -g 5000 /usr/bin/id
-```
-
-For system-wide usage, change `LIBDIR` to the final location of the libraries:
-
-```
 $ make LIBDIR=/lib64
+$ sudo ./minijail0 --preload-library=./libminijailpreload.so \
+  -u ${USER} -g 5000 -- /usr/bin/id
 ```
 
-Then install `libminijail.so` and `libminijailpreload.so` to `/lib64` and
-`minijail0` to your PATH (e.g. `/usr/bin`).
+For system-wide usage, install `libminijail.so` and `libminijailpreload.so` to
+`/lib64` and `minijail0` to a directory in your `PATH` (e.g. `/usr/bin`).
 
 ## Testing
 
@@ -36,7 +31,7 @@ You can download a suitable copy of Google Test using the
 $ ./get_googletest.sh
 googletest-release-1.8.0/
 ...
-$ make LIBDIR=`pwd` tests
+$ make tests
 ```
 
 Building the tests will automatically execute them.
