@@ -27,8 +27,9 @@ namespace {
 # define ROOT_PREFIX ""
 #endif
 
-const char kShellPath[] = ROOT_PREFIX "/bin/sh";
-const char kCatPath[] = ROOT_PREFIX "/bin/cat";
+constexpr char kShellPath[] = ROOT_PREFIX "/bin/sh";
+constexpr char kCatPath[] = ROOT_PREFIX "/bin/cat";
+constexpr char kPreloadPath[] = "./libminijailpreload.so";
 
 }  // namespace
 
@@ -152,6 +153,56 @@ TEST_F(MarshalTest, 0xff) {
   memset(buf_, 0xff, sizeof(buf_));
   /* Should fail on the first consumestr since a NUL will never be found. */
   EXPECT_EQ(-EINVAL, minijail_unmarshal(j_, buf_, sizeof(buf_)));
+}
+
+TEST(Test, minijail_run_pid_pipes) {
+  constexpr char teststr[] = "test\n";
+
+  struct minijail* j = minijail_new();
+  minijail_set_preload_path(j, kPreloadPath);
+
+  char* argv[4];
+  argv[0] = const_cast<char*>(kCatPath);
+  argv[1] = nullptr;
+  pid_t pid;
+  int child_stdin, child_stdout;
+  int mj_run_ret = minijail_run_pid_pipes(j, argv[0], argv, &pid, &child_stdin,
+                                          &child_stdout, nullptr);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  const size_t teststr_len = strlen(teststr);
+  ssize_t write_ret = write(child_stdin, teststr, teststr_len);
+  EXPECT_EQ(write_ret, static_cast<ssize_t>(teststr_len));
+
+  char buf[128];
+  ssize_t read_ret = read(child_stdout, buf, 8);
+  EXPECT_EQ(read_ret, static_cast<ssize_t>(teststr_len));
+  buf[teststr_len] = 0;
+  EXPECT_EQ(strcmp(buf, teststr), 0);
+
+  int status;
+  EXPECT_EQ(kill(pid, SIGTERM), 0);
+  waitpid(pid, &status, 0);
+  ASSERT_TRUE(WIFSIGNALED(status));
+  EXPECT_EQ(WTERMSIG(status), SIGTERM);
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "echo test >&2";
+  argv[3] = nullptr;
+  int child_stderr;
+  mj_run_ret = minijail_run_pid_pipes(j, argv[0], argv, &pid, &child_stdin,
+                                      &child_stdout, &child_stderr);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  read_ret = read(child_stderr, buf, sizeof(buf));
+  EXPECT_GE(read_ret, static_cast<ssize_t>(teststr_len));
+
+  waitpid(pid, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+
+  minijail_destroy(j);
 }
 
 TEST(Test, minijail_run_pid_pipes_no_preload) {

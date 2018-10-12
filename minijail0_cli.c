@@ -491,10 +491,12 @@ static void usage(const char *progn)
 	       "  --uts[=name]: Enter a new UTS namespace (and set hostname).\n"
 	       "  --logging=<s>:Use <s> as the logging system.\n"
 	       "                <s> must be 'syslog' (default) or 'stderr'.\n"
-	       "  --profile <p>,Configure minijail0 to run with the <p> sandboxing profile,\n"
+	       "  --profile <p>:Configure minijail0 to run with the <p> sandboxing profile,\n"
 	       "                which is a convenient way to express multiple flags\n"
 	       "                that are typically used together.\n"
-	       "                See the minijail0(1) man page for the full list.\n");
+	       "                See the minijail0(1) man page for the full list.\n"
+	       "  --preload-library=<f>:Overrides the path to \"" PRELOADPATH "\".\n"
+	       "                This is only really useful for local testing.\n");
 	/* clang-format on */
 }
 
@@ -509,8 +511,9 @@ static void seccomp_filter_usage(const char *progn)
 	printf("\nSee minijail0(5) for example policies.\n");
 }
 
-int parse_args(struct minijail *j, int argc, char * const argv[],
-	       int *exit_immediately, ElfType *elftype)
+int parse_args(struct minijail *j, int argc, char *const argv[],
+	       int *exit_immediately, ElfType *elftype,
+	       const char **preload_path)
 {
 	int opt;
 	int use_seccomp_filter = 0;
@@ -540,6 +543,7 @@ int parse_args(struct minijail *j, int argc, char * const argv[],
 		{"uts", optional_argument, 0, 129},
 		{"logging", required_argument, 0, 130},
 		{"profile", required_argument, 0, 131},
+		{"preload-library", required_argument, 0, 132},
 		{0, 0, 0, 0},
 	};
 	/* clang-format on */
@@ -769,6 +773,9 @@ int parse_args(struct minijail *j, int argc, char * const argv[],
 			break;
 		case 131: /* Profile */
 			use_profile(j, optarg, &pivot_root, chroot, &tmp_size);
+			break;
+		case 132: /* PRELOADPATH */
+			*preload_path = optarg;
 			break;
 		default:
 			usage(argv[0]);

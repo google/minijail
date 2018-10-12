@@ -265,6 +265,12 @@ int minijail_add_hook(struct minijail *j,
 int minijail_preserve_fd(struct minijail *j, int parent_fd, int child_fd);
 
 /*
+ * minijail_set_preload_path: overrides the default path for
+ * libminijailpreload.so.
+ */
+int minijail_set_preload_path(struct minijail *j, const char *preload_path);
+
+/*
  * Lock this process into the given minijail. Note that this procedure cannot
  * fail, since there is no way to undo privilege-dropping; therefore, if any
  * part of the privilege-drop fails, minijail_enter() will abort the entire
