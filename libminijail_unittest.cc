@@ -42,7 +42,6 @@ constexpr size_t kBufferSize = 128;
 
 std::set<pid_t> GetProcessSubtreePids(pid_t root_pid) {
   std::set<pid_t> pids{root_pid};
-  char path[kBufferSize];
   bool progress = false;
 
   do {
@@ -57,18 +56,19 @@ std::set<pid_t> GetProcessSubtreePids(pid_t root_pid) {
         continue;
       char* end;
       const int pid = strtol(dir_entry->d_name, &end, 10);
-      if ((*end) != '\0')
+      if (*end != '\0')
         continue;
-      snprintf(path, sizeof(path), "/proc/%d/stat", pid);
+      std::string path = "/proc/" + std::to_string(pid) + "/stat";
 
-      FILE* f = fopen(path, "r");
+      FILE* f = fopen(path.c_str(), "re");
       if (!f)
-        pdie("fopen(%s)", path);
+        pdie("fopen(%s)", path.c_str());
       pid_t ppid;
       int ret = fscanf(f, "%*d (%*[^)]) %*c %d", &ppid);
-      if (ret != 1)
-        continue;
       fclose(f);
+      if (ret != 1) {
+        continue;
+      }
       if (pids.find(ppid) == pids.end())
         continue;
       progress |= pids.insert(pid).second;
@@ -82,12 +82,12 @@ std::map<std::string, std::string> GetNamespaces(
     pid_t pid,
     const std::vector<std::string>& namespace_names) {
   std::map<std::string, std::string> namespaces;
-  char path[kBufferSize], buf[kBufferSize];
+  char buf[kBufferSize];
   for (const auto& namespace_name : namespace_names) {
-    snprintf(path, sizeof(path), "/proc/%d/ns/%s", pid, namespace_name.c_str());
-    ssize_t len = readlink(path, buf, sizeof(buf));
+    std::string path = "/proc/" + std::to_string(pid) + "/ns/" + namespace_name;
+    ssize_t len = readlink(path.c_str(), buf, sizeof(buf));
     if (len == -1)
-      pdie("readlink(\"%s\")", path);
+      pdie("readlink(\"%s\")", path.c_str());
     namespaces.emplace(namespace_name, std::string(buf, len));
   }
   return namespaces;
@@ -632,10 +632,8 @@ TEST_F(NamespaceTest, test_namespaces) {
     return;
   }
 
-  char uidmap[kBufferSize];
-  snprintf(uidmap, sizeof(uidmap), "0 %d 1", getuid());
-  char gidmap[kBufferSize];
-  snprintf(gidmap, sizeof(gidmap), "0 %d 1", getgid());
+  std::string uidmap = "0 " + std::to_string(getuid()) + " 1";
+  std::string gidmap = "0 " + std::to_string(getgid()) + " 1";
 
   const std::vector<std::string> namespace_names = {"pid", "mnt",    "user",
                                                     "net", "cgroup", "uts"};
@@ -666,9 +664,9 @@ TEST_F(NamespaceTest, test_namespaces) {
       minijail_namespace_vfs(j.get());
       minijail_namespace_uts(j.get());
 
-      // Set up the user namespace
-      minijail_uidmap(j.get(), uidmap);
-      minijail_gidmap(j.get(), gidmap);
+      // Set up the user namespace.
+      minijail_uidmap(j.get(), uidmap.c_str());
+      minijail_gidmap(j.get(), gidmap.c_str());
       minijail_namespace_user_disable_setgroups(j.get());
 
       minijail_close_open_fds(j.get());
