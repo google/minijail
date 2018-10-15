@@ -9,6 +9,7 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -105,12 +106,17 @@ static inline int is_android(void)
 #endif
 }
 
-void __asan_init(void) attribute_weak;
-void __hwasan_init(void) attribute_weak;
-
-static inline int running_with_asan(void)
+static inline bool running_with_asan(void)
 {
-	return &__asan_init != 0 || &__hwasan_init != 0;
+#if defined(__SANITIZE_ADDRESS__)
+	/* For gcc. */
+	return true;
+#elif defined(__has_feature)
+	/* For clang. */
+	return __has_feature(address_sanitizer);
+#else
+	return false;
+#endif
 }
 
 int lookup_syscall(const char *name);
