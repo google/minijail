@@ -4,6 +4,15 @@
 *.o
 *.a
 
+# Coverage-related files that appear when building with MODE=profiling.
+*.gcno
+*.gcda
+/lcov-coverage.info
+/lcov-html/
+
+# libseccomp.
+/libseccomp/
+
 # Shared libraries when compiling in-tree.
 *.so
 
