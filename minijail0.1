@@ -216,8 +216,9 @@ as they are completely different (even though they have similar names).
 .TP
 \fB-S <arch-specific seccomp_filter policy file>\fR
 Enable \fBseccomp\fR(2) in mode 13 which restricts the child process to a set of
-system calls defined in the policy file. Note that system calls often change
-names based on the architecture or mode. (uname -m is your friend.)
+system calls defined in the policy file. Note that system call names may be
+different based on the runtime environment; see \fBminijail0\fR(5) for more
+details.
 .TP
 \fB-t[size]\fR
 Mounts a tmpfs filesystem on /tmp. /tmp must exist already (e.g. in the chroot).
@@ -286,6 +287,13 @@ section below for the full list of supported values for \fIprofile\fR.
 \fB--preload-library <file path>\fR
 Allows overriding the default path of \fI/lib/libminijailpreload.so\fR.  This
 is only really useful for testing.
+\fB--seccomp-bpf-binary <arch-specific BPF binary>\fR
+This is similar to \fB-S\fR, but
+instead of using a policy file, \fB--secomp-bpf-binary\fR expects a
+arch-and-kernel-version-specific pre-compiled BPF binary (such as the ones
+produced by \fBparse_seccomp_policy\fR).  Note that the filter might be
+different based on the runtime environment; see \fBminijail0\fR(5) for more
+details.
 .SH SANDBOXING PROFILES
 The following sandboxing profiles are supported:
 .TP

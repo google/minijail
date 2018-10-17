@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <linux/capability.h>
+#include <linux/filter.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -868,7 +869,7 @@ static void clear_seccomp_options(struct minijail *j)
 	j->flags.no_new_privs = 0;
 }
 
-static int seccomp_should_parse_filters(struct minijail *j)
+static int seccomp_should_use_filters(struct minijail *j)
 {
 	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL) == -1) {
 		/*
@@ -916,10 +917,65 @@ static int seccomp_should_parse_filters(struct minijail *j)
 	return 1;
 }
 
+static int set_seccomp_filters_internal(struct minijail *j,
+					struct sock_fprog *filter, bool owned)
+{
+	struct sock_fprog *fprog;
+
+	if (owned) {
+		fprog = filter;
+	} else {
+		fprog = malloc(sizeof(struct sock_fprog));
+		if (!fprog)
+			return -ENOMEM;
+		fprog->len = filter->len;
+		fprog->filter = malloc(sizeof(struct sock_filter) * fprog->len);
+		if (!fprog->filter) {
+			free(fprog);
+			return -ENOMEM;
+		}
+		memcpy(fprog->filter, filter->filter,
+		       sizeof(struct sock_filter) * fprog->len);
+	}
+
+	if (j->filter_prog) {
+		free(j->filter_prog->filter);
+		free(j->filter_prog);
+	}
+
+	j->filter_len = fprog->len;
+	j->filter_prog = fprog;
+	return 0;
+}
+
+void API minijail_set_seccomp_filters(struct minijail *j,
+				      const struct sock_fprog *filter)
+{
+	if (!seccomp_should_use_filters(j))
+		return;
+
+	if (j->flags.seccomp_filter_logging) {
+		die("minijail_log_seccomp_filter_failures() is incompatible "
+		    "with minijail_set_seccomp_filters()");
+	}
+
+	/*
+	 * set_seccomp_filters_internal() can only fail with ENOMEM.
+	 * Furthermore, since we won't own the incoming filter, it will not be
+	 * modified.
+	 */
+	if (set_seccomp_filters_internal(j, (struct sock_fprog *)filter,
+					 false) < 0) {
+		die("failed to copy seccomp filter");
+	}
+}
+
 static int parse_seccomp_filters(struct minijail *j, const char *filename,
 				 FILE *policy_file)
 {
 	struct sock_fprog *fprog = malloc(sizeof(struct sock_fprog));
+	if (!fprog)
+		return -ENOMEM;
 	int use_ret_trap =
 	    j->flags.seccomp_filter_tsync || j->flags.seccomp_filter_logging;
 	int allow_logging = j->flags.seccomp_filter_logging;
@@ -930,14 +986,12 @@ static int parse_seccomp_filters(struct minijail *j, const char *filename,
 		return -1;
 	}
 
-	j->filter_len = fprog->len;
-	j->filter_prog = fprog;
-	return 0;
+	return set_seccomp_filters_internal(j, fprog, true);
 }
 
 void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 {
-	if (!seccomp_should_parse_filters(j))
+	if (!seccomp_should_use_filters(j))
 		return;
 
 	FILE *file = fopen(path, "re");
@@ -957,7 +1011,7 @@ void API minijail_parse_seccomp_filters_from_fd(struct minijail *j, int fd)
 	char *fd_path, *path;
 	FILE *file;
 
-	if (!seccomp_should_parse_filters(j))
+	if (!seccomp_should_use_filters(j))
 		return;
 
 	file = fdopen(fd, "r");
@@ -1228,10 +1282,8 @@ bad_cgroups:
 	for (i = 0; i < j->cgroup_count; ++i)
 		free(j->cgroups[i]);
 bad_mounts:
-	if (j->flags.seccomp_filter && j->filter_len > 0) {
+	if (j->filter_prog && j->filter_prog->filter)
 		free(j->filter_prog->filter);
-		free(j->filter_prog);
-	}
 bad_filter_prog_instrs:
 	if (j->filter_prog)
 		free(j->filter_prog);
@@ -2955,7 +3007,7 @@ void API minijail_destroy(struct minijail *j)
 {
 	size_t i;
 
-	if (j->flags.seccomp_filter && j->filter_prog) {
+	if (j->filter_prog) {
 		free(j->filter_prog->filter);
 		free(j->filter_prog);
 	}
