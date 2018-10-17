@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "dlopen(): %s\n", dl_mesg);
 			return 1;
 		}
+		minijail_set_preload_path(j, preload_path);
 		minijail_run(j, argv[0], argv);
 	} else {
 		fprintf(stderr,
