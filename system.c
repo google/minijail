@@ -20,17 +20,21 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
+#include <linux/securebits.h>
+
 #include "util.h"
 
-#ifdef HAVE_SECUREBITS_H
-#include <linux/securebits.h>
-#else
-#define SECURE_ALL_BITS 0x55
-#define SECURE_ALL_LOCKS (SECURE_ALL_BITS << 1)
+/*
+ * SECBIT_NO_CAP_AMBIENT_RAISE was added in kernel 4.3, so fill in the
+ * definition if the securebits header doesn't provide it.
+ */
+#ifndef SECBIT_NO_CAP_AMBIENT_RAISE
+#define SECBIT_NO_CAP_AMBIENT_RAISE (issecure_mask(6))
 #endif
 
-#define SECURE_BITS_NO_AMBIENT 0x15
-#define SECURE_LOCKS_NO_AMBIENT (SECURE_BITS_NO_AMBIENT << 1)
+#ifndef SECBIT_NO_CAP_AMBIENT_RAISE_LOCKED
+#define SECBIT_NO_CAP_AMBIENT_RAISE_LOCKED (issecure_mask(7))
+#endif
 
 /*
  * Assert the value of SECURE_ALL_BITS at compile-time.
@@ -67,7 +71,8 @@ int lock_securebits(uint64_t skip_mask)
 	 * configuring the permitted and inheritable set.
 	 */
 	unsigned long securebits =
-	    (SECURE_BITS_NO_AMBIENT | SECURE_LOCKS_NO_AMBIENT) & ~skip_mask;
+	    (SECBIT_NO_CAP_AMBIENT_RAISE | SECBIT_NO_CAP_AMBIENT_RAISE_LOCKED) &
+	    ~skip_mask;
 	if (!securebits) {
 		warn("not locking any securebits");
 		return 0;
