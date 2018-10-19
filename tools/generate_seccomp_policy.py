@@ -66,12 +66,26 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
-def get_seccomp_bpf_filter(entry):
+def get_seccomp_bpf_filter(syscall, entry):
     """Return a minijail seccomp-bpf filter expression for the syscall."""
     arg_index = entry.arg_index
     arg_values = entry.value_set
-    return ' || ' .join('arg%d == %s' % (arg_index, arg_value)
-                        for arg_value in arg_values)
+    atoms = []
+    if syscall in ('mmap', 'mmap2', 'mprotect') and arg_index == 2:
+        # See if there is at least one instance of any of these syscalls trying
+        # to map memory with both PROT_EXEC and PROT_WRITE. If there isn't, we
+        # can craft a concise expression to forbid this.
+        write_and_exec = set(('PROT_EXEC', 'PROT_WRITE'))
+        for arg_value in arg_values:
+            if write_and_exec.issubset(set(p.strip() for p in
+                                           arg_value.split('|'))):
+                break
+        else:
+            atoms.extend(['arg2 in 0xfffffffb', 'arg2 in 0xfffffffd'])
+            arg_values = set()
+    atoms.extend('arg%d == %s' % (arg_index, arg_value)
+                 for arg_value in arg_values)
+    return ' || '.join(atoms)
 
 
 def parse_trace_file(trace_filename, syscalls, arg_inspection):
@@ -136,7 +150,7 @@ def main(argv):
 
     for syscall in sorted_syscalls:
         if syscall in arg_inspection:
-            arg_filter = get_seccomp_bpf_filter(arg_inspection[syscall])
+            arg_filter = get_seccomp_bpf_filter(syscall, arg_inspection[syscall])
         else:
             arg_filter = ALLOW
         print('%s: %s' % (syscall, arg_filter))
