@@ -58,6 +58,16 @@ attacks and cannot be considered safe.
 
 \fBexecve\fR may only be used when invoking with CAP_SYS_ADMIN privileges.
 
+In order to promote reusability, policy files can include other policy files
+using the following syntax:
+
+  \fB@include /absolute/path/to/file.policy\fR
+  \fB@include ./path/relative/to/CWD/file.policy\fR
+
+Inclusion is limited to a single level (i.e. files that are \fB@include\fRd
+cannot themselves \fB@include\fR more files), since that makes the policies
+harder to understand.
+
 .SH SECCOMP_FILTER SYNTAX
 More formally, the expression after the colon can be an expression in
 Disjunctive Normal Form (DNF): a disjunction ("or", \fI||\fR) of
