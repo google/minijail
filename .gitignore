@@ -4,6 +4,8 @@
 *.o
 *.a
 
+/constants.json
+
 # Coverage-related files that appear when building with MODE=profiling.
 *.gcno
 *.gcda
@@ -17,6 +19,7 @@
 *.so
 
 # Executables when compiling in-tree.
+/dump_constants
 /libminijail_unittest
 /minijail0
 /minijail0_cli_unittest
