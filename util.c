@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -170,9 +171,7 @@ long int parse_single_constant(char *constant_str, char **endptr)
 	long int res = 0;
 	for (; entry->name; ++entry) {
 		if (!strcmp(entry->name, constant_str)) {
-			if (endptr)
-				*endptr = constant_str + strlen(constant_str);
-
+			*endptr = constant_str + strlen(constant_str);
 			return entry->value;
 		}
 	}
@@ -192,7 +191,7 @@ long int parse_single_constant(char *constant_str, char **endptr)
 				 */
 				warn("unsigned overflow: '%s'", constant_str);
 				*endptr = constant_str;
-				res = 0;
+				return 0;
 			}
 		} else if (res == LONG_MIN) {
 			/*
@@ -201,36 +200,126 @@ long int parse_single_constant(char *constant_str, char **endptr)
 			 */
 			warn("signed underflow: '%s'", constant_str);
 			*endptr = constant_str;
-			res = 0;
+			return 0;
 		}
+	}
+	if (**endptr != '\0') {
+		warn("trailing garbage after constant: '%s'", constant_str);
+		*endptr = constant_str;
+		return 0;
 	}
 	return res;
 }
 
+static char *tokenize_parenthesized_expression(char **stringp)
+{
+	char *ret = NULL, *found = NULL;
+	size_t paren_count = 1;
+
+	/* If the string is NULL, there are no parens to be found. */
+	if (stringp == NULL || *stringp == NULL)
+		return NULL;
+
+	/* If the string is not on an open paren, the results are undefined. */
+	if (**stringp != '(')
+		return NULL;
+
+	for (found = *stringp + 1; *found; ++found) {
+		switch (*found) {
+		case '(':
+			++paren_count;
+			break;
+		case ')':
+			--paren_count;
+			if (!paren_count) {
+				*found = '\0';
+				ret = *stringp + 1;
+				*stringp = found + 1;
+				return ret;
+			}
+			break;
+		}
+	}
+
+	/* We got to the end without finding the closing paren. */
+	warn("unclosed parenthesis: '%s'", *stringp);
+	return NULL;
+}
+
 long int parse_constant(char *constant_str, char **endptr)
 {
-	long int value = 0;
+	long int value = 0, current_value;
 	char *group, *lastpos = constant_str;
-	char *original_constant_str = constant_str;
 
 	/*
-	 * Try to parse constants separated by pipes.  Note that since
-	 * |constant_str| is an atom, there can be no spaces between the
-	 * constant and the pipe.  Constants can be either a named constant
-	 * defined in libconstants.gen.c or a number parsed with strtol(3).
+	 * If |endptr| is provided, parsing errors are signaled as |endptr|
+	 * pointing to |constant_str|.
+	 */
+	if (endptr)
+		*endptr = constant_str;
+
+	/*
+	 * Try to parse constant expressions. Valid constant expressions are:
+	 *
+	 * - A number that can be parsed with strtol(3).
+	 * - A named constant expression.
+	 * - A parenthesized, valid constant expression.
+	 * - A valid constant expression prefixed with the unary bitwise
+	 *   complement operator ~.
+	 * - A series of valid constant expressions separated by pipes.  Note
+	 *   that since |constant_str| is an atom, there can be no spaces
+	 *   between the constant and the pipe.
 	 *
 	 * If there is an error parsing any of the constants, the whole process
 	 * fails.
 	 */
-	while ((group = tokenize(&constant_str, "|")) != NULL) {
-		char *end = group;
-		value |= parse_single_constant(group, &end);
-		if (end == group) {
-			lastpos = original_constant_str;
-			value = 0;
-			break;
+	while (constant_str && *constant_str) {
+		bool negate = false;
+		if (*constant_str == '~') {
+			negate = true;
+			++constant_str;
 		}
-		lastpos = end;
+		if (*constant_str == '(') {
+			group =
+			    tokenize_parenthesized_expression(&constant_str);
+			if (group == NULL)
+				return 0;
+			char *end = group;
+			/* Recursively parse the parenthesized subexpression. */
+			current_value = parse_constant(group, &end);
+			if (end == group)
+				return 0;
+			if (constant_str && *constant_str) {
+				/*
+				 * If this is not the end of the atom, there
+				 * should be another | followed by more stuff.
+				 */
+				if (*constant_str != '|') {
+					warn("unterminated constant "
+					     "expression: '%s'",
+					     constant_str);
+					return 0;
+				}
+				++constant_str;
+				if (*constant_str == '\0') {
+					warn("unterminated constant "
+					     "expression: '%s'",
+					     constant_str);
+					return 0;
+				}
+			}
+			lastpos = end;
+		} else {
+			group = tokenize(&constant_str, "|");
+			char *end = group;
+			current_value = parse_single_constant(group, &end);
+			if (end == group)
+				return 0;
+			lastpos = end;
+		}
+		if (negate)
+			current_value = ~current_value;
+		value |= current_value;
 	}
 	if (endptr)
 		*endptr = lastpos;
