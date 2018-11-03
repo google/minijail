@@ -17,6 +17,7 @@
 int main() {
   std::cout << "{\n";
   std::cout << "  \"arch_nr\": " << ARCH_NR << ",\n";
+  std::cout << "  \"arch_name\": \"" << ARCH_NAME << "\",\n";
   std::cout << "  \"bits\": " << (sizeof(uintptr_t) * 8) << ",\n";
   std::cout << "  \"syscalls\": {\n";
   bool first = true;
