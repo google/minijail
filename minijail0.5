@@ -74,7 +74,7 @@ Disjunctive Normal Form (DNF): a disjunction ("or", \fI||\fR) of
 conjunctions ("and", \fI&&\fR) of atoms.
 
 .SS "Atom Syntax"
-Atoms are of the form \fIarg{DNUM} {OP} {NUM}\fR where:
+Atoms are of the form \fIarg{DNUM} {OP} {VAL}\fR where:
 .IP
 \[bu] \fIDNUM\fR is a decimal number
 
@@ -82,7 +82,11 @@ Atoms are of the form \fIarg{DNUM} {OP} {NUM}\fR where:
 \fI==\fR, \fI!=\fR, \fI<\fR, \fI<=\fR, \fI>\fR, \fI>=\fR, \fI&\fR (flags set),
 or \fIin\fR (inclusion)
 
-\[bu] \fINUM\fR is an octal, decimal, or hexadecimal number
+\[bu] \fVAL\fR is a constant expression.  It can be a named constant (like
+\fBO_RDONLY\fR), a number (octal, decimal, or hexadecimal), a mask of constants
+separated by \fI|\fR, or a parenthesized constant expression. Constant
+expressions can also be prefixed with the bitwise complement operator \fI~\fR
+to produce their complement.
 .RE
 
 \fI==\fR, \fI!=\fR, \fI<\fR, \fI<=\fR, \fI>\fR, and \fI>=\fR should be pretty
@@ -106,7 +110,12 @@ The system call will be allowed iff the flags set in the argument are included
   mmap: arg3 in MAP_PRIVATE|MAP_ANONYMOUS
 
 This will allow \fBmmap\fR(2) as long as \fIarg3\fR (flags) has any combination
-of MAP_PRIVATE and MAP_ANONYMOUS, but nothing else.
+of MAP_PRIVATE and MAP_ANONYMOUS, but nothing else.  One common use of this is
+to restrict \fBmmap\fR(2) / \fBmprotect\fR(2) to only allow write^exec
+mappings:
+
+  mmap: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
+  mprotect: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
 
 .SS "Return Values"
 
