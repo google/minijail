@@ -85,12 +85,12 @@ TEST(util, parse_constant_unsigned) {
 
 #if defined(BITS32)
   constant = "0x80000000";
-  c = parse_constant(const_cast<char*>(constant.c_str()), &end);
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
   EXPECT_EQ(0x80000000U, static_cast<unsigned long int>(c));
 
 #elif defined(BITS64)
   constant = "0x8000000000000000";
-  c = parse_constant(const_cast<char*>(constant.c_str()), &end);
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
   EXPECT_EQ(0x8000000000000000UL, static_cast<unsigned long int>(c));
 #endif
 }
@@ -102,13 +102,13 @@ TEST(util, parse_constant_unsigned_toobig) {
 
 #if defined(BITS32)
   constant = "0x100000000";  // Too big for 32-bit unsigned long int.
-  c = parse_constant(const_cast<char*>(constant.c_str()), &end);
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
   // Error case should return 0.
   EXPECT_EQ(0, c);
 
 #elif defined(BITS64)
   constant = "0x10000000000000000";
-  c = parse_constant(const_cast<char*>(constant.c_str()), &end);
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
   // Error case should return 0.
   EXPECT_EQ(0, c);
 #endif
@@ -118,7 +118,7 @@ TEST(util, parse_constant_signed) {
   char *end;
   long int c = 0;
   std::string constant = "-1";
-  c = parse_constant(const_cast<char*>(constant.c_str()), &end);
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
   EXPECT_EQ(-1, c);
 }
 
@@ -129,16 +129,67 @@ TEST(util, parse_constant_signed_toonegative) {
 
 #if defined(BITS32)
   constant = "-0x80000001";
-  c = parse_constant(const_cast<char*>(constant.c_str()), &end);
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
   // Error case should return 0.
   EXPECT_EQ(0, c);
 
 #elif defined(BITS64)
   constant = "-0x8000000000000001";
-  c = parse_constant(const_cast<char*>(constant.c_str()), &end);
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
   // Error case should return 0.
   EXPECT_EQ(0, c);
 #endif
+}
+
+TEST(util, parse_constant_complements) {
+  char* end;
+  long int c = 0;
+  std::string constant;
+
+#if defined(BITS32)
+  constant = "~0x005AF0FF|~0xFFA50FFF";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(c, 0xFFFFFF00);
+  constant = "0x0F|~(0x005AF000|0x00A50FFF)|0xF0";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(c, 0xFF0000FF);
+
+#elif defined(BITS64)
+  constant = "~0x00005A5AF0F0FFFF|~0xFFFFA5A50F0FFFFF";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(c, 0xFFFFFFFFFFFF0000UL);
+  constant = "0x00FF|~(0x00005A5AF0F00000|0x0000A5A50F0FFFFF)|0xFF00";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(c, 0xFFFF00000000FFFFUL);
+#endif
+}
+
+TEST(util, parse_parenthesized_expresions) {
+  char* end;
+
+  const std::vector<const char*> bad_expressions = {
+      "(1", "1)", "(1)1", "|(1)", "(1)|", "()",
+      "(",  "((", "(()",  "(()1", "1(0)",
+  };
+  for (const auto* expression : bad_expressions) {
+    std::string mutable_expression = expression;
+    long int c =
+        parse_constant(const_cast<char*>(mutable_expression.data()), &end);
+    EXPECT_EQ(reinterpret_cast<const void*>(end),
+              reinterpret_cast<const void*>(mutable_expression.data()));
+    // Error case should return 0.
+    EXPECT_EQ(c, 0) << "For expression: \"" << expression << "\"";
+  }
+
+  const std::vector<const char*> good_expressions = {
+      "(3)", "(1)|2", "1|(2)", "(1)|(2)", "((3))", "0|(1|2)", "(0|1|2)",
+  };
+  for (const auto* expression : good_expressions) {
+    std::string mutable_expression = expression;
+    long int c =
+        parse_constant(const_cast<char*>(mutable_expression.data()), &end);
+    EXPECT_EQ(c, 3) << "For expression: \"" << expression << "\"";
+  }
 }
 
 /* Test that setting one BPF instruction works. */
