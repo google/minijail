@@ -81,7 +81,7 @@ def get_seccomp_bpf_filter(syscall, entry):
                                            arg_value.split('|'))):
                 break
         else:
-            atoms.extend(['arg2 in 0xfffffffb', 'arg2 in 0xfffffffd'])
+            atoms.extend(['arg2 in ~PROT_EXEC', 'arg2 in ~PROT_WRITE'])
             arg_values = set()
     atoms.extend('arg%d == %s' % (arg_index, arg_value)
                  for arg_value in arg_values)
