@@ -399,6 +399,22 @@ class ParseFilterStatementTests(unittest.TestCase):
                 parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
             ]))
 
+    def test_parse_metadata(self):
+        """Accept valid filter statements with metadata."""
+        self.assertEqual(
+            self.parser.parse_filter_statement(
+                self._tokenize('read[arch=test]: arg0 == 0')),
+            parser.ParsedFilterStatement((parser.Syscall('read', 0), ), [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+            ]))
+        self.assertEqual(
+            self.parser.parse_filter_statement(
+                self._tokenize(
+                    '{read, nonexistent[arch=nonexistent]}: arg0 == 0')),
+            parser.ParsedFilterStatement((parser.Syscall('read', 0), ), [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+            ]))
+
     def test_parse_unclosed_brace(self):
         """Reject unclosed brace."""
         with self.assertRaisesRegex(parser.ParseException, 'unclosed brace'):
