@@ -484,6 +484,39 @@ class ParseFileTests(unittest.TestCase):
                         ]),
                 ]))
 
+    def test_parse_default(self):
+        """Allow defining a default action."""
+        path = self._write_file(
+            'test.policy', """
+            @default kill-thread
+            read: allow
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillThread(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('read', 0),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                ]))
+
+    def test_parse_default_permissive(self):
+        """Reject defining a permissive default action."""
+        path = self._write_file(
+            'test.policy', """
+            @default log
+            read: allow
+        """)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'invalid permissive default action'):
+            self.parser.parse_file(path)
+
     def test_parse_simple_grouped(self):
         """Allow simple policy files."""
         path = self._write_file(
