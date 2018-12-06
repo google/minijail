@@ -549,6 +549,32 @@ class ParseFileTests(unittest.TestCase):
                         ]),
                 ]))
 
+    def test_parse_frequency(self):
+        """Allow including frequency files."""
+        self._write_file(
+            'test.frequency', """
+            read: 2
+            write: 3
+        """)
+        path = self._write_file(
+            'test.policy', """
+            @frequency ./test.frequency
+            read: allow
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillProcess(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('read', 0),
+                        frequency=2,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                ]))
+
     def test_parse_multiple_unconditional(self):
         """Reject actions after an unconditional action."""
         path = self._write_file(
