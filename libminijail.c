@@ -454,7 +454,8 @@ void API minijail_namespace_vfs(struct minijail *j)
 
 void API minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path)
 {
-	int ns_fd = open(ns_path, O_RDONLY | O_CLOEXEC);
+	/* Note: Do not use O_CLOEXEC here.  We'll close it after we use it. */
+	int ns_fd = open(ns_path, O_RDONLY);
 	if (ns_fd < 0) {
 		pdie("failed to open namespace '%s'", ns_path);
 	}
@@ -519,7 +520,8 @@ void API minijail_namespace_net(struct minijail *j)
 
 void API minijail_namespace_enter_net(struct minijail *j, const char *ns_path)
 {
-	int ns_fd = open(ns_path, O_RDONLY | O_CLOEXEC);
+	/* Note: Do not use O_CLOEXEC here.  We'll close it after we use it. */
+	int ns_fd = open(ns_path, O_RDONLY);
 	if (ns_fd < 0) {
 		pdie("failed to open namespace '%s'", ns_path);
 	}
@@ -2079,8 +2081,11 @@ void API minijail_enter(const struct minijail *j)
 	 * so we don't even try. If any of our operations fail, we abort() the
 	 * entire process.
 	 */
-	if (j->flags.enter_vfs && setns(j->mountns_fd, CLONE_NEWNS))
-		pdie("setns(CLONE_NEWNS) failed");
+	if (j->flags.enter_vfs) {
+		if (setns(j->mountns_fd, CLONE_NEWNS))
+			pdie("setns(CLONE_NEWNS) failed");
+		close(j->mountns_fd);
+	}
 
 	if (j->flags.vfs) {
 		if (unshare(CLONE_NEWNS))
@@ -2113,6 +2118,7 @@ void API minijail_enter(const struct minijail *j)
 	if (j->flags.enter_net) {
 		if (setns(j->netns_fd, CLONE_NEWNET))
 			pdie("setns(CLONE_NEWNET) failed");
+		close(j->netns_fd);
 	} else if (j->flags.net) {
 		if (unshare(CLONE_NEWNET))
 			pdie("unshare(CLONE_NEWNET) failed");
@@ -2722,6 +2728,12 @@ static int minijail_run_internal(struct minijail *j,
 
 		if (j->flags.userns)
 			write_ugid_maps_or_die(j);
+
+		if (j->flags.enter_vfs)
+			close(j->mountns_fd);
+
+		if (j->flags.enter_net)
+			close(j->netns_fd);
 
 		if (sync_child)
 			parent_setup_complete(child_sync_pipe_fds);
