@@ -123,6 +123,11 @@ TEST_F(CliTest, invalid_set_user) {
 
   argv[1] = "1000x";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  // Supplying -u more than once is bad.
+  argv = {"-u", kValidUser, "-u", kValidUid, "/bin/sh"};
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1),
+              "-u provided multiple times");
 }
 
 // Valid calls to the change group option.
@@ -146,6 +151,11 @@ TEST_F(CliTest, invalid_set_group) {
 
   argv[1] = "1000x";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  // Supplying -g more than once is bad.
+  argv = {"-g", kValidGroup, "-g", kValidGid, "/bin/sh"};
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1),
+              "-g provided multiple times");
 }
 
 // Valid calls to the skip securebits option.
