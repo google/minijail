@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -573,6 +574,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
 	int caps = 0, ambient_caps = 0;
 	int seccomp = -1;
+	bool use_uid = false, use_gid = false;
 	uid_t uid = 0;
 	gid_t gid = 0;
 	char *uidmap = NULL, *gidmap = NULL;
@@ -601,9 +603,21 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	       -1) {
 		switch (opt) {
 		case 'u':
+			if (use_uid) {
+				fprintf(stderr,
+					"-u provided multiple times.\n");
+				exit(1);
+			}
+			use_uid = true;
 			set_user(j, optarg, &uid, &gid);
 			break;
 		case 'g':
+			if (use_gid) {
+				fprintf(stderr,
+					"-g provided multiple times.\n");
+				exit(1);
+			}
+			use_gid = true;
 			set_group(j, optarg, &gid);
 			break;
 		case 'n':
