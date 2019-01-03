@@ -709,6 +709,78 @@ TEST_F(NamespaceTest, test_namespaces) {
   }
 }
 
+TEST_F(NamespaceTest, test_enter_ns) {
+  char uidmap[kBufferSize], gidmap[kBufferSize];
+
+  if (!userns_supported_) {
+    SUCCEED();
+    return;
+  }
+
+  // We first create a child in a new userns so we have privs to run more tests.
+  // We can't combine the steps as the kernel disallows many resource sharing
+  // from outside the userns.
+  struct minijail *j = minijail_new();
+
+  minijail_namespace_vfs(j);
+  minijail_namespace_pids(j);
+  minijail_run_as_init(j);
+
+  // Perform userns mapping.
+  minijail_namespace_user(j);
+  snprintf(uidmap, sizeof(uidmap), "0 %d 1", getuid());
+  snprintf(gidmap, sizeof(gidmap), "0 %d 1", getgid());
+  minijail_uidmap(j, uidmap);
+  minijail_gidmap(j, gidmap);
+  minijail_namespace_user_disable_setgroups(j);
+
+  pid_t pid = minijail_fork(j);
+  if (pid == 0) {
+    // Child.
+    minijail_destroy(j);
+
+    // Create new namespaces inside this userns which we may enter.
+    j = minijail_new();
+    minijail_namespace_net(j);
+    minijail_namespace_vfs(j);
+    pid = minijail_fork(j);
+    if (pid == 0) {
+      // Child.
+      minijail_destroy(j);
+
+      // Finally enter those namespaces.
+      j = minijail_new();
+
+      // We need to get the absolute path because entering a new mntns will
+      // implicitly chdir(/) for us.
+      char *path = realpath(kPreloadPath, nullptr);
+      ASSERT_NE(nullptr, path);
+      minijail_set_preload_path(j, path);
+
+      minijail_namespace_net(j);
+      minijail_namespace_vfs(j);
+
+      minijail_namespace_enter_net(j, "/proc/self/ns/net");
+      minijail_namespace_enter_vfs(j, "/proc/self/ns/mnt");
+
+      char *argv[] = {"/bin/true", nullptr};
+      EXPECT_EQ(0, minijail_run(j, argv[0], argv));
+      EXPECT_EQ(0, minijail_wait(j));
+      minijail_destroy(j);
+      exit(0);
+    } else {
+      ASSERT_GT(pid, 0);
+      EXPECT_EQ(0, minijail_wait(j));
+      minijail_destroy(j);
+      exit(0);
+    }
+  } else {
+    ASSERT_GT(pid, 0);
+    EXPECT_EQ(0, minijail_wait(j));
+    minijail_destroy(j);
+  }
+}
+
 TEST(Test, parse_size) {
   size_t size;
 
