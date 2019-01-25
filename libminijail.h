@@ -53,7 +53,7 @@ typedef enum {
 	/* The hook will run just before calling execve(2). */
 	MINIJAIL_HOOK_EVENT_PRE_EXECVE,
 
-        /* The hook will run just before calling chroot(2) / pivot_root(2). */
+	/* The hook will run just before calling chroot(2) / pivot_root(2). */
 	MINIJAIL_HOOK_EVENT_PRE_CHROOT,
 
 	/* Sentinel for error checking. Must be last. */
