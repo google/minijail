@@ -55,7 +55,7 @@ CORE_OBJECT_FILES := libminijail.o syscall_filter.o signal_handler.o \
 		libconstants.gen.o libsyscalls.gen.o
 
 all: CC_BINARY(minijail0) CC_LIBRARY(libminijail.so) \
-	CC_LIBRARY(libminijailpreload.so) constants.json
+	CC_LIBRARY(libminijailpreload.so)
 
 parse_seccomp_policy: CXX_BINARY(parse_seccomp_policy)
 dump_constants: CXX_BINARY(dump_constants)
