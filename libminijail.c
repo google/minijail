@@ -771,8 +771,6 @@ int API minijail_mount_with_data(struct minijail *j, const char *src,
 		flags = MS_NODEV | MS_NOEXEC | MS_NOSUID;
 	m->flags = flags;
 
-	info("mount '%s' -> '%s' type '%s' flags %#lx", src, dest, type, flags);
-
 	/*
 	 * Force vfs namespacing so the mounts don't leak out into the
 	 * containing vfs namespace.
