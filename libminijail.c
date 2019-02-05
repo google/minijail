@@ -492,6 +492,13 @@ void API minijail_namespace_pids(struct minijail *j)
 	j->flags.do_init = 1;
 }
 
+void API minijail_namespace_pids_rw_proc(struct minijail *j)
+{
+	j->flags.vfs = 1;
+	j->flags.pids = 1;
+	j->flags.do_init = 1;
+}
+
 void API minijail_namespace_ipc(struct minijail *j)
 {
 	j->flags.ipc = 1;

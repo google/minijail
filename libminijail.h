@@ -120,6 +120,15 @@ void minijail_close_open_fds(struct minijail *j);
  * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
  */
 void minijail_namespace_pids(struct minijail *j);
+/*
+ * Implies namespace_vfs.
+ * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
+ * Minijail will by default remount /proc read-only when using a PID namespace.
+ * Certain complex applications expect to be able to do their own sandboxing
+ * which might require writing to /proc, so support a weaker version of PID
+ * namespacing with a RW /proc.
+ */
+void minijail_namespace_pids_rw_proc(struct minijail *j);
 void minijail_namespace_user(struct minijail *j);
 void minijail_namespace_user_disable_setgroups(struct minijail *j);
 int minijail_uidmap(struct minijail *j, const char *uidmap);
