@@ -295,7 +295,8 @@ int minijail_run(struct minijail *j, const char *filename,
 
 /*
  * Run the specified command in the given minijail, execve(2)-style.
- * Used with static binaries, or on systems without support for LD_PRELOAD.
+ * Don't use LD_PRELOAD to do privilege dropping. This is useful when sandboxing
+ * static binaries, or on systems without support for LD_PRELOAD.
  */
 int minijail_run_no_preload(struct minijail *j, const char *filename,
 			    char *const argv[]);
@@ -338,12 +339,33 @@ int minijail_run_pid_pipes(struct minijail *j, const char *filename,
  * standard output.
  * Update |*pstderr_fd| with a fd that allows reading from the child's
  * standard error.
- * Used with static binaries, or on systems without support for LD_PRELOAD.
+ * Don't use LD_PRELOAD to do privilege dropping. This is useful when sandboxing
+ * static binaries, or on systems without support for LD_PRELOAD.
  */
 int minijail_run_pid_pipes_no_preload(struct minijail *j, const char *filename,
 				      char *const argv[], pid_t *pchild_pid,
 				      int *pstdin_fd, int *pstdout_fd,
 				      int *pstderr_fd);
+
+/*
+ * Run the specified command in the given minijail, execve(2)-style.
+ * Pass |envp| as the full environment for the child.
+ * Update |*pchild_pid| with the pid of the child.
+ * Update |*pstdin_fd| with a fd that allows writing to the child's
+ * standard input.
+ * Update |*pstdout_fd| with a fd that allows reading from the child's
+ * standard output.
+ * Update |*pstderr_fd| with a fd that allows reading from the child's
+ * standard error.
+ * Don't use LD_PRELOAD to do privilege dropping. This is useful when sandboxing
+ * static binaries, or on systems without support for LD_PRELOAD.
+ */
+int minijail_run_env_pid_pipes_no_preload(struct minijail *j,
+					  const char *filename,
+					  char *const argv[],
+					  char *const envp[], pid_t *pchild_pid,
+					  int *pstdin_fd, int *pstdout_fd,
+					  int *pstderr_fd);
 
 /*
  * Fork, jail the child, and return. This behaves similar to fork(2), except it
