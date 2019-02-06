@@ -35,7 +35,6 @@ cc_defaults {
     cflags: [
         "-D_FILE_OFFSET_BITS=64",
         "-DALLOW_DEBUG_LOGGING",
-        "-DHAVE_SECUREBITS_H",
         "-Wall",
         "-Werror",
     ],
