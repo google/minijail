@@ -2157,23 +2157,19 @@ void API minijail_enter(const struct minijail *j)
 	}
 
 	/*
-	 * POSIX capabilities are a bit tricky. If we drop our capability to
-	 * change uids, our attempt to use drop_ugid() below will fail. Hang on
-	 * to root caps across drop_ugid(), then lock securebits.
+	 * POSIX capabilities are a bit tricky. We must set SECBIT_KEEP_CAPS
+	 * before drop_ugid() below as the latter would otherwise drop all
+	 * capabilities.
 	 */
 	if (j->flags.use_caps) {
 		/*
-		 * Using ambient capabilities takes care of most of the cases
-		 * where PR_SET_KEEPCAPS would be needed, but still try to set
-		 * them unless it is locked (maybe due to running minijail
-		 * within an already-minijailed process).
+		 * When using ambient capabilities, CAP_SET{GID,UID} can be
+		 * inherited across execve(2), so SECBIT_KEEP_CAPS is not
+		 * strictly needed.
 		 */
-		if (!j->flags.set_ambient_caps || !secure_keep_caps_locked()) {
-			if (prctl(PR_SET_KEEPCAPS, 1))
-				pdie("prctl(PR_SET_KEEPCAPS) failed");
-		}
-
-		if (lock_securebits(j->securebits_skip_mask) < 0) {
+		bool require_keep_caps = !j->flags.set_ambient_caps;
+		if (lock_securebits(j->securebits_skip_mask,
+				    require_keep_caps) < 0) {
 			pdie("locking securebits failed");
 		}
 	}
