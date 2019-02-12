@@ -2315,19 +2315,26 @@ static int setup_preload(const struct minijail *j attribute_unused,
 #else
 	const char *preload_path = j->preload_path ?: PRELOADPATH;
 	char *newenv = NULL;
+	int ret = 0;
 
 	if (!oldenv)
 		oldenv = "";
 
 	/* Only insert a separating space if we have something to separate... */
-	if (asprintf(&newenv, "%s=%s%s%s", kLdPreloadEnvVar, oldenv,
-		     oldenv[0] != '\0' ? " " : "", preload_path) < 0) {
-		return -ENOMEM;
+	if (asprintf(&newenv, "%s%s%s", oldenv, oldenv[0] != '\0' ? " " : "",
+		     preload_path) < 0) {
+		return -1;
 	}
 
-	/* putenv(3) will now own the string. */
-	putenv(newenv);
-	return 0;
+	/*
+	 * Avoid using putenv(3), since that requires us to hold onto a
+	 * reference to that string until the environment is no longer used to
+	 * prevent a memory leak.
+	 * See https://crbug.com/930189 for more details.
+	 */
+	ret = setenv(kLdPreloadEnvVar, newenv, 1);
+	free(newenv);
+	return ret;
 #endif
 }
 
