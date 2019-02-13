@@ -10,7 +10,10 @@
 
 #include "libminijail.h"
 
-namespace {
+namespace mj {
+
+namespace internal {
+
 struct ScopedMinijailDeleter {
     inline void operator()(minijail *j) const {
         if (j) {
@@ -18,8 +21,12 @@ struct ScopedMinijailDeleter {
         }
     }
 };
-}
 
-using ScopedMinijail = std::unique_ptr<minijail, ScopedMinijailDeleter>;
+}   // namespace internal
+
+}   // namespace mj
+
+using ScopedMinijail =
+        std::unique_ptr<minijail, mj::internal::ScopedMinijailDeleter>;
 
 #endif /* _SCOPED_MINIJAIL_H_ */
