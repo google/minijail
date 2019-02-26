@@ -35,6 +35,7 @@ cc_defaults {
     cflags: [
         "-D_FILE_OFFSET_BITS=64",
         "-DALLOW_DEBUG_LOGGING",
+        "-DDEFAULT_PIVOT_ROOT=\"/var/empty\"",
         "-Wall",
         "-Werror",
     ],
