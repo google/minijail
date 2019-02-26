@@ -385,7 +385,7 @@ static void use_profile(struct minijail *j, const char *profile,
 			*tmp_size = DEFAULT_TMP_SIZE;
 		}
 		minijail_remount_proc_readonly(j);
-		use_pivot_root(j, "/var/empty", pivot_root, chroot);
+		use_pivot_root(j, DEFAULT_PIVOT_ROOT, pivot_root, chroot);
 	} else {
 		fprintf(stderr, "Unrecognized profile name '%s'\n", profile);
 		exit(1);
