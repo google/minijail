@@ -557,7 +557,7 @@ int compile_file(const char *filename, FILE *policy_file,
 			if (compile_file(filename, included_file, head,
 					 arg_blocks, labels, use_ret_trap,
 					 allow_logging,
-					 ++include_level) == -1) {
+					 include_level + 1) == -1) {
 				compiler_warn(&state, "'@include %s' failed",
 					      filename);
 				fclose(included_file);

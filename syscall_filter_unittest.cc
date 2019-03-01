@@ -1744,6 +1744,25 @@ TEST(FilterTest, include_same_syscalls) {
   free(actual.filter);
 }
 
+TEST(FilterTest, include_two) {
+  struct sock_fprog actual;
+  std::string policy =
+      "@include " + source_path("test/seccomp.policy") + "\n" +
+      "@include " + source_path("test/seccomp.policy") + "\n";
+
+  FILE* policy_file = write_policy_to_pipe(policy);
+  ASSERT_NE(policy_file, nullptr);
+
+  int res = test_compile_filter("policy", policy_file, &actual);
+  fclose(policy_file);
+
+  ASSERT_EQ(res, 0);
+  EXPECT_EQ(actual.len,
+            ARCH_VALIDATION_LEN + 1 /* load syscall nr */ +
+                2 * 8 /* check syscalls twice */ + 1 /* filter return */);
+  free(actual.filter);
+}
+
 TEST(FilterTest, include_invalid_policy) {
   struct sock_fprog actual;
   std::string policy =
