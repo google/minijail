@@ -299,7 +299,7 @@ The following sandboxing profiles are supported:
 .TP
 \fBminimalistic-mountns\fR
 Set up a minimalistic mount namespace.  Equivalent to \fB-v -P /var/empty
--b /,/ -b /proc,/proc -t -r --mount-dev\fR.
+-b / -b /proc -b /dev/log -t -r --mount-dev\fR.
 .SH IMPLEMENTATION
 This program is broken up into two parts: \fBminijail0\fR (the frontend) and a helper
 library called \fBlibminijailpreload\fR.  Some jailings can only be achieved
