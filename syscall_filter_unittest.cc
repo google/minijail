@@ -1261,6 +1261,41 @@ TEST_F(FileTest, seccomp_read) {
   EXPECT_EQ(curr_block->next, nullptr);
 }
 
+TEST_F(FileTest, multiline) {
+  std::string policy =
+      "read:\\\n1\n"
+      "openat:arg0 in\\\n5";
+
+  const int LABEL_ID = 0;
+
+  FILE* policy_file = write_policy_to_pipe(policy);
+  ASSERT_NE(policy_file, nullptr);
+  int res = test_compile_file("policy", policy_file, head_, &arg_blocks_,
+                              &labels_);
+  fclose(policy_file);
+
+  /*
+   * Policy should be valid.
+   */
+  ASSERT_EQ(res, 0);
+
+  /* First block is the read. */
+  struct filter_block *curr_block = head_;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL(curr_block->instrs, __NR_read);
+
+  /* Second block is the open. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW_SYSCALL_ARGS(curr_block->instrs,
+                            __NR_openat,
+                            LABEL_ID,
+                            JUMP_JT,
+                            JUMP_JF);
+
+  EXPECT_EQ(curr_block->next, nullptr);
+}
+
 TEST(FilterTest, seccomp_mode1) {
   struct sock_fprog actual;
   std::string policy =
