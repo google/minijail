@@ -1,0 +1,14 @@
+{
+  "arch_nr": 3735928559,
+  "arch_name": "test",
+  "bits": 64,
+  "syscalls": {
+    "read": 0,
+    "write": 1
+  },
+  "constants": {
+    "O_RDONLY": 0,
+    "PROT_WRITE": 2,
+    "PROT_EXEC": 4
+  }
+}
