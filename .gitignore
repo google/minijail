@@ -15,6 +15,10 @@
 # libseccomp.
 /libseccomp/
 
+# Python-related files.
+/tools/__pycache__/
+*.pyc
+
 # Shared libraries when compiling in-tree.
 *.so
 
