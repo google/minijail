@@ -70,10 +70,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (exit_immediately) {
-		info("not running init loop, exiting immediately\n");
+	if (exit_immediately)
 		return 0;
-	}
+
 	int ret = minijail_wait(j);
 #if defined(__SANITIZE_ADDRESS__)
 	minijail_destroy(j);
