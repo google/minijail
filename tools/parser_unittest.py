@@ -366,5 +366,58 @@ class ParseFilterTests(unittest.TestCase):
             self.parser.parse_filter(self._tokenize('{ allow'))
 
 
+class ParseFilterStatementTests(unittest.TestCase):
+    """Tests for PolicyParser.parse_filter_statement."""
+
+    def setUp(self):
+        self.arch = ARCH_64
+        self.parser = parser.PolicyParser(
+            self.arch, kill_action=bpf.KillProcess())
+
+    def _tokenize(self, line):
+        # pylint: disable=protected-access
+        self.parser._parser_state.set_line(line)
+        return self.parser._parser_state.tokenize()
+
+    def test_parse_filter_statement(self):
+        """Accept valid filter statements."""
+        self.assertEqual(
+            self.parser.parse_filter_statement(
+                self._tokenize('read: arg0 == 0')),
+            parser.ParsedFilterStatement((parser.Syscall('read', 0), ), [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+            ]))
+        self.assertEqual(
+            self.parser.parse_filter_statement(
+                self._tokenize('{read, write}: arg0 == 0')),
+            parser.ParsedFilterStatement((
+                parser.Syscall('read', 0),
+                parser.Syscall('write', 1),
+            ), [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+            ]))
+
+    def test_parse_unclosed_brace(self):
+        """Reject unclosed brace."""
+        with self.assertRaisesRegex(parser.ParseException, 'unclosed brace'):
+            self.parser.parse_filter_statement(
+                self._tokenize('{ read, write: arg0 == 0'))
+
+    def test_parse_missing_colon(self):
+        """Reject missing colon."""
+        with self.assertRaisesRegex(parser.ParseException, 'missing colon'):
+            self.parser.parse_filter_statement(self._tokenize('read'))
+
+    def test_parse_invalid_colon(self):
+        """Reject invalid colon."""
+        with self.assertRaisesRegex(parser.ParseException, 'invalid colon'):
+            self.parser.parse_filter_statement(self._tokenize('read arg0'))
+
+    def test_parse_missing_filter(self):
+        """Reject missing filter."""
+        with self.assertRaisesRegex(parser.ParseException, 'missing filter'):
+            self.parser.parse_filter_statement(self._tokenize('read:'))
+
+
 if __name__ == '__main__':
     unittest.main()
