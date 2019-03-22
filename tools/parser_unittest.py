@@ -24,6 +24,7 @@ import os
 import unittest
 
 import arch
+import bpf
 import parser  # pylint: disable=wrong-import-order
 
 ARCH_64 = arch.Arch.load_from_json(
@@ -97,7 +98,8 @@ class ParseConstantTests(unittest.TestCase):
 
     def setUp(self):
         self.arch = ARCH_64
-        self.parser = parser.PolicyParser(self.arch)
+        self.parser = parser.PolicyParser(
+            self.arch, kill_action=bpf.KillProcess())
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
@@ -234,21 +236,22 @@ class ParseConstantTests(unittest.TestCase):
 
 
 class ParseFilterExpressionTests(unittest.TestCase):
-    """Tests for PolicyParser.parse_filter_expression."""
+    """Tests for PolicyParser.parse_argument_expression."""
 
     def setUp(self):
         self.arch = ARCH_64
-        self.parser = parser.PolicyParser(self.arch)
+        self.parser = parser.PolicyParser(
+            self.arch, kill_action=bpf.KillProcess())
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
         self.parser._parser_state.set_line(line)
         return self.parser._parser_state.tokenize()
 
-    def test_parse_filter_expression(self):
-        """Accept valid filter expressions."""
+    def test_parse_argument_expression(self):
+        """Accept valid argument expressions."""
         self.assertEqual(
-            self.parser.parse_filter_expression(
+            self.parser.parse_argument_expression(
                 self._tokenize(
                     'arg0 in 0xffff || arg0 == PROT_EXEC && arg1 == PROT_WRITE'
                 )), [
@@ -257,30 +260,110 @@ class ParseFilterExpressionTests(unittest.TestCase):
                      parser.Atom(1, '==', 2)],
                 ])
 
-    def test_parse_empty_filter_expression(self):
-        """Reject empty filter expressions."""
+    def test_parse_empty_argument_expression(self):
+        """Reject empty argument expressions."""
         with self.assertRaisesRegex(parser.ParseException,
-                                    'empty filter expression'):
-            self.parser.parse_filter_expression(
+                                    'empty argument expression'):
+            self.parser.parse_argument_expression(
                 self._tokenize('arg0 in 0xffff ||'))
 
     def test_parse_empty_clause(self):
         """Reject empty clause."""
         with self.assertRaisesRegex(parser.ParseException, 'empty clause'):
-            self.parser.parse_filter_expression(
+            self.parser.parse_argument_expression(
                 self._tokenize('arg0 in 0xffff &&'))
 
     def test_parse_invalid_argument(self):
         """Reject invalid argument."""
         with self.assertRaisesRegex(parser.ParseException, 'invalid argument'):
-            self.parser.parse_filter_expression(
+            self.parser.parse_argument_expression(
                 self._tokenize('argX in 0xffff'))
 
     def test_parse_invalid_operator(self):
         """Reject invalid operator."""
         with self.assertRaisesRegex(parser.ParseException, 'invalid operator'):
-            self.parser.parse_filter_expression(
+            self.parser.parse_argument_expression(
                 self._tokenize('arg0 = 0xffff'))
+
+
+class ParseFilterTests(unittest.TestCase):
+    """Tests for PolicyParser.parse_filter."""
+
+    def setUp(self):
+        self.arch = ARCH_64
+        self.parser = parser.PolicyParser(
+            self.arch, kill_action=bpf.KillProcess())
+
+    def _tokenize(self, line):
+        # pylint: disable=protected-access
+        self.parser._parser_state.set_line(line)
+        return self.parser._parser_state.tokenize()
+
+    def test_parse_filter(self):
+        """Accept valid filters."""
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('arg0 == 0')), [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('kill-process')), [
+                parser.Filter(None, bpf.KillProcess()),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('kill-thread')), [
+                parser.Filter(None, bpf.KillThread()),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('trap')), [
+                parser.Filter(None, bpf.Trap()),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('return ENOSYS')), [
+                parser.Filter(None,
+                              bpf.ReturnErrno(self.arch.constants['ENOSYS'])),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('trace')), [
+                parser.Filter(None, bpf.Trace()),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('log')), [
+                parser.Filter(None, bpf.Log()),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('allow')), [
+                parser.Filter(None, bpf.Allow()),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(self._tokenize('1')), [
+                parser.Filter(None, bpf.Allow()),
+            ])
+        self.assertEqual(
+            self.parser.parse_filter(
+                self._tokenize(
+                    '{ arg0 == 0, arg0 == 1; return ENOSYS, trap }')),
+            [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+                parser.Filter([[parser.Atom(0, '==', 1)]],
+                              bpf.ReturnErrno(self.arch.constants['ENOSYS'])),
+                parser.Filter(None, bpf.Trap()),
+            ])
+
+    def test_parse_missing_return_value(self):
+        """Reject missing return value."""
+        with self.assertRaisesRegex(parser.ParseException,
+                                    'missing return value'):
+            self.parser.parse_filter(self._tokenize('return'))
+
+    def test_parse_invalid_return_value(self):
+        """Reject invalid return value."""
+        with self.assertRaisesRegex(parser.ParseException, 'invalid constant'):
+            self.parser.parse_filter(self._tokenize('return arg0'))
+
+    def test_parse_unclosed_brace(self):
+        """Reject unclosed brace."""
+        with self.assertRaisesRegex(parser.ParseException, 'unclosed brace'):
+            self.parser.parse_filter(self._tokenize('{ allow'))
 
 
 if __name__ == '__main__':
