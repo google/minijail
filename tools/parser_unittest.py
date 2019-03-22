@@ -233,5 +233,55 @@ class ParseConstantTests(unittest.TestCase):
             self.parser.parse_value(self._tokenize('0|'))
 
 
+class ParseFilterExpressionTests(unittest.TestCase):
+    """Tests for PolicyParser.parse_filter_expression."""
+
+    def setUp(self):
+        self.arch = ARCH_64
+        self.parser = parser.PolicyParser(self.arch)
+
+    def _tokenize(self, line):
+        # pylint: disable=protected-access
+        self.parser._parser_state.set_line(line)
+        return self.parser._parser_state.tokenize()
+
+    def test_parse_filter_expression(self):
+        """Accept valid filter expressions."""
+        self.assertEqual(
+            self.parser.parse_filter_expression(
+                self._tokenize(
+                    'arg0 in 0xffff || arg0 == PROT_EXEC && arg1 == PROT_WRITE'
+                )), [
+                    [parser.Atom(0, 'in', 0xffff)],
+                    [parser.Atom(0, '==', 4),
+                     parser.Atom(1, '==', 2)],
+                ])
+
+    def test_parse_empty_filter_expression(self):
+        """Reject empty filter expressions."""
+        with self.assertRaisesRegex(parser.ParseException,
+                                    'empty filter expression'):
+            self.parser.parse_filter_expression(
+                self._tokenize('arg0 in 0xffff ||'))
+
+    def test_parse_empty_clause(self):
+        """Reject empty clause."""
+        with self.assertRaisesRegex(parser.ParseException, 'empty clause'):
+            self.parser.parse_filter_expression(
+                self._tokenize('arg0 in 0xffff &&'))
+
+    def test_parse_invalid_argument(self):
+        """Reject invalid argument."""
+        with self.assertRaisesRegex(parser.ParseException, 'invalid argument'):
+            self.parser.parse_filter_expression(
+                self._tokenize('argX in 0xffff'))
+
+    def test_parse_invalid_operator(self):
+        """Reject invalid operator."""
+        with self.assertRaisesRegex(parser.ParseException, 'invalid operator'):
+            self.parser.parse_filter_expression(
+                self._tokenize('arg0 = 0xffff'))
+
+
 if __name__ == '__main__':
     unittest.main()

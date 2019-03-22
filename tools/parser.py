@@ -137,6 +137,10 @@ class ParserState:
         return tokens
 
 
+Atom = collections.namedtuple('Atom', ['argument_index', 'op', 'value'])
+"""A single boolean comparison within a filter expression."""
+
+
 # pylint: disable=too-few-public-methods
 class PolicyParser:
     """A parser for the Minijail seccomp policy file format."""
@@ -228,3 +232,54 @@ class PolicyParser:
         else:
             self._parser_state.error('empty constant')
         return value
+
+    # atom = argument , op , value
+    #      ;
+    def _parse_atom(self, tokens):
+        if not tokens:
+            self._parser_state.error('missing argument')
+        argument = tokens.pop(0)
+        if argument.type != 'ARGUMENT':
+            self._parser_state.error('invalid argument', token=argument)
+
+        if not tokens:
+            self._parser_state.error('missing operator')
+        operator = tokens.pop(0)
+        if operator.type != 'OP':
+            self._parser_state.error('invalid operator', token=operator)
+
+        value = self.parse_value(tokens)
+        return Atom(int(argument.value[3:]), operator.value, value)
+
+    # clause = atom , [ { '&&' , atom } ]
+    #        ;
+    def _parse_clause(self, tokens):
+        atoms = []
+        while tokens:
+            atoms.append(self._parse_atom(tokens))
+            if not tokens or tokens[0].type != 'AND':
+                break
+            tokens.pop(0)
+        else:
+            self._parser_state.error('empty clause')
+        return atoms
+
+    # filter-expression = clause , [ { '||' , clause } ]
+    #                   ;
+    def parse_filter_expression(self, tokens):
+        """Parse a filter expression in Disjunctive Normal Form.
+
+        Since BPF disallows back jumps, we build the basic blocks in reverse
+        order so that all the jump targets are known by the time we need to
+        reference them.
+        """
+
+        clauses = []
+        while tokens:
+            clauses.append(self._parse_clause(tokens))
+            if not tokens or tokens[0].type != 'OR':
+                break
+            tokens.pop(0)
+        else:
+            self._parser_state.error('empty filter expression')
+        return clauses
