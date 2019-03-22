@@ -4,7 +4,9 @@
   "bits": 64,
   "syscalls": {
     "read": 0,
-    "write": 1
+    "write": 1,
+    "open": 2,
+    "close": 3
   },
   "constants": {
     "ENOSYS": 38,
