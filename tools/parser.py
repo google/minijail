@@ -34,6 +34,7 @@ Token = collections.namedtuple('token',
 _TOKEN_SPECIFICATION = (
     ('COMMENT', r'#.*$'),
     ('WHITESPACE', r'\s+'),
+    ('DEFAULT', r'@default'),
     ('INCLUDE', r'@include'),
     ('FREQUENCY', r'@frequency'),
     ('PATH', r'(?:\.)?/\S+'),
@@ -327,6 +328,29 @@ class PolicyParser:
             self._parser_state.error('empty argument expression')
         return clauses
 
+    # default-action = 'kill-process'
+    #                | 'kill-thread'
+    #                | 'kill'
+    #                | 'trap'
+    #                ;
+    def _parse_default_action(self, tokens):
+        if not tokens:
+            self._parser_state.error('missing default action')
+        action_token = tokens.pop(0)
+        if action_token.type != 'ACTION':
+            return self._parser_state.error(
+                'invalid default action', token=action_token)
+        if action_token.value == 'kill-process':
+            return bpf.KillProcess()
+        if action_token.value == 'kill-thread':
+            return bpf.KillThread()
+        if action_token.value == 'kill':
+            return self._kill_action
+        if action_token.value == 'trap':
+            return bpf.Trap()
+        return self._parser_state.error(
+            'invalid permissive default action', token=action_token)
+
     # action = 'allow' | '1'
     #        | 'kill-process'
     #        | 'kill-thread'
@@ -595,6 +619,18 @@ class PolicyParser:
                 token=frequency_path)
         return self._parse_frequency_file(frequency_filename)
 
+    # default-statement = '@default' , default-action
+    #                   ;
+    def _parse_default_statement(self, tokens):
+        if not tokens:
+            self._parser_state.error('empty default statement')
+        if tokens[0].type != 'DEFAULT':
+            self._parser_state.error('invalid default', token=tokens[0])
+        tokens.pop(0)
+        if not tokens:
+            self._parser_state.error('empty action')
+        return self._parse_default_action(tokens)
+
     def _parse_policy_file(self, filename):
         self._parser_states.append(ParserState(filename))
         try:
@@ -616,6 +652,9 @@ class PolicyParser:
                                 tokens).items():
                             self._frequency_mapping[
                                 syscall_number] += frequency
+                    elif tokens[0].type == 'DEFAULT':
+                        self._default_action = self._parse_default_statement(
+                            tokens)
                     else:
                         statement = self.parse_filter_statement(tokens)
                         if statement is None:
