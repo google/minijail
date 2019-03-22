@@ -150,6 +150,17 @@ of lists, one for disjunctions and the inner one for conjunctions. The elements
 of the inner list are Atoms.
 """
 
+Syscall = collections.namedtuple('Syscall', ['name', 'number'])
+"""A system call."""
+
+ParsedFilterStatement = collections.namedtuple('ParsedFilterStatement',
+                                               ['syscalls', 'filters'])
+"""The result of parsing a filter statement.
+
+Statements have a list of syscalls, and an associated list of filters that will
+be evaluated sequentially when any of the syscalls is invoked.
+"""
+
 
 # pylint: disable=too-few-public-methods
 class PolicyParser:
@@ -375,3 +386,53 @@ class PolicyParser:
         else:
             filters.append(self._parse_single_filter(tokens))
         return filters
+
+    # syscall-descriptor = syscall-name , [ metadata ]
+    #                    | libc-function , [ metadata ]
+    #                    ;
+    def _parse_syscall_descriptor(self, tokens):
+        if not tokens:
+            self._parser_state.error('missing syscall descriptor')
+        syscall_descriptor = tokens.pop(0)
+        if syscall_descriptor.type != 'IDENTIFIER':
+            self._parser_state.error(
+                'invalid syscall descriptor', token=syscall_descriptor)
+        if syscall_descriptor.value not in self._arch.syscalls:
+            self._parser_state.error(
+                'nonexistent syscall', token=syscall_descriptor)
+        # TODO(lhchavez): Support libc function names.
+        # TODO(lhchavez): Support metadata.
+        return (Syscall(syscall_descriptor.value,
+                        self._arch.syscalls[syscall_descriptor.value]), )
+
+    # filter-statement = '{' , syscall-descriptor , [ { ',', syscall-descriptor } ] , '}' ,
+    #                       ':' , filter
+    #                  | syscall-descriptor , ':' , filter
+    #                  ;
+    def parse_filter_statement(self, tokens):
+        """Parse a filter statement and return a ParsedFilterStatement."""
+        if not tokens:
+            self._parser_state.error('empty filter statement')
+        syscall_descriptors = []
+        if tokens[0].type == 'LBRACE':
+            opening_brace = tokens.pop(0)
+            while tokens:
+                syscall_descriptors.extend(
+                    self._parse_syscall_descriptor(tokens))
+                if not tokens or tokens[0].type != 'COMMA':
+                    break
+                tokens.pop(0)
+            if not tokens or tokens[0].type != 'RBRACE':
+                self._parser_state.error('unclosed brace', token=opening_brace)
+            tokens.pop(0)
+        else:
+            syscall_descriptors.extend(self._parse_syscall_descriptor(tokens))
+        if not tokens:
+            self._parser_state.error('missing colon')
+        if tokens[0].type != 'COLON':
+            self._parser_state.error('invalid colon', token=tokens[0])
+        tokens.pop(0)
+        parsed_filter = self.parse_filter(tokens)
+        if not syscall_descriptors:
+            return None
+        return ParsedFilterStatement(tuple(syscall_descriptors), parsed_filter)
