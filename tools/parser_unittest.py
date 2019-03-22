@@ -21,6 +21,8 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import shutil
+import tempfile
 import unittest
 
 import arch
@@ -417,6 +419,143 @@ class ParseFilterStatementTests(unittest.TestCase):
         """Reject missing filter."""
         with self.assertRaisesRegex(parser.ParseException, 'missing filter'):
             self.parser.parse_filter_statement(self._tokenize('read:'))
+
+
+class ParseFileTests(unittest.TestCase):
+    """Tests for PolicyParser.parse_file."""
+
+    def setUp(self):
+        self.arch = ARCH_64
+        self.parser = parser.PolicyParser(
+            self.arch, kill_action=bpf.KillProcess())
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tempdir)
+
+    def _write_file(self, filename, contents):
+        """Helper to write out a file for testing."""
+        path = os.path.join(self.tempdir, filename)
+        with open(path, 'w') as outf:
+            outf.write(contents)
+        return path
+
+    def test_parse_simple(self):
+        """Allow simple policy files."""
+        path = self._write_file(
+            'test.policy', """
+            # Comment.
+            read: allow
+            write: allow
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillProcess(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('read', 0),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('write', 1),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                ]))
+
+    def test_parse_simple_grouped(self):
+        """Allow simple policy files."""
+        path = self._write_file(
+            'test.policy', """
+            # Comment.
+            {read, write}: allow
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillProcess(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('read', 0),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('write', 1),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                ]))
+
+    def test_parse_include(self):
+        """Allow including policy files."""
+        path = self._write_file(
+            'test.include.policy', """
+            {read, write}: arg0 == 0; allow
+        """)
+        path = self._write_file(
+            'test.policy', """
+            @include ./test.include.policy
+            read: return ENOSYS
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillProcess(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('read', 0),
+                        frequency=1,
+                        filters=[
+                            parser.Filter([[parser.Atom(0, '==', 0)]],
+                                          bpf.Allow()),
+                            parser.Filter(
+                                None,
+                                bpf.ReturnErrno(
+                                    self.arch.constants['ENOSYS'])),
+                        ]),
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('write', 1),
+                        frequency=1,
+                        filters=[
+                            parser.Filter([[parser.Atom(0, '==', 0)]],
+                                          bpf.Allow()),
+                            parser.Filter(None, bpf.KillProcess()),
+                        ]),
+                ]))
+
+    def test_parse_multiple_unconditional(self):
+        """Reject actions after an unconditional action."""
+        path = self._write_file(
+            'test.policy', """
+            read: allow
+            read: allow
+        """)
+
+        with self.assertRaisesRegex(
+                parser.ParseException,
+                r'Syscall read.*already had an unconditional action applied'):
+            self.parser.parse_file(path)
+
+        path = self._write_file(
+            'test.policy', """
+            read: log
+            read: arg0 == 0; log
+        """)
+
+        with self.assertRaisesRegex(
+                parser.ParseException,
+                r'Syscall read.*already had an unconditional action applied'):
+            self.parser.parse_file(path)
 
 
 if __name__ == '__main__':

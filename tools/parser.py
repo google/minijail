@@ -21,6 +21,8 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import itertools
+import os.path
 import re
 
 import bpf
@@ -161,14 +163,28 @@ Statements have a list of syscalls, and an associated list of filters that will
 be evaluated sequentially when any of the syscalls is invoked.
 """
 
+FilterStatement = collections.namedtuple('FilterStatement',
+                                         ['syscall', 'frequency', 'filters'])
+"""The filter list for a particular syscall.
+
+This is a mapping from one syscall to a list of filters that are evaluated
+sequentially. The last filter is always an unconditional action.
+"""
+
+ParsedPolicy = collections.namedtuple('ParsedPolicy',
+                                      ['default_action', 'filter_statements'])
+"""The result of parsing a minijail .policy file."""
+
 
 # pylint: disable=too-few-public-methods
 class PolicyParser:
     """A parser for the Minijail seccomp policy file format."""
 
-    def __init__(self, arch, *, kill_action):
+    def __init__(self, arch, *, kill_action, include_depth_limit=10):
         self._parser_states = [ParserState("<memory>")]
         self._kill_action = kill_action
+        self._include_depth_limit = include_depth_limit
+        self._default_action = self._kill_action
         self._arch = arch
 
     @property
@@ -436,3 +452,90 @@ class PolicyParser:
         if not syscall_descriptors:
             return None
         return ParsedFilterStatement(tuple(syscall_descriptors), parsed_filter)
+
+    # include-statement = '@include' , posix-path
+    #                   ;
+    def _parse_include_statement(self, tokens):
+        if not tokens:
+            self._parser_state.error('empty filter statement')
+        if tokens[0].type != 'INCLUDE':
+            self._parser_state.error('invalid include', token=tokens[0])
+        tokens.pop(0)
+        if not tokens:
+            self._parser_state.error('empty include path')
+        include_path = tokens.pop(0)
+        if include_path.type != 'PATH':
+            self._parser_state.error(
+                'invalid include path', token=include_path)
+        if len(self._parser_states) == self._include_depth_limit:
+            self._parser_state.error('@include statement nested too deep')
+        include_filename = os.path.normpath(
+            os.path.join(
+                os.path.dirname(self._parser_state.filename),
+                include_path.value))
+        if not os.path.isfile(include_filename):
+            self._parser_state.error(
+                'Could not @include %s' % include_filename, token=include_path)
+        return self._parse_policy_file(include_filename)
+
+    def _parse_policy_file(self, filename):
+        self._parser_states.append(ParserState(filename))
+        try:
+            statements = []
+            with open(filename) as policy_file:
+                for line in policy_file:
+                    self._parser_state.set_line(line.rstrip())
+                    tokens = self._parser_state.tokenize()
+
+                    if not tokens:
+                        # Allow empty lines.
+                        continue
+
+                    if tokens[0].type == 'INCLUDE':
+                        statements.extend(
+                            self._parse_include_statement(tokens))
+                    else:
+                        statements.append(self.parse_filter_statement(tokens))
+
+                    if tokens:
+                        self._parser_state.error(
+                            'extra tokens', token=tokens[0])
+            return statements
+        finally:
+            self._parser_states.pop()
+
+    def parse_file(self, filename):
+        """Parse a file and return the list of FilterStatements."""
+        try:
+            statements = [x for x in self._parse_policy_file(filename)]
+        except RecursionError:
+            raise ParseException('recursion limit exceeded', filename,
+                                 self._parser_states[-1].line)
+
+        # Collapse statements into a single syscall-to-filter-list.
+        syscall_filter_mapping = {}
+        filter_statements = []
+        for syscalls, filters in statements:
+            for syscall in syscalls:
+                if syscall not in syscall_filter_mapping:
+                    filter_statements.append(FilterStatement(syscall, 1, []))
+                    syscall_filter_mapping[syscall] = filter_statements[-1]
+                syscall_filter_mapping[syscall].filters.extend(filters)
+        for filter_statement in filter_statements:
+            unconditional_actions_suffix = list(
+                itertools.dropwhile(lambda filt: filt.expression is not None,
+                                    filter_statement.filters))
+            if len(unconditional_actions_suffix) == 1:
+                # The last filter already has an unconditional action, no need
+                # to add another one.
+                continue
+            if len(unconditional_actions_suffix) > 1:
+                raise ParseException(('Syscall %s (number %d) already had '
+                                      'an unconditional action applied') %
+                                     (filter_statement.syscall.name,
+                                      filter_statement.syscall.number),
+                                     filename, self._parser_states[-1].line)
+            assert not unconditional_actions_suffix
+            filter_statement.filters.append(
+                Filter(expression=None, action=self._default_action))
+        return ParsedPolicy(self._default_action, filter_statements)
