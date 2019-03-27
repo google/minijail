@@ -272,5 +272,92 @@ class CompileFilterStatementTests(unittest.TestCase):
                     'ALLOW')
 
 
+class CompileFileTests(unittest.TestCase):
+    """Tests for PolicyCompiler.compile_file."""
+
+    def setUp(self):
+        self.arch = ARCH_64
+        self.compiler = compiler.PolicyCompiler(self.arch)
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tempdir)
+
+    def _write_file(self, filename, contents):
+        """Helper to write out a file for testing."""
+        path = os.path.join(self.tempdir, filename)
+        with open(path, 'w') as outf:
+            outf.write(contents)
+        return path
+
+    def test_compile_linear(self):
+        """Reject empty / malformed lines."""
+        self._write_file(
+            'test.frequency', """
+            read: 1
+            close: 10
+        """)
+        path = self._write_file(
+            'test.policy', """
+            @frequency ./test.frequency
+            read: 1
+            close: 1
+        """)
+
+        program = self.compiler.compile_file(
+            path,
+            optimization_strategy=compiler.OptimizationStrategy.LINEAR,
+            kill_action=bpf.KillProcess())
+        self.assertGreater(
+            bpf.simulate(program.instructions, self.arch.arch_nr,
+                         self.arch.syscalls['read'], 0)[0],
+            bpf.simulate(program.instructions, self.arch.arch_nr,
+                         self.arch.syscalls['close'], 0)[0],
+        )
+
+    def test_compile_bst(self):
+        """Ensure compilation with BST is cheaper than the linear model."""
+        self._write_file(
+            'test.frequency', """
+            read: 1
+            close: 10
+        """)
+        path = self._write_file(
+            'test.policy', """
+            @frequency ./test.frequency
+            read: 1
+            close: 1
+        """)
+
+        program = self.compiler.compile_file(
+            path,
+            optimization_strategy=compiler.OptimizationStrategy.BST,
+            kill_action=bpf.KillProcess())
+        # BST for very few syscalls does not make a lot of sense and does
+        # introduce some overhead, so there will be no checking for cost.
+        self.assertEqual(
+            bpf.simulate(program.instructions, self.arch.arch_nr,
+                         self.arch.syscalls['read'], 0)[1], 'ALLOW')
+        self.assertEqual(
+            bpf.simulate(program.instructions, self.arch.arch_nr,
+                         self.arch.syscalls['close'], 0)[1], 'ALLOW')
+
+    def test_compile_empty_file(self):
+        """Accept empty files."""
+        path = self._write_file(
+            'test.policy', """
+            @default kill-thread
+        """)
+
+        for strategy in list(compiler.OptimizationStrategy):
+            program = self.compiler.compile_file(
+                path,
+                optimization_strategy=strategy,
+                kill_action=bpf.KillProcess())
+            self.assertEqual(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls['read'], 0)[1], 'KILL_THREAD')
+
+
 if __name__ == '__main__':
     unittest.main()
