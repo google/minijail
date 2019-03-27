@@ -651,3 +651,23 @@ class FlatteningVisitor:
         self._instructions = instructions + self._instructions
         self._offsets[id(block)] = -len(self._instructions)
         return
+
+
+class ArgFilterForwardingVisitor:
+    """A visitor that forwards visitation to all arg filters."""
+
+    def __init__(self, visitor):
+        self.visitor = visitor
+
+    def visit(self, block):
+        # All arg filters are BasicBlocks.
+        if not isinstance(block, BasicBlock):
+            return
+        # But the ALLOW, KILL_PROCESS, TRAP, etc. actions are too and we don't
+        # want to visit them just yet.
+        if (isinstance(block, KillProcess) or isinstance(block, KillThread)
+                or isinstance(block, Trap) or isinstance(block, ReturnErrno)
+                or isinstance(block, Trace) or isinstance(block, Log)
+                or isinstance(block, Allow)):
+            return
+        block.accept(self.visitor)
