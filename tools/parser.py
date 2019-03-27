@@ -207,11 +207,17 @@ ParsedPolicy = collections.namedtuple('ParsedPolicy',
 class PolicyParser:
     """A parser for the Minijail seccomp policy file format."""
 
-    def __init__(self, arch, *, kill_action, include_depth_limit=10):
+    def __init__(self,
+                 arch,
+                 *,
+                 kill_action,
+                 include_depth_limit=10,
+                 override_default_action=None):
         self._parser_states = [ParserState("<memory>")]
         self._kill_action = kill_action
         self._include_depth_limit = include_depth_limit
         self._default_action = self._kill_action
+        self._override_default_action = override_default_action
         self._frequency_mapping = collections.defaultdict(int)
         self._arch = arch
 
@@ -385,7 +391,7 @@ class PolicyParser:
     #        | 'log'
     #        | 'return' , single-constant
     #        ;
-    def _parse_action(self, tokens):
+    def parse_action(self, tokens):
         if not tokens:
             self._parser_state.error('missing action')
         action_token = tokens.pop(0)
@@ -425,12 +431,12 @@ class PolicyParser:
             argument_expression = self.parse_argument_expression(tokens)
             if tokens and tokens[0].type == 'SEMICOLON':
                 tokens.pop(0)
-                action = self._parse_action(tokens)
+                action = self.parse_action(tokens)
             else:
                 action = bpf.Allow()
             return Filter(argument_expression, action)
         else:
-            return Filter(None, self._parse_action(tokens))
+            return Filter(None, self.parse_action(tokens))
 
     # filter = '{' , single-filter , [ { ',' , single-filter } ] , '}'
     #        | single-filter
@@ -722,6 +728,7 @@ class PolicyParser:
                             []))
                     syscall_filter_mapping[syscall] = filter_statements[-1]
                 syscall_filter_mapping[syscall].filters.extend(filters)
+        default_action = self._override_default_action or self._default_action
         for filter_statement in filter_statements:
             unconditional_actions_suffix = list(
                 itertools.dropwhile(lambda filt: filt.expression is not None,
@@ -740,5 +747,5 @@ class PolicyParser:
                     line=self._parser_states[-1].line)
             assert not unconditional_actions_suffix
             filter_statement.filters.append(
-                Filter(expression=None, action=self._default_action))
-        return ParsedPolicy(self._default_action, filter_statements)
+                Filter(expression=None, action=default_action))
+        return ParsedPolicy(default_action, filter_statements)
