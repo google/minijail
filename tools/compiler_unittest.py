@@ -19,6 +19,8 @@
 from __future__ import print_function
 
 import os
+import random
+import shutil
 import tempfile
 import unittest
 
@@ -357,6 +359,40 @@ class CompileFileTests(unittest.TestCase):
             self.assertEqual(
                 bpf.simulate(program.instructions, self.arch.arch_nr,
                              self.arch.syscalls['read'], 0)[1], 'KILL_THREAD')
+
+    def test_compile_simulate(self):
+        """Ensure policy reflects script by testing some random scripts."""
+        iterations = 10
+        for i in range(iterations):
+            num_entries = len(self.arch.syscalls) * (i + 1) // iterations
+            syscalls = dict(
+                zip(
+                    random.sample(self.arch.syscalls.keys(), num_entries),
+                    (random.randint(1, 1024) for _ in range(num_entries)),
+                ))
+
+            frequency_contents = '\n'.join(
+                '%s: %d' % s for s in syscalls.items())
+            policy_contents = '@frequency ./test.frequency\n' + '\n'.join(
+                '%s: 1' % s[0] for s in syscalls.items())
+
+            self._write_file('test.frequency', frequency_contents)
+            path = self._write_file('test.policy', policy_contents)
+
+            for strategy in list(compiler.OptimizationStrategy):
+                program = self.compiler.compile_file(
+                    path,
+                    optimization_strategy=strategy,
+                    kill_action=bpf.KillProcess())
+                for name, number in self.arch.syscalls.items():
+                    expected_result = ('ALLOW'
+                                       if name in syscalls else 'KILL_PROCESS')
+                    self.assertEqual(
+                        bpf.simulate(program.instructions, self.arch.arch_nr,
+                                     number, 0)[1], expected_result,
+                        ('syscall name: %s, syscall number: %d, '
+                         'strategy: %s, policy:\n%s') %
+                        (name, number, strategy, policy_contents))
 
 
 if __name__ == '__main__':
