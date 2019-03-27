@@ -460,6 +460,40 @@ class CompileFileTests(unittest.TestCase):
                              self.arch.syscalls[name], number + 1)[1],
                 'KILL_PROCESS')
 
+    def test_compile_huge_filter(self):
+        """Ensure jumps while compiling a huge policy are still valid."""
+        # This is intended to force cases where the AST visitation would result
+        # in a combinatorial explosion of calls to Block.accept(). An optimized
+        # implementation should be O(n).
+        num_entries = 128
+        syscalls = {}
+        # Here we force every single filter to be distinct. Otherwise the
+        # codegen layer will coalesce filters that compile to the same
+        # instructions.
+        policy_contents = []
+        for name in random.sample(self.arch.syscalls.keys(), num_entries):
+            values = random.sample(range(1024), num_entries)
+            syscalls[name] = values
+            policy_contents.append(
+                '%s: %s' % (name, ' || '.join('arg0 == %d' % value
+                                              for value in values)))
+
+        path = self._write_file('test.policy', '\n'.join(policy_contents))
+
+        program = self.compiler.compile_file(
+            path,
+            optimization_strategy=compiler.OptimizationStrategy.LINEAR,
+            kill_action=bpf.KillProcess())
+        for name, values in syscalls.items():
+            self.assertEqual(
+                bpf.simulate(program.instructions,
+                             self.arch.arch_nr, self.arch.syscalls[name],
+                             random.choice(values))[1], 'ALLOW')
+            self.assertEqual(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls[name], 1025)[1],
+                'KILL_PROCESS')
+
 
 if __name__ == '__main__':
     unittest.main()
