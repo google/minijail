@@ -51,10 +51,9 @@ class SyscallPolicyEntry:
 
     def __repr__(self):
         return ('SyscallPolicyEntry<name: %s, number: %d, '
-                'frequency: %d, filter: %r>') % (self.name, self.number,
-                                                 self.frequency,
-                                                 self.filter.instructions
-                                                 if self.filter else None)
+                'frequency: %d, filter: %r>') % (
+                    self.name, self.number, self.frequency,
+                    self.filter.instructions if self.filter else None)
 
     def simulate(self, arch, syscall_number, *args):
         """Simulate the policy with the given arguments."""
@@ -75,8 +74,8 @@ class SyscallPolicyRange:
 
     def __repr__(self):
         return 'SyscallPolicyRange<numbers: %r, frequency: %d, filter: %r>' % (
-            self.numbers, self.frequency, self.filter.instructions
-            if self.filter else None)
+            self.numbers, self.frequency,
+            self.filter.instructions if self.filter else None)
 
     def simulate(self, arch, syscall_number, *args):
         """Simulate the policy with the given arguments."""
@@ -221,7 +220,8 @@ def _compile_entries_bst(entries, accept_action, reject_action):
 
         # Now recursively go through all possible partitions of the interval
         # currently being considered.
-        previous_accumulated = ranges[indices[0]].accumulated - ranges[indices[0]].frequency
+        previous_accumulated = ranges[indices[0]].accumulated - ranges[
+            indices[0]].frequency
         bst_comparison_cost = (
             ranges[indices[1] - 1].accumulated - previous_accumulated)
         for i, entry in enumerate(ranges[slice(*indices)]):
@@ -265,12 +265,14 @@ class PolicyCompiler:
                      *,
                      optimization_strategy,
                      kill_action,
-                     include_depth_limit=10):
+                     include_depth_limit=10,
+                     override_default_action=None):
         """Return a compiled BPF program from the provided policy file."""
         policy_parser = parser.PolicyParser(
             self._arch,
             kill_action=kill_action,
-            include_depth_limit=include_depth_limit)
+            include_depth_limit=include_depth_limit,
+            override_default_action=override_default_action)
         parsed_policy = policy_parser.parse_file(policy_filename)
         entries = [
             self.compile_filter_statement(

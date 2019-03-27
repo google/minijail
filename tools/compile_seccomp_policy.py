@@ -28,6 +28,7 @@ import sys
 import arch
 import bpf
 import compiler
+import parser
 
 
 def parse_args(argv):
@@ -40,6 +41,14 @@ def parse_args(argv):
         choices=list(compiler.OptimizationStrategy))
     parser.add_argument('--include-depth-limit', default=10)
     parser.add_argument('--arch-json', default='constants.json')
+    parser.add_argument(
+        '--default-action',
+        type=str,
+        help=('Use the specified default action, overriding any @default '
+              'action found in the .policy files. '
+              'This allows the use of permissive actions (allow, log, trace) '
+              'since it is not valid to specify a permissive action in '
+              '.policy files. This is useful for debugging.'))
     parser.add_argument(
         '--use-kill-process',
         action='store_true',
@@ -55,19 +64,27 @@ def parse_args(argv):
 def main(argv):
     """Main entrypoint."""
     opts = parse_args(argv)
-    policy_compiler = compiler.PolicyCompiler(
-        arch.Arch.load_from_json(opts.arch_json))
+    parsed_arch = arch.Arch.load_from_json(opts.arch_json)
+    policy_compiler = compiler.PolicyCompiler(parsed_arch)
     if opts.use_kill_process:
         kill_action = bpf.KillProcess()
     else:
         kill_action = bpf.KillThread()
+    override_default_action = None
+    if opts.default_action:
+        parser_state = parser.ParserState('<memory>')
+        parser_state.set_line(opts.default_action)
+        override_default_action = parser.PolicyParser(
+            parsed_arch, kill_action=bpf.KillProcess()).parse_action(
+                parser_state.tokenize())
     with opts.output as outf:
         outf.write(
             policy_compiler.compile_file(
                 opts.policy.name,
                 optimization_strategy=opts.optimization_strategy,
                 kill_action=kill_action,
-                include_depth_limit=opts.include_depth_limit).opcodes)
+                include_depth_limit=opts.include_depth_limit,
+                override_default_action=override_default_action).opcodes)
     return 0
 
 
