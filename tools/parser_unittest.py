@@ -236,6 +236,11 @@ class ParseConstantTests(unittest.TestCase):
         with self.assertRaisesRegex(parser.ParseException, 'empty constant'):
             self.parser.parse_value(self._tokenize('0|'))
 
+    def test_parse_invalid_constant(self):
+        """Reject parsing invalid constants."""
+        with self.assertRaisesRegex(parser.ParseException, 'invalid constant'):
+            self.parser.parse_value(self._tokenize('foo'))
+
 
 class ParseFilterExpressionTests(unittest.TestCase):
     """Tests for PolicyParser.parse_argument_expression."""
@@ -286,6 +291,16 @@ class ParseFilterExpressionTests(unittest.TestCase):
         with self.assertRaisesRegex(parser.ParseException, 'invalid operator'):
             self.parser.parse_argument_expression(
                 self._tokenize('arg0 = 0xffff'))
+
+    def test_parse_missing_operator(self):
+        """Reject missing operator."""
+        with self.assertRaisesRegex(parser.ParseException, 'missing operator'):
+            self.parser.parse_argument_expression(self._tokenize('arg0'))
+
+    def test_parse_missing_operand(self):
+        """Reject missing operand."""
+        with self.assertRaisesRegex(parser.ParseException, 'empty constant'):
+            self.parser.parse_argument_expression(self._tokenize('arg0 =='))
 
 
 class ParseFilterTests(unittest.TestCase):
@@ -567,6 +582,28 @@ class ParseFileTests(unittest.TestCase):
                         ]),
                 ]))
 
+    def test_parse_other_arch(self):
+        """Allow entries that only target another architecture."""
+        path = self._write_file(
+            'test.policy', """
+            # Comment.
+            read[arch=nonexistent]: allow
+            write: allow
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillProcess(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('write', 1),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                ]))
+
     def test_parse_include(self):
         """Allow including policy files."""
         path = self._write_file(
@@ -605,6 +642,40 @@ class ParseFileTests(unittest.TestCase):
                         ]),
                 ]))
 
+    def test_parse_invalid_include(self):
+        """Reject including invalid policy files."""
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'empty include path'):
+            path = self._write_file(
+                'test.policy', """
+                @include
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'invalid include path'):
+            path = self._write_file(
+                'test.policy', """
+                @include arg0
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'@include statement nested too deep'):
+            path = self._write_file(
+                'test.policy', """
+                @include ./test.policy
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'Could not @include .*'):
+            path = self._write_file(
+                'test.policy', """
+                @include ./nonexistent.policy
+            """)
+            self.parser.parse_file(path)
+
     def test_parse_frequency(self):
         """Allow including frequency files."""
         self._write_file(
@@ -630,6 +701,65 @@ class ParseFileTests(unittest.TestCase):
                             parser.Filter(None, bpf.Allow()),
                         ]),
                 ]))
+
+    def test_parse_invalid_frequency(self):
+        """Reject including invalid frequency files."""
+        path = self._write_file('test.policy',
+                                """@frequency ./test.frequency""")
+
+        with self.assertRaisesRegex(parser.ParseException, r'missing colon'):
+            self._write_file('test.frequency', """
+                read
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException, r'invalid colon'):
+            self._write_file('test.frequency', """
+                read foo
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException, r'missing number'):
+            self._write_file('test.frequency', """
+                read:
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException, r'invalid number'):
+            self._write_file('test.frequency', """
+                read: foo
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException, r'invalid number'):
+            self._write_file('test.frequency', """
+                read: -1
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'empty frequency path'):
+            path = self._write_file(
+                'test.policy', """
+                @frequency
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'invalid frequency path'):
+            path = self._write_file(
+                'test.policy', """
+                @frequency arg0
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'Could not open frequency file.*'):
+            path = self._write_file(
+                'test.policy', """
+                @frequency ./nonexistent.frequency
+            """)
+            self.parser.parse_file(path)
 
     def test_parse_multiple_unconditional(self):
         """Reject actions after an unconditional action."""
