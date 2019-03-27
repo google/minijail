@@ -57,7 +57,7 @@ _TOKEN_SPECIFICATION = (
     ('ARGUMENT', r'arg[0-9]+'),
     ('RETURN', r'return'),
     ('ACTION', r'allow|kill-process|kill-thread|kill|trap|trace|log'),
-    ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z_0-9@]*'),
+    ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z_0-9-@]*'),
 )
 _TOKEN_RE = re.compile('|'.join(
     r'(?P<%s>%s)' % pair for pair in _TOKEN_SPECIFICATION))
@@ -481,7 +481,7 @@ class PolicyParser:
         return metadata
 
     # syscall-descriptor = syscall-name , [ metadata ]
-    #                    | libc-function , [ metadata ]
+    #                    | syscall-group-name , [ metadata ]
     #                    ;
     def _parse_syscall_descriptor(self, tokens):
         if not tokens:
@@ -490,11 +490,28 @@ class PolicyParser:
         if syscall_descriptor.type != 'IDENTIFIER':
             self._parser_state.error(
                 'invalid syscall descriptor', token=syscall_descriptor)
-        # TODO(lhchavez): Support libc function names.
         if tokens and tokens[0].type == 'LBRACKET':
             metadata = self._parse_metadata(tokens)
             if 'arch' in metadata and self._arch.arch_name not in metadata['arch']:
                 return ()
+        if '@' in syscall_descriptor.value:
+            # This is a syscall group.
+            subtokens = syscall_descriptor.value.split('@')
+            if len(subtokens) != 2:
+                self._parser_state.error(
+                    'invalid syscall group name', token=syscall_descriptor)
+            syscall_group_name, syscall_namespace_name = subtokens
+            if syscall_namespace_name not in self._arch.syscall_groups:
+                self._parser_state.error(
+                    'nonexistent syscall group namespace',
+                    token=syscall_descriptor)
+            syscall_namespace = self._arch.syscall_groups[
+                syscall_namespace_name]
+            if syscall_group_name not in syscall_namespace:
+                self._parser_state.error(
+                    'nonexistent syscall group', token=syscall_descriptor)
+            return (Syscall(name, self._arch.syscalls[name])
+                    for name in syscall_namespace[syscall_group_name])
         if syscall_descriptor.value not in self._arch.syscalls:
             self._parser_state.error(
                 'nonexistent syscall', token=syscall_descriptor)
