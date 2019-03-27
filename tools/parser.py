@@ -27,13 +27,14 @@ import re
 
 import bpf
 
-Token = collections.namedtuple('token',
-                               ['type', 'value', 'filename', 'line', 'column'])
+Token = collections.namedtuple(
+    'token', ['type', 'value', 'filename', 'line', 'line_number', 'column'])
 
 # A regex that can tokenize a Minijail policy file line.
 _TOKEN_SPECIFICATION = (
     ('COMMENT', r'#.*$'),
     ('WHITESPACE', r'\s+'),
+    ('CONTINUATION', r'\\$'),
     ('DEFAULT', r'@default'),
     ('INCLUDE', r'@include'),
     ('FREQUENCY', r'@frequency'),
@@ -67,8 +68,16 @@ class ParseException(Exception):
     """An exception that is raised when parsing fails."""
 
     # pylint: disable=too-many-arguments
-    def __init__(self, message, filename, line, line_number=1, token=None):
+    def __init__(self,
+                 message,
+                 filename,
+                 *,
+                 line='',
+                 line_number=1,
+                 token=None):
         if token:
+            line = token.line
+            line_number = token.line_number
             column = token.column
             length = len(token.value)
         else:
@@ -105,42 +114,58 @@ class ParserState:
         """Return the current line number being processed."""
         return self._line_number
 
-    def set_line(self, line):
-        """Update the current line being processed."""
-        self._line = line
-        self._line_number += 1
-
     def error(self, message, token=None):
         """Raise a ParserException with the provided message."""
-        raise ParseException(message, self.filename, self.line,
-                             self.line_number, token)
+        raise ParseException(
+            message,
+            self.filename,
+            line=self._line,
+            line_number=self._line_number,
+            token=token)
 
-    def tokenize(self):
+    def tokenize(self, lines):
         """Return a list of tokens for the current line."""
         tokens = []
 
-        last_end = 0
-        for token in _TOKEN_RE.finditer(self.line):
-            if token.start() != last_end:
+        for line_number, line in enumerate(lines):
+            self._line_number = line_number + 1
+            self._line = line.rstrip('\r\n')
+
+            last_end = 0
+            for token in _TOKEN_RE.finditer(self._line):
+                if token.start() != last_end:
+                    self.error(
+                        'invalid token',
+                        token=Token('INVALID',
+                                    self._line[last_end:token.start()],
+                                    self.filename, self._line,
+                                    self._line_number, last_end))
+                last_end = token.end()
+
+                # Omit whitespace and comments now to avoid sprinkling this logic
+                # elsewhere.
+                if token.lastgroup in ('WHITESPACE', 'COMMENT',
+                                       'CONTINUATION'):
+                    continue
+                tokens.append(
+                    Token(token.lastgroup, token.group(), self.filename,
+                          self._line, self._line_number, token.start()))
+            if last_end != len(self._line):
                 self.error(
                     'invalid token',
-                    token=Token('INVALID', self.line[last_end:token.start()],
-                                self.filename, self.line_number, last_end))
-            last_end = token.end()
+                    token=Token('INVALID', self._line[last_end:],
+                                self.filename, self._line, self._line_number,
+                                last_end))
 
-            # Omit whitespace and comments now to avoid sprinkling this logic
-            # elsewhere.
-            if token.lastgroup in ('WHITESPACE', 'COMMENT'):
+            if self._line.endswith('\\'):
+                # This line is not finished yet.
                 continue
-            tokens.append(
-                Token(token.lastgroup, token.group(), self.filename,
-                      self.line_number, token.start()))
-        if last_end != len(self.line):
-            self.error(
-                'invalid token',
-                token=Token('INVALID', self.line[last_end:], self.filename,
-                            self.line_number, last_end))
-        return tokens
+
+            if tokens:
+                # Return a copy of the token list so that the caller can be free
+                # to modify it.
+                yield tokens[::]
+            tokens.clear()
 
 
 Atom = collections.namedtuple('Atom', ['argument_index', 'op', 'value'])
@@ -580,13 +605,7 @@ class PolicyParser:
         try:
             frequency_mapping = collections.defaultdict(int)
             with open(filename) as frequency_file:
-                for line in frequency_file:
-                    self._parser_state.set_line(line.rstrip())
-                    tokens = self._parser_state.tokenize()
-
-                    if not tokens:
-                        continue
-
+                for tokens in self._parser_state.tokenize(frequency_file):
                     syscall_numbers = self._parse_syscall_descriptor(tokens)
                     if not tokens:
                         self._parser_state.error('missing colon')
@@ -653,14 +672,7 @@ class PolicyParser:
         try:
             statements = []
             with open(filename) as policy_file:
-                for line in policy_file:
-                    self._parser_state.set_line(line.rstrip())
-                    tokens = self._parser_state.tokenize()
-
-                    if not tokens:
-                        # Allow empty lines.
-                        continue
-
+                for tokens in self._parser_state.tokenize(policy_file):
                     if tokens[0].type == 'INCLUDE':
                         statements.extend(
                             self._parse_include_statement(tokens))
@@ -693,8 +705,10 @@ class PolicyParser:
         try:
             statements = [x for x in self._parse_policy_file(filename)]
         except RecursionError:
-            raise ParseException('recursion limit exceeded', filename,
-                                 self._parser_states[-1].line)
+            raise ParseException(
+                'recursion limit exceeded',
+                filename,
+                line=self._parser_states[-1].line)
 
         # Collapse statements into a single syscall-to-filter-list.
         syscall_filter_mapping = {}
@@ -717,11 +731,13 @@ class PolicyParser:
                 # to add another one.
                 continue
             if len(unconditional_actions_suffix) > 1:
-                raise ParseException(('Syscall %s (number %d) already had '
-                                      'an unconditional action applied') %
-                                     (filter_statement.syscall.name,
-                                      filter_statement.syscall.number),
-                                     filename, self._parser_states[-1].line)
+                raise ParseException(
+                    ('Syscall %s (number %d) already had '
+                     'an unconditional action applied') %
+                    (filter_statement.syscall.name,
+                     filter_statement.syscall.number),
+                    filename,
+                    line=self._parser_states[-1].line)
             assert not unconditional_actions_suffix
             filter_statement.filters.append(
                 Filter(expression=None, action=self._default_action))
