@@ -21,9 +21,10 @@ import json
 
 
 class Arch(
-        collections.namedtuple(
-            'Arch',
-            ['arch_nr', 'arch_name', 'bits', 'syscalls', 'constants'])):
+        collections.namedtuple('Arch', [
+            'arch_nr', 'arch_name', 'bits', 'syscalls', 'constants',
+            'syscall_groups'
+        ])):
     """Holds architecture-specific information."""
 
     def truncate_word(self, value):
@@ -51,4 +52,5 @@ class Arch(
                 bits=constants['bits'],
                 syscalls=constants['syscalls'],
                 constants=constants['constants'],
+                syscall_groups=constants.get('syscall_groups', {}),
             )
