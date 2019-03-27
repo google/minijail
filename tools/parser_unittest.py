@@ -40,8 +40,7 @@ class TokenizerTests(unittest.TestCase):
     @staticmethod
     def _tokenize(line):
         parser_state = parser.ParserState('<memory>')
-        parser_state.set_line(line)
-        return parser_state.tokenize()
+        return list(parser_state.tokenize([line]))[0]
 
     def test_tokenize(self):
         """Accept valid tokens."""
@@ -105,8 +104,7 @@ class ParseConstantTests(unittest.TestCase):
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
-        self.parser._parser_state.set_line(line)
-        return self.parser._parser_state.tokenize()
+        return list(self.parser._parser_state.tokenize([line]))[0]
 
     def test_parse_constant_unsigned(self):
         """Accept reasonably-sized unsigned constants."""
@@ -232,7 +230,7 @@ class ParseConstantTests(unittest.TestCase):
     def test_parse_empty_constant(self):
         """Reject parsing nothing."""
         with self.assertRaisesRegex(parser.ParseException, 'empty constant'):
-            self.parser.parse_value(self._tokenize(''))
+            self.parser.parse_value([])
         with self.assertRaisesRegex(parser.ParseException, 'empty constant'):
             self.parser.parse_value(self._tokenize('0|'))
 
@@ -252,8 +250,7 @@ class ParseFilterExpressionTests(unittest.TestCase):
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
-        self.parser._parser_state.set_line(line)
-        return self.parser._parser_state.tokenize()
+        return list(self.parser._parser_state.tokenize([line]))[0]
 
     def test_parse_argument_expression(self):
         """Accept valid argument expressions."""
@@ -313,8 +310,7 @@ class ParseFilterTests(unittest.TestCase):
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
-        self.parser._parser_state.set_line(line)
-        return self.parser._parser_state.tokenize()
+        return list(self.parser._parser_state.tokenize([line]))[0]
 
     def test_parse_filter(self):
         """Accept valid filters."""
@@ -393,8 +389,7 @@ class ParseFilterStatementTests(unittest.TestCase):
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
-        self.parser._parser_state.set_line(line)
-        return self.parser._parser_state.tokenize()
+        return list(self.parser._parser_state.tokenize([line]))[0]
 
     def test_parse_filter_statement(self):
         """Accept valid filter statements."""
@@ -500,6 +495,35 @@ class ParseFileTests(unittest.TestCase):
             'test.policy', """
             # Comment.
             read: allow
+            write: allow
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillProcess(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('read', 0),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('write', 1),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                ]))
+
+    def test_parse_multiline(self):
+        """Allow simple multi-line policy files."""
+        path = self._write_file(
+            'test.policy', """
+            # Comment.
+            read: \
+                allow
             write: allow
         """)
 
