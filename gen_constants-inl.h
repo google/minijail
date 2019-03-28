@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <linux/fs.h>
 #include <linux/mman.h>
+#include <linux/net.h>
 #include <linux/prctl.h>
 #include <linux/sched.h>
 #include <linux/serial.h>
