@@ -499,6 +499,45 @@ int parse_include_statement(struct parser_state *state, char *policy_line,
 	return 0;
 }
 
+/*
+ * This is like getline() but supports line wrapping with \.
+ */
+static ssize_t getmultiline(char **lineptr, size_t *n, FILE *stream)
+{
+	ssize_t ret = getline(lineptr, n, stream);
+	if (ret < 0)
+		return ret;
+
+	char *line = *lineptr;
+	/* Eat the newline to make processing below easier. */
+	if (ret > 0 && line[ret - 1] == '\n')
+		line[--ret] = '\0';
+
+	/* If the line doesn't end in a backslash, we're done. */
+	if (ret <= 0 || line[ret - 1] != '\\')
+		return ret;
+
+	/* This line ends in a backslash. Get the nextline. */
+	line[--ret] = '\0';
+	size_t next_n = 0;
+	char *next_line = NULL;
+	ssize_t next_ret = getmultiline(&next_line, &next_n, stream);
+	if (next_ret == -1) {
+		free(next_line);
+		/* We couldn't fully read the line, so return an error. */
+		return -1;
+	}
+
+	/* Merge the lines. */
+	*n = ret + next_ret + 2;
+	line = realloc(line, *n);
+	line[ret] = ' ';
+	memcpy(&line[ret + 1], next_line, next_ret + 1);
+	free(next_line);
+	*lineptr = line;
+	return ret;
+}
+
 int compile_file(const char *filename, FILE *policy_file,
 		 struct filter_block *head, struct filter_block **arg_blocks,
 		 struct bpf_labels *labels, int use_ret_trap, int allow_logging,
@@ -522,7 +561,7 @@ int compile_file(const char *filename, FILE *policy_file,
 	size_t len = 0;
 	int ret = 0;
 
-	while (getline(&line, &len, policy_file) != -1) {
+	while (getmultiline(&line, &len, policy_file) != -1) {
 		char *policy_line = line;
 		policy_line = strip(policy_line);
 
