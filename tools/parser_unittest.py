@@ -40,8 +40,7 @@ class TokenizerTests(unittest.TestCase):
     @staticmethod
     def _tokenize(line):
         parser_state = parser.ParserState('<memory>')
-        parser_state.set_line(line)
-        return parser_state.tokenize()
+        return list(parser_state.tokenize([line]))[0]
 
     def test_tokenize(self):
         """Accept valid tokens."""
@@ -105,8 +104,7 @@ class ParseConstantTests(unittest.TestCase):
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
-        self.parser._parser_state.set_line(line)
-        return self.parser._parser_state.tokenize()
+        return list(self.parser._parser_state.tokenize([line]))[0]
 
     def test_parse_constant_unsigned(self):
         """Accept reasonably-sized unsigned constants."""
@@ -232,9 +230,14 @@ class ParseConstantTests(unittest.TestCase):
     def test_parse_empty_constant(self):
         """Reject parsing nothing."""
         with self.assertRaisesRegex(parser.ParseException, 'empty constant'):
-            self.parser.parse_value(self._tokenize(''))
+            self.parser.parse_value([])
         with self.assertRaisesRegex(parser.ParseException, 'empty constant'):
             self.parser.parse_value(self._tokenize('0|'))
+
+    def test_parse_invalid_constant(self):
+        """Reject parsing invalid constants."""
+        with self.assertRaisesRegex(parser.ParseException, 'invalid constant'):
+            self.parser.parse_value(self._tokenize('foo'))
 
 
 class ParseFilterExpressionTests(unittest.TestCase):
@@ -247,8 +250,7 @@ class ParseFilterExpressionTests(unittest.TestCase):
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
-        self.parser._parser_state.set_line(line)
-        return self.parser._parser_state.tokenize()
+        return list(self.parser._parser_state.tokenize([line]))[0]
 
     def test_parse_argument_expression(self):
         """Accept valid argument expressions."""
@@ -287,6 +289,16 @@ class ParseFilterExpressionTests(unittest.TestCase):
             self.parser.parse_argument_expression(
                 self._tokenize('arg0 = 0xffff'))
 
+    def test_parse_missing_operator(self):
+        """Reject missing operator."""
+        with self.assertRaisesRegex(parser.ParseException, 'missing operator'):
+            self.parser.parse_argument_expression(self._tokenize('arg0'))
+
+    def test_parse_missing_operand(self):
+        """Reject missing operand."""
+        with self.assertRaisesRegex(parser.ParseException, 'empty constant'):
+            self.parser.parse_argument_expression(self._tokenize('arg0 =='))
+
 
 class ParseFilterTests(unittest.TestCase):
     """Tests for PolicyParser.parse_filter."""
@@ -298,8 +310,7 @@ class ParseFilterTests(unittest.TestCase):
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
-        self.parser._parser_state.set_line(line)
-        return self.parser._parser_state.tokenize()
+        return list(self.parser._parser_state.tokenize([line]))[0]
 
     def test_parse_filter(self):
         """Accept valid filters."""
@@ -378,8 +389,7 @@ class ParseFilterStatementTests(unittest.TestCase):
 
     def _tokenize(self, line):
         # pylint: disable=protected-access
-        self.parser._parser_state.set_line(line)
-        return self.parser._parser_state.tokenize()
+        return list(self.parser._parser_state.tokenize([line]))[0]
 
     def test_parse_filter_statement(self):
         """Accept valid filter statements."""
@@ -392,6 +402,24 @@ class ParseFilterStatementTests(unittest.TestCase):
         self.assertEqual(
             self.parser.parse_filter_statement(
                 self._tokenize('{read, write}: arg0 == 0')),
+            parser.ParsedFilterStatement((
+                parser.Syscall('read', 0),
+                parser.Syscall('write', 1),
+            ), [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+            ]))
+        self.assertEqual(
+            self.parser.parse_filter_statement(
+                self._tokenize('io@libc: arg0 == 0')),
+            parser.ParsedFilterStatement((
+                parser.Syscall('read', 0),
+                parser.Syscall('write', 1),
+            ), [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+            ]))
+        self.assertEqual(
+            self.parser.parse_filter_statement(
+                self._tokenize('file-io@systemd: arg0 == 0')),
             parser.ParsedFilterStatement((
                 parser.Syscall('read', 0),
                 parser.Syscall('write', 1),
@@ -417,6 +445,11 @@ class ParseFilterStatementTests(unittest.TestCase):
 
     def test_parse_unclosed_brace(self):
         """Reject unclosed brace."""
+        with self.assertRaisesRegex(parser.ParseException, 'unclosed brace'):
+            self.parser.parse_filter(self._tokenize('{ allow'))
+
+    def test_parse_invalid_syscall_group(self):
+        """Reject invalid syscall groups."""
         with self.assertRaisesRegex(parser.ParseException, 'unclosed brace'):
             self.parser.parse_filter_statement(
                 self._tokenize('{ read, write: arg0 == 0'))
@@ -462,6 +495,35 @@ class ParseFileTests(unittest.TestCase):
             'test.policy', """
             # Comment.
             read: allow
+            write: allow
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillProcess(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('read', 0),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('write', 1),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                ]))
+
+    def test_parse_multiline(self):
+        """Allow simple multi-line policy files."""
+        path = self._write_file(
+            'test.policy', """
+            # Comment.
+            read: \
+                allow
             write: allow
         """)
 
@@ -544,6 +606,28 @@ class ParseFileTests(unittest.TestCase):
                         ]),
                 ]))
 
+    def test_parse_other_arch(self):
+        """Allow entries that only target another architecture."""
+        path = self._write_file(
+            'test.policy', """
+            # Comment.
+            read[arch=nonexistent]: allow
+            write: allow
+        """)
+
+        self.assertEqual(
+            self.parser.parse_file(path),
+            parser.ParsedPolicy(
+                default_action=bpf.KillProcess(),
+                filter_statements=[
+                    parser.FilterStatement(
+                        syscall=parser.Syscall('write', 1),
+                        frequency=1,
+                        filters=[
+                            parser.Filter(None, bpf.Allow()),
+                        ]),
+                ]))
+
     def test_parse_include(self):
         """Allow including policy files."""
         path = self._write_file(
@@ -582,6 +666,40 @@ class ParseFileTests(unittest.TestCase):
                         ]),
                 ]))
 
+    def test_parse_invalid_include(self):
+        """Reject including invalid policy files."""
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'empty include path'):
+            path = self._write_file(
+                'test.policy', """
+                @include
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'invalid include path'):
+            path = self._write_file(
+                'test.policy', """
+                @include arg0
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'@include statement nested too deep'):
+            path = self._write_file(
+                'test.policy', """
+                @include ./test.policy
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'Could not @include .*'):
+            path = self._write_file(
+                'test.policy', """
+                @include ./nonexistent.policy
+            """)
+            self.parser.parse_file(path)
+
     def test_parse_frequency(self):
         """Allow including frequency files."""
         self._write_file(
@@ -607,6 +725,65 @@ class ParseFileTests(unittest.TestCase):
                             parser.Filter(None, bpf.Allow()),
                         ]),
                 ]))
+
+    def test_parse_invalid_frequency(self):
+        """Reject including invalid frequency files."""
+        path = self._write_file('test.policy',
+                                """@frequency ./test.frequency""")
+
+        with self.assertRaisesRegex(parser.ParseException, r'missing colon'):
+            self._write_file('test.frequency', """
+                read
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException, r'invalid colon'):
+            self._write_file('test.frequency', """
+                read foo
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException, r'missing number'):
+            self._write_file('test.frequency', """
+                read:
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException, r'invalid number'):
+            self._write_file('test.frequency', """
+                read: foo
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException, r'invalid number'):
+            self._write_file('test.frequency', """
+                read: -1
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'empty frequency path'):
+            path = self._write_file(
+                'test.policy', """
+                @frequency
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'invalid frequency path'):
+            path = self._write_file(
+                'test.policy', """
+                @frequency arg0
+            """)
+            self.parser.parse_file(path)
+
+        with self.assertRaisesRegex(parser.ParseException,
+                                    r'Could not open frequency file.*'):
+            path = self._write_file(
+                'test.policy', """
+                @frequency ./nonexistent.frequency
+            """)
+            self.parser.parse_file(path)
 
     def test_parse_multiple_unconditional(self):
         """Reject actions after an unconditional action."""

@@ -19,6 +19,8 @@
 from __future__ import print_function
 
 import os
+import random
+import shutil
 import tempfile
 import unittest
 
@@ -231,6 +233,14 @@ class CompileFilterStatementTests(unittest.TestCase):
             block.simulate(self.arch.arch_nr, self.arch.syscalls['read'], 1,
                            1)[1], 'ALLOW')
 
+    def test_trap(self):
+        """Accept lines that trap unconditionally."""
+        block = self._compile('read: trap')
+
+        self.assertEqual(
+            block.simulate(self.arch.arch_nr, self.arch.syscalls['read'],
+                           0)[1], 'TRAP')
+
     def test_ret_errno(self):
         """Accept lines that return errno."""
         block = self._compile('read : arg0 == 0 || arg0 == 1 ; return 1')
@@ -253,6 +263,22 @@ class CompileFilterStatementTests(unittest.TestCase):
             block.simulate(self.arch.arch_nr, self.arch.syscalls['read'],
                            0)[1:], ('ERRNO', 1))
 
+    def test_trace(self):
+        """Accept lines that trace unconditionally."""
+        block = self._compile('read: trace')
+
+        self.assertEqual(
+            block.simulate(self.arch.arch_nr, self.arch.syscalls['read'],
+                           0)[1], 'TRACE')
+
+    def test_log(self):
+        """Accept lines that log unconditionally."""
+        block = self._compile('read: log')
+
+        self.assertEqual(
+            block.simulate(self.arch.arch_nr, self.arch.syscalls['read'],
+                           0)[1], 'LOG')
+
     def test_mmap_write_xor_exec(self):
         """Accept the idiomatic filter for mmap."""
         block = self._compile(
@@ -270,6 +296,203 @@ class CompileFilterStatementTests(unittest.TestCase):
                     block.simulate(self.arch.arch_nr,
                                    self.arch.syscalls['read'], prot)[1],
                     'ALLOW')
+
+
+class CompileFileTests(unittest.TestCase):
+    """Tests for PolicyCompiler.compile_file."""
+
+    def setUp(self):
+        self.arch = ARCH_64
+        self.compiler = compiler.PolicyCompiler(self.arch)
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tempdir)
+
+    def _write_file(self, filename, contents):
+        """Helper to write out a file for testing."""
+        path = os.path.join(self.tempdir, filename)
+        with open(path, 'w') as outf:
+            outf.write(contents)
+        return path
+
+    def test_compile(self):
+        """Ensure compilation works with all strategies."""
+        self._write_file(
+            'test.frequency', """
+            read: 1
+            close: 10
+        """)
+        path = self._write_file(
+            'test.policy', """
+            @frequency ./test.frequency
+            read: 1
+            close: 1
+        """)
+
+        program = self.compiler.compile_file(
+            path,
+            optimization_strategy=compiler.OptimizationStrategy.LINEAR,
+            kill_action=bpf.KillProcess())
+        self.assertGreater(
+            bpf.simulate(program.instructions, self.arch.arch_nr,
+                         self.arch.syscalls['read'], 0)[0],
+            bpf.simulate(program.instructions, self.arch.arch_nr,
+                         self.arch.syscalls['close'], 0)[0],
+        )
+
+    def test_compile_bst(self):
+        """Ensure compilation with BST is cheaper than the linear model."""
+        self._write_file(
+            'test.frequency', """
+            read: 1
+            close: 10
+        """)
+        path = self._write_file(
+            'test.policy', """
+            @frequency ./test.frequency
+            read: 1
+            close: 1
+        """)
+
+        for strategy in list(compiler.OptimizationStrategy):
+            program = self.compiler.compile_file(
+                path,
+                optimization_strategy=strategy,
+                kill_action=bpf.KillProcess())
+            self.assertGreater(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls['read'], 0)[0],
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls['close'], 0)[0],
+            )
+            self.assertEqual(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls['read'], 0)[1], 'ALLOW')
+            self.assertEqual(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls['close'], 0)[1], 'ALLOW')
+
+    def test_compile_empty_file(self):
+        """Accept empty files."""
+        path = self._write_file(
+            'test.policy', """
+            @default kill-thread
+        """)
+
+        for strategy in list(compiler.OptimizationStrategy):
+            program = self.compiler.compile_file(
+                path,
+                optimization_strategy=strategy,
+                kill_action=bpf.KillProcess())
+            self.assertEqual(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls['read'], 0)[1], 'KILL_THREAD')
+
+    def test_compile_simulate(self):
+        """Ensure policy reflects script by testing some random scripts."""
+        iterations = 5
+        for i in range(iterations):
+            num_entries = 64 * (i + 1) // iterations
+            syscalls = dict(
+                zip(
+                    random.sample(self.arch.syscalls.keys(), num_entries),
+                    (random.randint(1, 1024) for _ in range(num_entries)),
+                ))
+
+            frequency_contents = '\n'.join(
+                '%s: %d' % s for s in syscalls.items())
+            policy_contents = '@frequency ./test.frequency\n' + '\n'.join(
+                '%s: 1' % s[0] for s in syscalls.items())
+
+            self._write_file('test.frequency', frequency_contents)
+            path = self._write_file('test.policy', policy_contents)
+
+            for strategy in list(compiler.OptimizationStrategy):
+                program = self.compiler.compile_file(
+                    path,
+                    optimization_strategy=strategy,
+                    kill_action=bpf.KillProcess())
+                for name, number in self.arch.syscalls.items():
+                    expected_result = ('ALLOW'
+                                       if name in syscalls else 'KILL_PROCESS')
+                    self.assertEqual(
+                        bpf.simulate(program.instructions, self.arch.arch_nr,
+                                     number, 0)[1], expected_result,
+                        ('syscall name: %s, syscall number: %d, '
+                         'strategy: %s, policy:\n%s') %
+                        (name, number, strategy, policy_contents))
+
+    @unittest.skipIf(not int(os.getenv('SLOW_TESTS', '0')), 'slow')
+    def test_compile_huge_policy(self):
+        """Ensure jumps while compiling a huge policy are still valid."""
+        # Given that the BST strategy is O(n^3), don't choose a crazy large
+        # value, but it still needs to be around 128 so that we exercise the
+        # codegen paths that depend on the length of the jump.
+        #
+        # Immediate jump offsets in BPF comparison instructions are limited to
+        # 256 instructions, so given that every syscall filter consists of a
+        # load and jump instructions, with 128 syscalls there will be at least
+        # one jump that's further than 256 instructions.
+        num_entries = 128
+        syscalls = dict(random.sample(self.arch.syscalls.items(), num_entries))
+        # Here we force every single filter to be distinct. Otherwise the
+        # codegen layer will coalesce filters that compile to the same
+        # instructions.
+        policy_contents = '\n'.join(
+            '%s: arg0 == %d' % s for s in syscalls.items())
+
+        path = self._write_file('test.policy', policy_contents)
+
+        program = self.compiler.compile_file(
+            path,
+            optimization_strategy=compiler.OptimizationStrategy.BST,
+            kill_action=bpf.KillProcess())
+        for name, number in self.arch.syscalls.items():
+            expected_result = ('ALLOW'
+                               if name in syscalls else 'KILL_PROCESS')
+            self.assertEqual(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls[name], number)[1],
+                expected_result)
+            self.assertEqual(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls[name], number + 1)[1],
+                'KILL_PROCESS')
+
+    def test_compile_huge_filter(self):
+        """Ensure jumps while compiling a huge policy are still valid."""
+        # This is intended to force cases where the AST visitation would result
+        # in a combinatorial explosion of calls to Block.accept(). An optimized
+        # implementation should be O(n).
+        num_entries = 128
+        syscalls = {}
+        # Here we force every single filter to be distinct. Otherwise the
+        # codegen layer will coalesce filters that compile to the same
+        # instructions.
+        policy_contents = []
+        for name in random.sample(self.arch.syscalls.keys(), num_entries):
+            values = random.sample(range(1024), num_entries)
+            syscalls[name] = values
+            policy_contents.append(
+                '%s: %s' % (name, ' || '.join('arg0 == %d' % value
+                                              for value in values)))
+
+        path = self._write_file('test.policy', '\n'.join(policy_contents))
+
+        program = self.compiler.compile_file(
+            path,
+            optimization_strategy=compiler.OptimizationStrategy.LINEAR,
+            kill_action=bpf.KillProcess())
+        for name, values in syscalls.items():
+            self.assertEqual(
+                bpf.simulate(program.instructions,
+                             self.arch.arch_nr, self.arch.syscalls[name],
+                             random.choice(values))[1], 'ALLOW')
+            self.assertEqual(
+                bpf.simulate(program.instructions, self.arch.arch_nr,
+                             self.arch.syscalls[name], 1025)[1],
+                'KILL_PROCESS')
 
 
 if __name__ == '__main__':

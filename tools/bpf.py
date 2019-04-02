@@ -172,6 +172,8 @@ class BasicBlock(AbstractBlock):
         self._instructions = instructions
 
     def accept(self, visitor):
+        if visitor.visited(self):
+            return
         visitor.visit(self)
 
     @property
@@ -251,6 +253,8 @@ class ValidateArch(AbstractBlock):
         self.next_block = next_block
 
     def accept(self, visitor):
+        if visitor.visited(self):
+            return
         self.next_block.accept(visitor)
         visitor.visit(self)
 
@@ -274,6 +278,8 @@ class SyscallEntry(AbstractBlock):
         return False
 
     def accept(self, visitor):
+        if visitor.visited(self):
+            return
         self.jt.accept(visitor)
         self.jf.accept(visitor)
         visitor.visit(self)
@@ -299,6 +305,8 @@ class WideAtom(AbstractBlock):
         self.jf = jf
 
     def accept(self, visitor):
+        if visitor.visited(self):
+            return
         self.jt.accept(visitor)
         self.jf.accept(visitor)
         visitor.visit(self)
@@ -344,6 +352,8 @@ class Atom(AbstractBlock):
         self.value = value
 
     def accept(self, visitor):
+        if visitor.visited(self):
+            return
         self.jt.accept(visitor)
         self.jf.accept(visitor)
         visitor.visit(self)
@@ -351,6 +361,15 @@ class Atom(AbstractBlock):
 
 class AbstractVisitor(abc.ABC):
     """An abstract visitor."""
+
+    def __init__(self):
+        self._visited = set()
+
+    def visited(self, block):
+        if id(block) in self._visited:
+            return True
+        self._visited.add(id(block))
+        return False
 
     def process(self, block):
         block.accept(self)
@@ -437,6 +456,7 @@ class CopyingVisitor(AbstractVisitor):
     """A visitor that copies Blocks."""
 
     def __init__(self):
+        super().__init__()
         self._mapping = {}
 
     def process(self, block):
@@ -445,54 +465,44 @@ class CopyingVisitor(AbstractVisitor):
         return self._mapping[id(block)]
 
     def visitKillProcess(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = KillProcess()
 
     def visitKillThread(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = KillThread()
 
     def visitTrap(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = Trap()
 
     def visitReturnErrno(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = ReturnErrno(block.errno)
 
     def visitTrace(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = Trace()
 
     def visitLog(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = Log()
 
     def visitAllow(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = Allow()
 
     def visitBasicBlock(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = BasicBlock(block.instructions)
 
     def visitValidateArch(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = ValidateArch(
             block.arch, self._mapping[id(block.next_block)])
 
     def visitSyscallEntry(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = SyscallEntry(
             block.syscall_number,
             self._mapping[id(block.jt)],
@@ -500,15 +510,13 @@ class CopyingVisitor(AbstractVisitor):
             op=block.op)
 
     def visitWideAtom(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = WideAtom(
             block.arg_offset, block.op, block.value, self._mapping[id(
                 block.jt)], self._mapping[id(block.jf)])
 
     def visitAtom(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
         self._mapping[id(block)] = Atom(block.arg_index, block.op, block.value,
                                         self._mapping[id(block.jt)],
                                         self._mapping[id(block.jf)])
@@ -522,8 +530,7 @@ class LoweringVisitor(CopyingVisitor):
         self._bits = arch.bits
 
     def visitAtom(self, block):
-        if id(block) in self._mapping:
-            return
+        assert id(block) not in self._mapping
 
         lo = block.value & 0xFFFFFFFF
         hi = (block.value >> 32) & 0xFFFFFFFF
@@ -582,6 +589,7 @@ class FlatteningVisitor:
     """A visitor that flattens a DAG of Block objects."""
 
     def __init__(self, *, arch, kill_action):
+        self._visited = set()
         self._kill_action = kill_action
         self._instructions = []
         self._arch = arch
@@ -621,9 +629,14 @@ class FlatteningVisitor:
             SockFilter(BPF_JMP | BPF_JA, 0, 0, jf_distance),
         ]
 
+    def visited(self, block):
+        if id(block) in self._visited:
+            return True
+        self._visited.add(id(block))
+        return False
+
     def visit(self, block):
-        if id(block) in self._offsets:
-            return
+        assert id(block) not in self._offsets
 
         if isinstance(block, BasicBlock):
             instructions = block.instructions
@@ -651,3 +664,30 @@ class FlatteningVisitor:
         self._instructions = instructions + self._instructions
         self._offsets[id(block)] = -len(self._instructions)
         return
+
+
+class ArgFilterForwardingVisitor:
+    """A visitor that forwards visitation to all arg filters."""
+
+    def __init__(self, visitor):
+        self._visited = set()
+        self.visitor = visitor
+
+    def visited(self, block):
+        if id(block) in self._visited:
+            return True
+        self._visited.add(id(block))
+        return False
+
+    def visit(self, block):
+        # All arg filters are BasicBlocks.
+        if not isinstance(block, BasicBlock):
+            return
+        # But the ALLOW, KILL_PROCESS, TRAP, etc. actions are too and we don't
+        # want to visit them just yet.
+        if (isinstance(block, KillProcess) or isinstance(block, KillThread)
+                or isinstance(block, Trap) or isinstance(block, ReturnErrno)
+                or isinstance(block, Trace) or isinstance(block, Log)
+                or isinstance(block, Allow)):
+            return
+        block.accept(self.visitor)

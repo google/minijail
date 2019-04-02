@@ -27,13 +27,14 @@ import re
 
 import bpf
 
-Token = collections.namedtuple('token',
-                               ['type', 'value', 'filename', 'line', 'column'])
+Token = collections.namedtuple(
+    'token', ['type', 'value', 'filename', 'line', 'line_number', 'column'])
 
 # A regex that can tokenize a Minijail policy file line.
 _TOKEN_SPECIFICATION = (
     ('COMMENT', r'#.*$'),
     ('WHITESPACE', r'\s+'),
+    ('CONTINUATION', r'\\$'),
     ('DEFAULT', r'@default'),
     ('INCLUDE', r'@include'),
     ('FREQUENCY', r'@frequency'),
@@ -57,7 +58,7 @@ _TOKEN_SPECIFICATION = (
     ('ARGUMENT', r'arg[0-9]+'),
     ('RETURN', r'return'),
     ('ACTION', r'allow|kill-process|kill-thread|kill|trap|trace|log'),
-    ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z_0-9@]*'),
+    ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z_0-9-@]*'),
 )
 _TOKEN_RE = re.compile('|'.join(
     r'(?P<%s>%s)' % pair for pair in _TOKEN_SPECIFICATION))
@@ -67,8 +68,16 @@ class ParseException(Exception):
     """An exception that is raised when parsing fails."""
 
     # pylint: disable=too-many-arguments
-    def __init__(self, message, filename, line, line_number=1, token=None):
+    def __init__(self,
+                 message,
+                 filename,
+                 *,
+                 line='',
+                 line_number=1,
+                 token=None):
         if token:
+            line = token.line
+            line_number = token.line_number
             column = token.column
             length = len(token.value)
         else:
@@ -105,42 +114,58 @@ class ParserState:
         """Return the current line number being processed."""
         return self._line_number
 
-    def set_line(self, line):
-        """Update the current line being processed."""
-        self._line = line
-        self._line_number += 1
-
     def error(self, message, token=None):
         """Raise a ParserException with the provided message."""
-        raise ParseException(message, self.filename, self.line,
-                             self.line_number, token)
+        raise ParseException(
+            message,
+            self.filename,
+            line=self._line,
+            line_number=self._line_number,
+            token=token)
 
-    def tokenize(self):
+    def tokenize(self, lines):
         """Return a list of tokens for the current line."""
         tokens = []
 
-        last_end = 0
-        for token in _TOKEN_RE.finditer(self.line):
-            if token.start() != last_end:
+        for line_number, line in enumerate(lines):
+            self._line_number = line_number + 1
+            self._line = line.rstrip('\r\n')
+
+            last_end = 0
+            for token in _TOKEN_RE.finditer(self._line):
+                if token.start() != last_end:
+                    self.error(
+                        'invalid token',
+                        token=Token('INVALID',
+                                    self._line[last_end:token.start()],
+                                    self.filename, self._line,
+                                    self._line_number, last_end))
+                last_end = token.end()
+
+                # Omit whitespace and comments now to avoid sprinkling this logic
+                # elsewhere.
+                if token.lastgroup in ('WHITESPACE', 'COMMENT',
+                                       'CONTINUATION'):
+                    continue
+                tokens.append(
+                    Token(token.lastgroup, token.group(), self.filename,
+                          self._line, self._line_number, token.start()))
+            if last_end != len(self._line):
                 self.error(
                     'invalid token',
-                    token=Token('INVALID', self.line[last_end:token.start()],
-                                self.filename, self.line_number, last_end))
-            last_end = token.end()
+                    token=Token('INVALID', self._line[last_end:],
+                                self.filename, self._line, self._line_number,
+                                last_end))
 
-            # Omit whitespace and comments now to avoid sprinkling this logic
-            # elsewhere.
-            if token.lastgroup in ('WHITESPACE', 'COMMENT'):
+            if self._line.endswith('\\'):
+                # This line is not finished yet.
                 continue
-            tokens.append(
-                Token(token.lastgroup, token.group(), self.filename,
-                      self.line_number, token.start()))
-        if last_end != len(self.line):
-            self.error(
-                'invalid token',
-                token=Token('INVALID', self.line[last_end:], self.filename,
-                            self.line_number, last_end))
-        return tokens
+
+            if tokens:
+                # Return a copy of the token list so that the caller can be free
+                # to modify it.
+                yield tokens[::]
+            tokens.clear()
 
 
 Atom = collections.namedtuple('Atom', ['argument_index', 'op', 'value'])
@@ -182,11 +207,17 @@ ParsedPolicy = collections.namedtuple('ParsedPolicy',
 class PolicyParser:
     """A parser for the Minijail seccomp policy file format."""
 
-    def __init__(self, arch, *, kill_action, include_depth_limit=10):
+    def __init__(self,
+                 arch,
+                 *,
+                 kill_action,
+                 include_depth_limit=10,
+                 override_default_action=None):
         self._parser_states = [ParserState("<memory>")]
         self._kill_action = kill_action
         self._include_depth_limit = include_depth_limit
         self._default_action = self._kill_action
+        self._override_default_action = override_default_action
         self._frequency_mapping = collections.defaultdict(int)
         self._arch = arch
 
@@ -360,7 +391,7 @@ class PolicyParser:
     #        | 'log'
     #        | 'return' , single-constant
     #        ;
-    def _parse_action(self, tokens):
+    def parse_action(self, tokens):
         if not tokens:
             self._parser_state.error('missing action')
         action_token = tokens.pop(0)
@@ -400,12 +431,12 @@ class PolicyParser:
             argument_expression = self.parse_argument_expression(tokens)
             if tokens and tokens[0].type == 'SEMICOLON':
                 tokens.pop(0)
-                action = self._parse_action(tokens)
+                action = self.parse_action(tokens)
             else:
                 action = bpf.Allow()
             return Filter(argument_expression, action)
         else:
-            return Filter(None, self._parse_action(tokens))
+            return Filter(None, self.parse_action(tokens))
 
     # filter = '{' , single-filter , [ { ',' , single-filter } ] , '}'
     #        | single-filter
@@ -481,7 +512,7 @@ class PolicyParser:
         return metadata
 
     # syscall-descriptor = syscall-name , [ metadata ]
-    #                    | libc-function , [ metadata ]
+    #                    | syscall-group-name , [ metadata ]
     #                    ;
     def _parse_syscall_descriptor(self, tokens):
         if not tokens:
@@ -490,11 +521,28 @@ class PolicyParser:
         if syscall_descriptor.type != 'IDENTIFIER':
             self._parser_state.error(
                 'invalid syscall descriptor', token=syscall_descriptor)
-        # TODO(lhchavez): Support libc function names.
         if tokens and tokens[0].type == 'LBRACKET':
             metadata = self._parse_metadata(tokens)
             if 'arch' in metadata and self._arch.arch_name not in metadata['arch']:
                 return ()
+        if '@' in syscall_descriptor.value:
+            # This is a syscall group.
+            subtokens = syscall_descriptor.value.split('@')
+            if len(subtokens) != 2:
+                self._parser_state.error(
+                    'invalid syscall group name', token=syscall_descriptor)
+            syscall_group_name, syscall_namespace_name = subtokens
+            if syscall_namespace_name not in self._arch.syscall_groups:
+                self._parser_state.error(
+                    'nonexistent syscall group namespace',
+                    token=syscall_descriptor)
+            syscall_namespace = self._arch.syscall_groups[
+                syscall_namespace_name]
+            if syscall_group_name not in syscall_namespace:
+                self._parser_state.error(
+                    'nonexistent syscall group', token=syscall_descriptor)
+            return (Syscall(name, self._arch.syscalls[name])
+                    for name in syscall_namespace[syscall_group_name])
         if syscall_descriptor.value not in self._arch.syscalls:
             self._parser_state.error(
                 'nonexistent syscall', token=syscall_descriptor)
@@ -563,13 +611,7 @@ class PolicyParser:
         try:
             frequency_mapping = collections.defaultdict(int)
             with open(filename) as frequency_file:
-                for line in frequency_file:
-                    self._parser_state.set_line(line.rstrip())
-                    tokens = self._parser_state.tokenize()
-
-                    if not tokens:
-                        continue
-
+                for tokens in self._parser_state.tokenize(frequency_file):
                     syscall_numbers = self._parse_syscall_descriptor(tokens)
                     if not tokens:
                         self._parser_state.error('missing colon')
@@ -636,14 +678,7 @@ class PolicyParser:
         try:
             statements = []
             with open(filename) as policy_file:
-                for line in policy_file:
-                    self._parser_state.set_line(line.rstrip())
-                    tokens = self._parser_state.tokenize()
-
-                    if not tokens:
-                        # Allow empty lines.
-                        continue
-
+                for tokens in self._parser_state.tokenize(policy_file):
                     if tokens[0].type == 'INCLUDE':
                         statements.extend(
                             self._parse_include_statement(tokens))
@@ -676,8 +711,10 @@ class PolicyParser:
         try:
             statements = [x for x in self._parse_policy_file(filename)]
         except RecursionError:
-            raise ParseException('recursion limit exceeded', filename,
-                                 self._parser_states[-1].line)
+            raise ParseException(
+                'recursion limit exceeded',
+                filename,
+                line=self._parser_states[-1].line)
 
         # Collapse statements into a single syscall-to-filter-list.
         syscall_filter_mapping = {}
@@ -691,6 +728,7 @@ class PolicyParser:
                             []))
                     syscall_filter_mapping[syscall] = filter_statements[-1]
                 syscall_filter_mapping[syscall].filters.extend(filters)
+        default_action = self._override_default_action or self._default_action
         for filter_statement in filter_statements:
             unconditional_actions_suffix = list(
                 itertools.dropwhile(lambda filt: filt.expression is not None,
@@ -700,12 +738,14 @@ class PolicyParser:
                 # to add another one.
                 continue
             if len(unconditional_actions_suffix) > 1:
-                raise ParseException(('Syscall %s (number %d) already had '
-                                      'an unconditional action applied') %
-                                     (filter_statement.syscall.name,
-                                      filter_statement.syscall.number),
-                                     filename, self._parser_states[-1].line)
+                raise ParseException(
+                    ('Syscall %s (number %d) already had '
+                     'an unconditional action applied') %
+                    (filter_statement.syscall.name,
+                     filter_statement.syscall.number),
+                    filename,
+                    line=self._parser_states[-1].line)
             assert not unconditional_actions_suffix
             filter_statement.filters.append(
-                Filter(expression=None, action=self._default_action))
-        return ParsedPolicy(self._default_action, filter_statements)
+                Filter(expression=None, action=default_action))
+        return ParsedPolicy(default_action, filter_statements)
