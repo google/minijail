@@ -218,18 +218,24 @@ TEST_F(MarshalTest, 0xff) {
 }
 
 TEST(Test, minijail_run_pid_pipes) {
+  // TODO(crbug.com/895875): The preload library interferes with ASan since they
+  // both need to use LD_PRELOAD.
+  if (running_with_asan()) {
+    SUCCEED();
+    return;
+  }
   constexpr char teststr[] = "test\n";
 
-  struct minijail* j = minijail_new();
-  minijail_set_preload_path(j, kPreloadPath);
+  ScopedMinijail j(minijail_new());
+  minijail_set_preload_path(j.get(), kPreloadPath);
 
   char* argv[4];
   argv[0] = const_cast<char*>(kCatPath);
   argv[1] = nullptr;
   pid_t pid;
   int child_stdin, child_stdout;
-  int mj_run_ret = minijail_run_pid_pipes(j, argv[0], argv, &pid, &child_stdin,
-                                          &child_stdout, nullptr);
+  int mj_run_ret = minijail_run_pid_pipes(j.get(), argv[0], argv, &pid,
+                                          &child_stdin, &child_stdout, nullptr);
   EXPECT_EQ(mj_run_ret, 0);
 
   const size_t teststr_len = strlen(teststr);
@@ -253,8 +259,9 @@ TEST(Test, minijail_run_pid_pipes) {
   argv[2] = "echo test >&2";
   argv[3] = nullptr;
   int child_stderr;
-  mj_run_ret = minijail_run_pid_pipes(j, argv[0], argv, &pid, &child_stdin,
-                                      &child_stdout, &child_stderr);
+  mj_run_ret = minijail_run_pid_pipes(j.get(), argv[0], argv, &pid,
+                                      &child_stdin, &child_stdout,
+                                      &child_stderr);
   EXPECT_EQ(mj_run_ret, 0);
 
   read_ret = read(child_stderr, buf, sizeof(buf));
@@ -263,8 +270,6 @@ TEST(Test, minijail_run_pid_pipes) {
   waitpid(pid, &status, 0);
   ASSERT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 0);
-
-  minijail_destroy(j);
 }
 
 TEST(Test, minijail_run_pid_pipes_no_preload) {
@@ -422,18 +427,17 @@ TEST(Test, test_minijail_fork) {
   int pipe_fds[2];
   ssize_t pid_size = sizeof(mj_fork_ret);
 
-  struct minijail *j = minijail_new();
+  ScopedMinijail j(minijail_new());
 
   ASSERT_EQ(pipe(pipe_fds), 0);
 
-  mj_fork_ret = minijail_fork(j);
+  mj_fork_ret = minijail_fork(j.get());
   ASSERT_GE(mj_fork_ret, 0);
   if (mj_fork_ret == 0) {
     pid_t pid_in_parent;
     // Wait for the parent to tell us the pid in the parent namespace.
     ASSERT_EQ(read(pipe_fds[0], &pid_in_parent, pid_size), pid_size);
     ASSERT_EQ(pid_in_parent, getpid());
-    minijail_destroy(j);
     exit(0);
   }
 
@@ -441,8 +445,6 @@ TEST(Test, test_minijail_fork) {
   waitpid(mj_fork_ret, &status, 0);
   ASSERT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 0);
-
-  minijail_destroy(j);
 }
 
 static int early_exit(void* payload) {
@@ -668,7 +670,9 @@ TEST_F(NamespaceTest, test_tmpfs_userns) {
 TEST_F(NamespaceTest, test_namespaces) {
   constexpr char teststr[] = "test\n";
 
-  if (!userns_supported_) {
+  // TODO(crbug.com/895875): The preload library interferes with ASan since they
+  // both need to use LD_PRELOAD.
+  if (!userns_supported_ || running_with_asan()) {
     SUCCEED();
     return;
   }
