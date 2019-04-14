@@ -203,7 +203,7 @@ TEST(write_pid_to_path, basic) {
   TemporaryFile tmp;
   ASSERT_TRUE(tmp.is_valid());
 
-  EXPECT_EQ(0, write_pid_to_path(1234, tmp.path.c_str()));
+  ASSERT_EQ(0, write_pid_to_path(1234, tmp.path.c_str()));
   FILE *fp = fopen(tmp.path.c_str(), "re");
   EXPECT_NE(nullptr, fp);
   char data[6] = {};
