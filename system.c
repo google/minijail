@@ -3,6 +3,7 @@
  * found in the LICENSE file.
  */
 
+#define _GNU_SOURCE
 #include "system.h"
 
 #include <errno.h>
@@ -12,6 +13,7 @@
 #include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/prctl.h>
@@ -234,23 +236,56 @@ int setup_and_dupe_pipe_end(int fds[2], size_t index, int fd)
 
 int write_pid_to_path(pid_t pid, const char *path)
 {
-	FILE *fp = fopen(path, "we");
+	char *temp_path;
+	int ret;
 
+	if (asprintf(&temp_path, "%s.XXXXXX", path) < 0) {
+		warn("asprintf(temp_path) failed");
+		return -ENOMEM;
+	}
+	int fd = mkstemp(temp_path);
+	if (fd < 0) {
+		pwarn("mkstemp(%s) failed", temp_path);
+		ret = -errno;
+		goto done;
+	}
+
+	FILE *fp = fdopen(fd, "we");
 	if (!fp) {
-		pwarn("failed to open '%s'", path);
-		return -errno;
+		pwarn("fdopen(fd, \"we\") failed");
+		ret = -errno;
+		close(fd);
+		goto unlink_temp;
 	}
 	if (fprintf(fp, "%d\n", (int)pid) < 0) {
 		/* fprintf(3) does not set errno on failure. */
 		warn("fprintf(%s) failed", path);
-		return -1;
+		ret = -1;
+		fclose(fp);
+		goto unlink_temp;
 	}
 	if (fclose(fp)) {
 		pwarn("fclose(%s) failed", path);
-		return -errno;
+		ret = -errno;
+		/* Best effort. */
+		close(fd);
+		goto unlink_temp;
 	}
 
-	return 0;
+	if (rename(temp_path, path) < 0) {
+		pwarn("rename(%s, %s) failed", temp_path, path);
+		ret = -errno;
+		goto unlink_temp;
+	}
+	ret = 0;
+	goto done;
+
+unlink_temp:
+	/* Best effort. */
+	unlink(temp_path);
+done:
+	free(temp_path);
+	return ret;
 }
 
 /*
