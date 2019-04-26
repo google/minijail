@@ -2673,11 +2673,12 @@ static int minijail_run_internal(struct minijail *j,
 	}
 
 	/*
-	 * If we want to set up a new uid/gid map in the user namespace,
-	 * or if we need to add the child process to cgroups, create the pipe(2)
-	 * to sync between parent and child.
+         * If the parent process needs to configure the child's runtime
+         * environment after forking, create a pipe(2) to block the child until
+         * configuration is done.
 	 */
-	if (j->flags.userns || j->flags.cgroups) {
+	if (j->flags.forward_signals || j->flags.pid_file || j->flags.cgroups ||
+	    j->rlimit_count || j->flags.userns) {
 		sync_child = 1;
 		if (pipe(child_sync_pipe_fds))
 			return -EFAULT;
