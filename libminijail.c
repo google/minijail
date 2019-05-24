@@ -163,6 +163,7 @@ struct minijail {
 		int close_open_fds : 1;
 		int new_session_keyring : 1;
 		int forward_signals : 1;
+		int setsid : 1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -237,6 +238,7 @@ void minijail_preenter(struct minijail *j)
 	j->flags.pid_file = 0;
 	j->flags.cgroups = 0;
 	j->flags.forward_signals = 0;
+	j->flags.setsid = 0;
 	j->remount_mode = 0;
 }
 
@@ -730,6 +732,11 @@ int API minijail_rlimit(struct minijail *j, int type, rlim_t cur, rlim_t max)
 int API minijail_forward_signals(struct minijail *j)
 {
 	j->flags.forward_signals = 1;
+	return 0;
+}
+
+int API minijail_create_session(struct minijail *j) {
+	j->flags.setsid = 1;
 	return 0;
 }
 
@@ -2930,15 +2937,15 @@ static int minijail_run_internal(struct minijail *j,
 	}
 
 	/*
-	 * If any of stdin, stdout, or stderr are TTYs, create a new session.
-	 * This prevents the jailed process from using the TIOCSTI ioctl
-	 * to push characters into the parent process terminal's input buffer,
-	 * therefore escaping the jail.
+	 * If any of stdin, stdout, or stderr are TTYs, or setsid flag is
+	 * set, create a new session. This prevents the jailed process from
+	 * using the TIOCSTI ioctl to push characters into the parent process
+	 * terminal's input buffer, therefore escaping the jail.
 	 *
 	 * Since it has just forked, the child will not be a process group
 	 * leader, and this call to setsid() should always succeed.
 	 */
-	if (isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) ||
+	if (j->flags.setsid || isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) ||
 	    isatty(STDERR_FILENO)) {
 		if (setsid() < 0) {
 			pdie("setsid() failed");
