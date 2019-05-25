@@ -877,3 +877,47 @@ TEST(Test, parse_size) {
   ASSERT_EQ(-EINVAL, parse_size(&size, "-1G"));
   ASSERT_EQ(-EINVAL, parse_size(&size, "; /bin/rm -- "));
 }
+
+void TestCreateSession(bool create_session) {
+  int status;
+  int pipe_fds[2];
+  pid_t child_pid;
+  pid_t parent_sid = getsid(0);
+  ssize_t pid_size = sizeof(pid_t);
+
+  ScopedMinijail j(minijail_new());
+  // stdin/stdout/stderr might be attached to TTYs. Close them to avoid creating
+  // a new session because of that.
+  minijail_close_open_fds(j.get());
+
+  if (create_session)
+    minijail_create_session(j.get());
+
+  ASSERT_EQ(pipe(pipe_fds), 0);
+  minijail_preserve_fd(j.get(), pipe_fds[0], pipe_fds[0]);
+
+  child_pid = minijail_fork(j.get());
+  ASSERT_GE(child_pid, 0);
+  if (child_pid == 0) {
+    pid_t sid_in_parent;
+    ASSERT_EQ(read(pipe_fds[0], &sid_in_parent, pid_size), pid_size);
+    if (create_session)
+      ASSERT_NE(sid_in_parent, getsid(0));
+    else
+      ASSERT_EQ(sid_in_parent, getsid(0));
+    exit(0);
+  }
+
+  EXPECT_EQ(write(pipe_fds[1], &parent_sid, pid_size), pid_size);
+  waitpid(child_pid, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(Test, default_no_new_session) {
+  TestCreateSession(/*create_session=*/false);
+}
+
+TEST(Test, create_new_session) {
+  TestCreateSession(/*create_session=*/true);
+}

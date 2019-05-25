@@ -160,6 +160,9 @@ int minijail_add_to_cgroup(struct minijail *j, const char *path);
  */
 int minijail_forward_signals(struct minijail *j);
 
+/* The jailed child process should call setsid() to create a new session. */
+int minijail_create_session(struct minijail *j);
+
 /*
  * minijail_enter_chroot: enables chroot() restriction for @j
  * @j   minijail to apply restriction to
