@@ -355,9 +355,9 @@ TEST(Test, minijail_run_env_pid_pipes_no_preload) {
   EXPECT_EQ(mj_run_ret, 0);
 
   read_ret = read(child_stdout, buf, sizeof(buf));
-  EXPECT_GE(read_ret, (int)testvar_len);
+  EXPECT_EQ(read_ret, (int)testvar_len + 2);
 
-  EXPECT_EQ("|test\n", std::string(buf));
+  EXPECT_EQ("|test\n", std::string(buf, 0, testvar_len + 2));
 
   EXPECT_EQ(waitpid(pid, &status, 0), pid);
   ASSERT_TRUE(WIFEXITED(status));
