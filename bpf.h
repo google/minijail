@@ -48,6 +48,7 @@ enum {
 #define SECCOMP_RET_KILL	0x00000000U /* kill the task immediately */
 #define SECCOMP_RET_TRAP	0x00030000U /* return SIGSYS */
 #define SECCOMP_RET_ERRNO	0x00050000U /* return -1 and set errno */
+#define SECCOMP_RET_LOG		0x7ffc0000U /* allow after logging */
 #define SECCOMP_RET_ALLOW	0x7fff0000U /* allow */
 
 #define SECCOMP_RET_DATA	0x0000ffffU /* mask for return value */
@@ -171,6 +172,9 @@ static inline size_t set_bpf_instr(struct sock_filter *instr,
 #define set_bpf_ret_errno(_block, _errno) \
 	set_bpf_stmt((_block), BPF_RET+BPF_K, \
 		SECCOMP_RET_ERRNO | ((_errno) & SECCOMP_RET_DATA))
+
+#define set_bpf_ret_log(_block) \
+	set_bpf_stmt((_block), BPF_RET+BPF_K, SECCOMP_RET_LOG)
 
 #define set_bpf_ret_allow(_block) \
 	set_bpf_stmt((_block), BPF_RET+BPF_K, SECCOMP_RET_ALLOW)
