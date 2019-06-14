@@ -46,8 +46,10 @@ ifeq ($(USE_SYSTEM_GTEST),no)
 GTEST_CXXFLAGS := -std=gnu++14
 GTEST_LIBS := gtest.a
 else
-GTEST_CXXFLAGS := $(shell gtest-config --cxxflags)
-GTEST_LIBS := $(shell gtest-config --libs)
+GTEST_CXXFLAGS := $(shell gtest-config --cxxflags 2>/dev/null || \
+  echo "-pthread")
+GTEST_LIBS := $(shell gtest-config --libs 2>/dev/null || \
+  echo "-lgtest -pthread -lpthread")
 endif
 
 CORE_OBJECT_FILES := libminijail.o syscall_filter.o signal_handler.o \
