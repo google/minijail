@@ -18,6 +18,8 @@ The \fIsrc\fR path must be an absolute path.
 If \fIdest\fR is not specified, it will default to \fIsrc\fR.
 If the destination does not exist, it will be created as a file or directory
 based on the \fIsrc\fR type (including missing parent directories).
+To create a writable bind-mount set \fIwritable\fR to \fB1\fR. If not specified
+it will default to \fB0\fR (read-only).
 .TP
 \fB-B <mask>\fR
 Skip setting securebits in \fImask\fR when restricting capabilities (\fB-c\fR).
