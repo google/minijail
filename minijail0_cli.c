@@ -139,9 +139,16 @@ static void add_binding(struct minijail *j, char *arg)
 	}
 	if (dest == NULL || dest[0] == '\0')
 		dest = src;
-	if (flags == NULL || flags[0] == '\0')
-		flags = "0";
-	if (minijail_bind(j, src, dest, atoi(flags))) {
+	int writable;
+	if (flags == NULL || flags[0] == '\0' || !strcmp(flags, "0"))
+		writable = 0;
+	else if (!strcmp(flags, "1"))
+		writable = 1;
+	else {
+		fprintf(stderr, "Bad value for <writable>: %s\n", flags);
+		exit(1);
+	}
+	if (minijail_bind(j, src, dest, writable)) {
 		fprintf(stderr, "minijail_bind failed.\n");
 		exit(1);
 	}

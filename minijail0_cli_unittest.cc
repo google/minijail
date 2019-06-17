@@ -405,6 +405,10 @@ TEST_F(CliTest, invalid_binding) {
   // Missing mount namespace/etc...
   argv = {"-b", "/", "/bin/sh"};
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  // Bad value for <writable>.
+  argv = {"-b", "/,,writable", "/bin/sh"};
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
 
 // Valid calls to the mount option.
