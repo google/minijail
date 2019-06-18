@@ -992,10 +992,13 @@ static int parse_seccomp_filters(struct minijail *j, const char *filename,
 		return -ENOMEM;
 	int use_ret_trap =
 	    j->flags.seccomp_filter_tsync || j->flags.seccomp_filter_logging;
-	int allow_logging = j->flags.seccomp_filter_logging;
 
-	if (compile_filter(filename, policy_file, fprog, use_ret_trap,
-			   allow_logging)) {
+	struct filter_options filteropts = {
+	    .action = use_ret_trap ? ACTION_RET_TRAP : ACTION_RET_KILL,
+	    .allow_logging = j->flags.seccomp_filter_logging,
+	    .allow_syscalls_for_logging = j->flags.seccomp_filter_logging,
+	};
+	if (compile_filter(filename, policy_file, fprog, &filteropts)) {
 		free(fprog);
 		return -1;
 	}
