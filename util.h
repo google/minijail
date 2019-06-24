@@ -134,6 +134,14 @@ static inline bool running_with_asan(void)
 	return compiled_with_asan() || &__asan_init != 0 || &__hwasan_init != 0;
 }
 
+static inline bool debug_logging_allowed(void) {
+#if defined(ALLOW_DEBUG_LOGGING)
+	return true;
+#else
+	return false;
+#endif
+}
+
 int lookup_syscall(const char *name);
 const char *lookup_syscall_name(int nr);
 
