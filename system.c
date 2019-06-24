@@ -464,3 +464,61 @@ int lookup_group(const char *group, gid_t *gid)
 	*gid = pgr->gr_gid;
 	return 0;
 }
+
+static int seccomp_action_is_available(const char *wanted)
+{
+	if (is_android()) {
+		/*
+		 * Accessing |actions_avail| is generating SELinux denials, so
+		 * skip for now.
+		 * TODO(crbug.com/978022, jorgelo): Remove once the denial is
+		 * fixed.
+		 */
+		return 0;
+	}
+	const char actions_avail_path[] =
+	    "/proc/sys/kernel/seccomp/actions_avail";
+	FILE *f = fopen(actions_avail_path, "re");
+
+	if (!f) {
+		pwarn("fopen(%s) failed", actions_avail_path);
+		return 0;
+	}
+
+	char *actions_avail = NULL;
+	size_t buf_size = 0;
+	if (getline(&actions_avail, &buf_size, f) < 0) {
+		pwarn("getline() failed");
+		free(actions_avail);
+		return 0;
+	}
+
+	/*
+	 * This is just substring search, which means that partial matches will
+	 * match too (e.g. "action" would match "longaction"). There are no
+	 * seccomp actions which include other actions though, so we're good for
+	 * now. Eventually we might want to split the string by spaces.
+	 */
+	return strstr(actions_avail, wanted) != NULL;
+}
+
+int seccomp_ret_log_available(void)
+{
+	static int ret_log_available = -1;
+
+	if (ret_log_available == -1)
+		ret_log_available = seccomp_action_is_available("log");
+
+	return ret_log_available;
+}
+
+int seccomp_ret_kill_process_available(void)
+{
+	static int ret_kill_process_available = -1;
+
+	if (ret_kill_process_available == -1)
+		ret_kill_process_available =
+		    seccomp_action_is_available("kill_process");
+
+	return ret_kill_process_available;
+}

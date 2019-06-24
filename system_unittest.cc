@@ -362,3 +362,8 @@ TEST(setup_mount_destination, create_char_dev) {
   // We check it's a directory by deleting it as such.
   EXPECT_EQ(0, rmdir(child_dev.c_str()));
 }
+
+TEST(seccomp_actions_available, smoke) {
+  seccomp_ret_log_available();
+  seccomp_ret_kill_process_available();
+}
