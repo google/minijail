@@ -505,8 +505,9 @@ static void usage(const char *progn)
 	       "  -K:           Do not change share mode of any existing mounts.\n"
 	       "  -K<mode>:     Mark all existing mounts as <mode> instead of MS_PRIVATE.\n"
 	       "  -l:           Enter new IPC namespace.\n"
-	       "  -L:           Report blocked syscalls to syslog when using seccomp filter.\n"
-	       "                Forces the following syscalls to be allowed:\n"
+	       "  -L:           Report blocked syscalls when using seccomp filter.\n"
+	       "                If the kernel does not support SECCOMP_RET_LOG,\n"
+	       "                forces the following syscalls to be allowed:\n"
 	       "                  ", progn);
 	/* clang-format on */
 	for (i = 0; i < log_syscalls_len; i++)

@@ -382,6 +382,17 @@ void API minijail_set_seccomp_filter_tsync(struct minijail *j)
 		die("minijail_set_seccomp_filter_tsync() must be called "
 		    "before minijail_parse_seccomp_filters()");
 	}
+
+	if (j->flags.seccomp_filter_logging && !seccomp_ret_log_available()) {
+		/*
+		 * If SECCOMP_RET_LOG is not available, we don't want to use
+		 * SECCOMP_RET_TRAP to both kill the entire process and report
+		 * failing syscalls, since it will be brittle. Just bail.
+		 */
+		die("SECCOMP_RET_LOG not available, cannot use logging and "
+		    "thread sync at the same time");
+	}
+
 	j->flags.seccomp_filter_tsync = 1;
 }
 
@@ -391,11 +402,23 @@ void API minijail_log_seccomp_filter_failures(struct minijail *j)
 		die("minijail_log_seccomp_filter_failures() must be called "
 		    "before minijail_parse_seccomp_filters()");
 	}
-#ifdef ALLOW_DEBUG_LOGGING
-	j->flags.seccomp_filter_logging = 1;
-#else
-	warn("non-debug build: ignoring request to enable seccomp logging");
-#endif
+
+	if (j->flags.seccomp_filter_tsync && !seccomp_ret_log_available()) {
+		/*
+		 * If SECCOMP_RET_LOG is not available, we don't want to use
+		 * SECCOMP_RET_TRAP to both kill the entire process and report
+		 * failing syscalls, since it will be brittle. Just bail.
+		 */
+		die("SECCOMP_RET_LOG not available, cannot use logging and "
+		    "thread sync at the same time");
+	}
+
+	if (debug_logging_allowed()) {
+		j->flags.seccomp_filter_logging = 1;
+	} else {
+		warn("non-debug build: ignoring request to enable seccomp "
+		     "logging");
+	}
 }
 
 void API minijail_use_caps(struct minijail *j, uint64_t capmask)
@@ -932,12 +955,17 @@ static int seccomp_should_use_filters(struct minijail *j)
 }
 
 static int set_seccomp_filters_internal(struct minijail *j,
-					struct sock_fprog *filter, bool owned)
+					const struct sock_fprog *filter,
+					bool owned)
 {
 	struct sock_fprog *fprog;
 
 	if (owned) {
-		fprog = filter;
+		/*
+		 * If |owned| is true, it's OK to cast away the const-ness since
+		 * we'll own the pointer going forward.
+		 */
+		fprog = (struct sock_fprog *)filter;
 	} else {
 		fprog = malloc(sizeof(struct sock_fprog));
 		if (!fprog)
@@ -962,48 +990,48 @@ static int set_seccomp_filters_internal(struct minijail *j,
 	return 0;
 }
 
-void API minijail_set_seccomp_filters(struct minijail *j,
-				      const struct sock_fprog *filter)
-{
-	if (!seccomp_should_use_filters(j))
-		return;
-
-	if (j->flags.seccomp_filter_logging) {
-		die("minijail_log_seccomp_filter_failures() is incompatible "
-		    "with minijail_set_seccomp_filters()");
-	}
-
-	/*
-	 * set_seccomp_filters_internal() can only fail with ENOMEM.
-	 * Furthermore, since we won't own the incoming filter, it will not be
-	 * modified.
-	 */
-	if (set_seccomp_filters_internal(j, (struct sock_fprog *)filter,
-					 false) < 0) {
-		die("failed to copy seccomp filter");
-	}
-}
-
 static int parse_seccomp_filters(struct minijail *j, const char *filename,
 				 FILE *policy_file)
 {
 	struct sock_fprog *fprog = malloc(sizeof(struct sock_fprog));
 	if (!fprog)
 		return -ENOMEM;
-	int use_ret_trap =
-	    j->flags.seccomp_filter_tsync || j->flags.seccomp_filter_logging;
 
-	struct filter_options filteropts = {
-	    .action = use_ret_trap ? ACTION_RET_TRAP : ACTION_RET_KILL,
-	    .allow_logging = j->flags.seccomp_filter_logging,
-	    .allow_syscalls_for_logging = j->flags.seccomp_filter_logging,
-	};
+	struct filter_options filteropts;
+
+	/*
+	 * Figure out filter options.
+	 * Allow logging?
+	 */
+	filteropts.allow_logging =
+	    debug_logging_allowed() && j->flags.seccomp_filter_logging;
+
+	/* What to do on a blocked system call? */
+	if (filteropts.allow_logging) {
+		if (seccomp_ret_log_available())
+			filteropts.action = ACTION_RET_LOG;
+		else
+			filteropts.action = ACTION_RET_TRAP;
+	} else {
+		if (j->flags.seccomp_filter_tsync)
+			filteropts.action = ACTION_RET_TRAP;
+		else
+			filteropts.action = ACTION_RET_KILL;
+	}
+
+	/*
+	 * If SECCOMP_RET_LOG is not available, need to allow extra syscalls
+	 * for logging.
+	 */
+	filteropts.allow_syscalls_for_logging =
+	    filteropts.allow_logging && !seccomp_ret_log_available();
+
 	if (compile_filter(filename, policy_file, fprog, &filteropts)) {
 		free(fprog);
 		return -1;
 	}
 
-	return set_seccomp_filters_internal(j, fprog, true);
+	return set_seccomp_filters_internal(j, fprog, true /* owned */);
 }
 
 void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
@@ -1049,6 +1077,27 @@ void API minijail_parse_seccomp_filters_from_fd(struct minijail *j, int fd)
 	}
 	free(path);
 	fclose(file);
+}
+
+void API minijail_set_seccomp_filters(struct minijail *j,
+				      const struct sock_fprog *filter)
+{
+	if (!seccomp_should_use_filters(j))
+		return;
+
+	if (j->flags.seccomp_filter_logging) {
+		die("minijail_log_seccomp_filter_failures() is incompatible "
+		    "with minijail_set_seccomp_filters()");
+	}
+
+	/*
+	 * set_seccomp_filters_internal() can only fail with ENOMEM.
+	 * Furthermore, since we won't own the incoming filter, it will not be
+	 * modified.
+	 */
+	if (set_seccomp_filters_internal(j, filter, false /* owned */) < 0) {
+		die("failed to set seccomp filter");
+	}
 }
 
 int API minijail_use_alt_syscall(struct minijail *j, const char *table)
@@ -1962,13 +2011,16 @@ static void set_seccomp_filter(const struct minijail *j)
 
 	if (j->flags.seccomp_filter) {
 		if (j->flags.seccomp_filter_logging) {
-			/*
-			 * If logging seccomp filter failures,
-			 * install the SIGSYS handler first.
-			 */
-			if (install_sigsys_handler())
-				pdie("failed to install SIGSYS handler");
 			warn("logging seccomp filter failures");
+			if (!seccomp_ret_log_available()) {
+				/*
+				 * If SECCOMP_RET_LOG is not available,
+				 * install the SIGSYS handler first.
+				 */
+				if (install_sigsys_handler())
+					pdie(
+					    "failed to install SIGSYS handler");
+			}
 		} else if (j->flags.seccomp_filter_tsync) {
 			/*
 			 * If setting thread sync,

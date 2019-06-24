@@ -699,6 +699,7 @@ int compile_file(const char *filename, FILE *policy_file,
 					free_block_list(*arg_blocks);
 					*arg_blocks = NULL;
 				}
+				warn("could not allocate filter block");
 				ret = -1;
 				goto free_line;
 			}
@@ -717,6 +718,7 @@ int compile_file(const char *filename, FILE *policy_file,
 			free_block_list(*arg_blocks);
 			*arg_blocks = NULL;
 		}
+		warn("getmultiline() failed");
 		ret = -1;
 	}
 
