@@ -38,22 +38,21 @@ enum ret_trap {
 };
 
 enum use_logging {
-  NO_LOGGING  = 0,
-  USE_LOGGING = 1,
+  NO_LOGGING          = 0,
+  USE_SIGSYS_LOGGING  = 1,
+  USE_RET_LOG_LOGGING = 2,
 };
 
 int test_compile_filter(
     std::string filename,
     FILE* policy_file,
     struct sock_fprog* prog,
-    enum ret_trap use_ret_trap = USE_RET_KILL,
+    enum block_action action = ACTION_RET_KILL,
     enum use_logging allow_logging = NO_LOGGING) {
-  enum block_action action =
-      (use_ret_trap == USE_RET_TRAP) ? ACTION_RET_TRAP : ACTION_RET_KILL;
   struct filter_options filteropts {
     .action = action,
-    .allow_logging = allow_logging == USE_LOGGING,
-    .allow_syscalls_for_logging = allow_logging == USE_LOGGING,
+    .allow_logging = allow_logging != NO_LOGGING,
+    .allow_syscalls_for_logging = allow_logging == USE_SIGSYS_LOGGING,
   };
   return compile_filter(filename.c_str(), policy_file, prog, &filteropts);
 }
@@ -64,15 +63,13 @@ int test_compile_file(
     struct filter_block* head,
     struct filter_block** arg_blocks,
     struct bpf_labels* labels,
-    enum ret_trap use_ret_trap = USE_RET_KILL,
+    enum block_action action = ACTION_RET_KILL,
     enum use_logging allow_logging = NO_LOGGING,
     unsigned int include_level = 0) {
-  enum block_action action =
-      (use_ret_trap == USE_RET_TRAP) ? ACTION_RET_TRAP : ACTION_RET_KILL;
   struct filter_options filteropts {
     .action = action,
-    .allow_logging = allow_logging == USE_LOGGING,
-    .allow_syscalls_for_logging = allow_logging == USE_LOGGING,
+    .allow_logging = allow_logging != NO_LOGGING,
+    .allow_syscalls_for_logging = allow_logging == USE_SIGSYS_LOGGING,
   };
   return compile_file(filename.c_str(), policy_file, head, arg_blocks, labels,
                       &filteropts, include_level);
@@ -84,10 +81,9 @@ struct filter_block* test_compile_policy_line(
     std::string policy_line,
     unsigned int label_id,
     struct bpf_labels* labels,
-    enum ret_trap do_ret_trap = USE_RET_KILL) {
-  return compile_policy_line(
-      state, nr, policy_line.c_str(), label_id, labels,
-      do_ret_trap == USE_RET_TRAP ? ACTION_RET_TRAP : ACTION_RET_KILL);
+    enum block_action action = ACTION_RET_KILL) {
+  return compile_policy_line(state, nr, policy_line.c_str(), label_id,
+           labels, action);
 }
 
 }  // namespace
@@ -536,6 +532,86 @@ TEST_F(ArgFilterTest, arg0_equals) {
   free_block_list(block);
 }
 
+TEST_F(ArgFilterTest, arg0_equals_trap) {
+  std::string fragment = "arg0 == 0";
+
+  struct filter_block* block = test_compile_policy_line(
+      &state_, nr_, fragment, id_, &labels_, ACTION_RET_TRAP);
+
+  ASSERT_NE(block, nullptr);
+  size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+  EXPECT_EQ(block->total_len, exp_total_len);
+
+  /* First block is a label. */
+  struct filter_block* curr_block = block;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_EQ(curr_block->len, 1U);
+  EXPECT_LBL(curr_block->instrs);
+
+  /* Second block is a comparison. */
+  curr_block = curr_block->next;
+  EXPECT_COMP(curr_block);
+
+  /* Third block is a jump and a label (end of AND group). */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_GROUP_END(curr_block);
+
+  /* Fourth block is SECCOMP_RET_TRAP. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_TRAP(curr_block);
+
+  /* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW(curr_block);
+
+  EXPECT_EQ(curr_block->next, nullptr);
+
+  free_block_list(block);
+}
+
+TEST_F(ArgFilterTest, arg0_equals_log) {
+  std::string fragment = "arg0 == 0";
+
+  struct filter_block* block = test_compile_policy_line(
+      &state_, nr_, fragment, id_, &labels_, ACTION_RET_LOG);
+
+  ASSERT_NE(block, nullptr);
+  size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
+  EXPECT_EQ(block->total_len, exp_total_len);
+
+  /* First block is a label. */
+  struct filter_block* curr_block = block;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_EQ(curr_block->len, 1U);
+  EXPECT_LBL(curr_block->instrs);
+
+  /* Second block is a comparison. */
+  curr_block = curr_block->next;
+  EXPECT_COMP(curr_block);
+
+  /* Third block is a jump and a label (end of AND group). */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_GROUP_END(curr_block);
+
+  /* Fourth block is SECCOMP_RET_LOG. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_LOG(curr_block);
+
+  /* Fifth block is "SUCCESS" label and SECCOMP_RET_ALLOW. */
+  curr_block = curr_block->next;
+  ASSERT_NE(curr_block, nullptr);
+  EXPECT_ALLOW(curr_block);
+
+  EXPECT_EQ(curr_block->next, nullptr);
+
+  free_block_list(block);
+}
+
 TEST_F(ArgFilterTest, arg0_short_gt_ge_comparisons) {
   for (std::string fragment :
        {"arg1 < 0xff", "arg1 <= 0xff", "arg1 > 0xff", "arg1 >= 0xff"}) {
@@ -942,7 +1018,7 @@ TEST_F(ArgFilterTest, log_no_ret_error) {
 
   struct filter_block* block =
       test_compile_policy_line(&state_, nr_, fragment, id_, &labels_,
-                               USE_RET_TRAP);
+                               ACTION_RET_TRAP);
 
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
@@ -1026,7 +1102,7 @@ TEST_F(ArgFilterTest, no_log_bad_ret_error) {
 
   struct filter_block* block =
       test_compile_policy_line(&state_, nr_, fragment, id_, &labels_,
-                               USE_RET_TRAP);
+                               ACTION_RET_TRAP);
   ASSERT_NE(block, nullptr);
   size_t exp_total_len = 1 + (BPF_ARG_COMP_LEN + 1) + 2 + 1 + 2;
   EXPECT_EQ(block->total_len, exp_total_len);
@@ -1358,7 +1434,8 @@ TEST(FilterTest, seccomp_mode1_trap) {
   FILE* policy_file = write_policy_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
-  int res = test_compile_filter("policy", policy_file, &actual, USE_RET_TRAP);
+  int res =
+      test_compile_filter("policy", policy_file, &actual, ACTION_RET_TRAP);
   fclose(policy_file);
 
   /*
@@ -1383,6 +1460,66 @@ TEST(FilterTest, seccomp_mode1_trap) {
       SECCOMP_RET_TRAP);
 
   free(actual.filter);
+}
+
+TEST(FilterTest, seccomp_mode1_log) {
+  struct sock_fprog actual;
+  std::string policy =
+    "read: 1\n"
+    "write: 1\n"
+    "rt_sigreturn: 1\n"
+    "exit: 1\n";
+
+  FILE* policy_file = write_policy_to_pipe(policy);
+  ASSERT_NE(policy_file, nullptr);
+
+  int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_LOG,
+                                USE_RET_LOG_LOGGING);
+  fclose(policy_file);
+
+  /*
+   * Checks return value, filter length, and that the filter
+   * validates arch, loads syscall number, and
+   * only allows expected syscalls.
+   */
+  ASSERT_EQ(res, 0);
+  EXPECT_EQ(actual.len, 13);
+  EXPECT_ARCH_VALIDATION(actual.filter);
+  EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
+      BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+  EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 1,
+      __NR_read);
+  EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 3,
+      __NR_write);
+  EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 5,
+      __NR_rt_sigreturn);
+  EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
+      __NR_exit);
+  EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET+BPF_K,
+      SECCOMP_RET_LOG);
+
+  free(actual.filter);
+}
+
+TEST(FilterTest, seccomp_mode1_log_fails) {
+  struct sock_fprog actual;
+  std::string policy =
+    "read: 1\n"
+    "write: 1\n"
+    "rt_sigreturn: 1\n"
+    "exit: 1\n";
+
+  FILE* policy_file = write_policy_to_pipe(policy);
+  ASSERT_NE(policy_file, nullptr);
+
+  int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_LOG,
+                                NO_LOGGING);
+  fclose(policy_file);
+
+  /*
+   * ACTION_RET_LOG should never be used without allowing logging.
+   */
+  ASSERT_EQ(res, -1);
 }
 
 TEST(FilterTest, seccomp_read_write) {
@@ -1525,8 +1662,8 @@ TEST(FilterTest, log) {
   FILE* policy_file = write_policy_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
-  int res = test_compile_filter("policy", policy_file, &actual, USE_RET_TRAP,
-                                 USE_LOGGING);
+  int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_TRAP,
+                                USE_SIGSYS_LOGGING);
   fclose(policy_file);
 
   size_t i;
@@ -1572,8 +1709,8 @@ TEST(FilterTest, allow_log_but_kill) {
   FILE* policy_file = write_policy_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
-  int res = test_compile_filter("policy", policy_file, &actual, USE_RET_KILL,
-                                USE_LOGGING);
+  int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_KILL,
+                                USE_SIGSYS_LOGGING);
   fclose(policy_file);
 
   size_t i;
@@ -1581,7 +1718,7 @@ TEST(FilterTest, allow_log_but_kill) {
   /*
    * Checks return value, filter length, and that the filter
    * validates arch, loads syscall number, only allows expected syscalls,
-   * and returns TRAP on failure.
+   * and kills on failure.
    * NOTE(jorgelo): the filter is longer since we add the syscalls needed
    * for logging.
    */
@@ -1726,7 +1863,7 @@ TEST(FilterTest, include) {
   FILE* file_plain = write_policy_to_pipe(policy_plain);
   ASSERT_NE(file_plain, nullptr);
   int res_plain = test_compile_filter("policy", file_plain, &compiled_plain,
-                                 USE_RET_KILL);
+                                      ACTION_RET_KILL);
   fclose(file_plain);
 
   std::string policy_with_include =
@@ -1734,9 +1871,8 @@ TEST(FilterTest, include) {
 
   FILE* file_with_include = write_policy_to_pipe(policy_with_include);
   ASSERT_NE(file_with_include, nullptr);
-  int res_with_include =
-      test_compile_filter("policy", file_with_include, &compiled_with_include,
-                     USE_RET_KILL);
+  int res_with_include = test_compile_filter(
+      "policy", file_with_include, &compiled_with_include, ACTION_RET_KILL);
   fclose(file_with_include);
 
   /*
