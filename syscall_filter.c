@@ -556,7 +556,7 @@ static ssize_t getmultiline(char **lineptr, size_t *n, FILE *stream)
 	memcpy(&line[ret + 1], next_line, next_ret + 1);
 	free(next_line);
 	*lineptr = line;
-	return ret;
+	return *n - 1;
 }
 
 int compile_file(const char *filename, FILE *policy_file,

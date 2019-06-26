@@ -1354,7 +1354,7 @@ TEST_F(FileTest, seccomp_read) {
 TEST_F(FileTest, multiline) {
   std::string policy =
       "read:\\\n1\n"
-      "openat:arg0 in\\\n5";
+      "openat:arg0 \\\nin\\\n   \\\n5";
 
   const int LABEL_ID = 0;
 
