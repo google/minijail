@@ -389,7 +389,7 @@ void API minijail_set_seccomp_filter_tsync(struct minijail *j)
 		 * SECCOMP_RET_TRAP to both kill the entire process and report
 		 * failing syscalls, since it will be brittle. Just bail.
 		 */
-		die("SECCOMP_RET_LOG not available, cannot use logging and "
+		die("SECCOMP_RET_LOG not available, cannot use logging with "
 		    "thread sync at the same time");
 	}
 
@@ -409,8 +409,8 @@ void API minijail_log_seccomp_filter_failures(struct minijail *j)
 		 * SECCOMP_RET_TRAP to both kill the entire process and report
 		 * failing syscalls, since it will be brittle. Just bail.
 		 */
-		die("SECCOMP_RET_LOG not available, cannot use logging and "
-		    "thread sync at the same time");
+		die("SECCOMP_RET_LOG not available, cannot use thread sync with "
+		    "logging at the same time");
 	}
 
 	if (debug_logging_allowed()) {
