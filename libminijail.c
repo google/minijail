@@ -2940,6 +2940,13 @@ static int minijail_run_internal(struct minijail *j,
 			inheritable_fds[size++] = stderr_fds[0];
 			inheritable_fds[size++] = stderr_fds[1];
 		}
+
+		/* Preserve namespace file descriptors. */
+		if (j->flags.enter_vfs)
+			minijail_preserve_fd(j, j->mountns_fd, j->mountns_fd);
+		if (j->flags.enter_net)
+			minijail_preserve_fd(j, j->netns_fd, j->netns_fd);
+
 		for (i = 0; i < j->preserved_fd_count; i++) {
 			/*
 			 * Preserve all parent_fds. They will be dup2(2)-ed in
