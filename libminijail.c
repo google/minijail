@@ -2941,7 +2941,11 @@ static int minijail_run_internal(struct minijail *j,
 			inheritable_fds[size++] = stderr_fds[1];
 		}
 
-		/* Preserve namespace file descriptors. */
+		/*
+		 * Preserve namespace file descriptors over the close_open_fds()
+		 * call. These are closed in minijail_enter() so they won't leak
+		 * into the child process.
+		 */
 		if (j->flags.enter_vfs)
 			minijail_preserve_fd(j, j->mountns_fd, j->mountns_fd);
 		if (j->flags.enter_net)
