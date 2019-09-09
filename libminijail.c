@@ -2802,7 +2802,7 @@ static int minijail_run_internal(struct minijail *j,
 		if (use_preload) {
 			free(oldenv_copy);
 		}
-		pdie("failed to fork child");
+		die("failed to fork child");
 	}
 
 	if (child_pid) {
