@@ -340,7 +340,7 @@ int get_mount_flags_for_directory(const char *path, unsigned long *mnt_flags)
 	rc = statvfs(path, &stvfs_buf);
 	if (rc) {
 		rc = errno;
-		pwarn("statvfs('%s') failed", path);
+		pwarn("failed to look up mount flags: source=%s", path);
 		return -rc;
 	}
 	*mnt_flags = vfs_flags_to_mount_flags(stvfs_buf.f_flag);
@@ -356,104 +356,82 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 {
 	int rc;
 	struct stat st_buf;
-	bool do_mkdir = false;
-	bool is_abspath = source && source[0] == '/';
-	/* Assume relative |source| paths are pseudo filesystems. */
-	bool is_pseudofs = !is_abspath;
+	bool domkdir;
 
 	rc = stat(dest, &st_buf);
-	if (rc) {
-		/*
-		 * |dest| does not exist. Try to create it.
-		 * Either make a directory or touch a file depending on the
-		 * source type.
-		 *
-		 * If |source| isn't an absolute path, assume it is a filesystem
-		 * type such as "tmpfs" and create a directory to mount it on.
-		 * |dest| will be something like "none" or "proc" which we
-		 * shouldn't be checking.
-		 */
-		if (is_abspath) {
-			/* |source| is an absolute path -- it better exist! */
-			rc = stat(source, &st_buf);
-			if (rc) {
-				rc = errno;
-				pwarn("stat('%s') failed", source);
-				return -rc;
-			}
+	if (rc == 0) /* destination exists */
+		return get_mount_flags_for_directory(source, mnt_flags);
 
-			/*
-			 * If bind mounting, we only create a directory if the
-			 * source is a directory, else we always bind mount it
-			 * as a file to support device nodes, sockets, etc...
-			 *
-			 * For all other mounts, we assume a block/char source
-			 * is going to want a directory to mount to.  If the
-			 * source is something else (e.g. a fifo or socket),
-			 * this probably will not do the right thing, but we'll
-			 * fail later on when we try to mount(), so shouldn't be
-			 * a big deal.
-			 */
-			do_mkdir = S_ISDIR(st_buf.st_mode) ||
-				   (!bind && (S_ISBLK(st_buf.st_mode) ||
-					      S_ISCHR(st_buf.st_mode)));
-
-		} else {
-			/*
-			 * |source| is a relative path -- assume it's a pseudo
-			 * fs.
-			 */
-
-			/* Disallow relative bind mounts. */
-			if (bind) {
-				warn("relative bind-mounts are not allowed: "
-				     "source=%s",
-				     source);
-				return -EINVAL;
-			}
-
-			do_mkdir = true;
-		}
-
-		/*
-		 * Now that we know what we want to do, do it!
-		 * We always create the intermediate dirs and the final path
-		 * with 0755 perms and root/root ownership.  This shouldn't be a
-		 * problem because the actual mount will set those
-		 * perms/ownership on the mount point which is all people should
-		 * need to access it.
-		 */
-		rc = mkdir_p(dest, 0755, do_mkdir);
-		if (rc)
-			return rc;
-		if (!do_mkdir) {
-			int fd = open(dest, O_RDWR | O_CREAT | O_CLOEXEC, 0700);
-			if (fd < 0) {
-				rc = errno;
-				pwarn("open('%s') failed", dest);
-				return -rc;
-			}
-			close(fd);
-		}
-		if (chown(dest, uid, gid)) {
+	/*
+	 * Try to create the destination.
+	 * Either make a directory or touch a file depending on the source type.
+	 *
+	 * If the source isn't an absolute path, assume it is a filesystem type
+	 * such as "tmpfs" and create a directory to mount it on.  The dest will
+	 * be something like "none" or "proc" which we shouldn't be checking.
+	 */
+	if (source[0] == '/') {
+		/* The source is an absolute path -- it better exist! */
+		rc = stat(source, &st_buf);
+		if (rc) {
 			rc = errno;
-			pwarn("chown('%s', %u, %u) failed", dest, uid, gid);
+			pwarn("stat(%s) failed", source);
 			return -rc;
 		}
+
+		/*
+		 * If bind mounting, we only create a directory if the source
+		 * is a directory, else we always bind mount it as a file to
+		 * support device nodes, sockets, etc...
+		 *
+		 * For all other mounts, we assume a block/char source is
+		 * going to want a directory to mount to.  If the source is
+		 * something else (e.g. a fifo or socket), this probably will
+		 * not do the right thing, but we'll fail later on when we try
+		 * to mount(), so shouldn't be a big deal.
+		 */
+		domkdir = S_ISDIR(st_buf.st_mode) ||
+			  (!bind && (S_ISBLK(st_buf.st_mode) ||
+				     S_ISCHR(st_buf.st_mode)));
+
+	} else {
+		/* The source is a relative path -- assume it's a pseudo fs. */
+
+		/* Disallow relative bind mounts. */
+		if (bind) {
+			warn("relative bind-mounts are not allowed: source=%s",
+			     source);
+			return -EINVAL;
+		}
+
+		domkdir = true;
 	}
 
 	/*
-	 * At this point, either because it already existed or because it was
-	 * created above, |dest| exists.
+	 * Now that we know what we want to do, do it!
+	 * We always create the intermediate dirs and the final path with 0755
+	 * perms and root/root ownership.  This shouldn't be a problem because
+	 * the actual mount will set those perms/ownership on the mount point
+	 * which is all people should need to access it.
 	 */
-	if (is_pseudofs) {
-		/* If |source| is a pseudo fs, it will have no mount flags. */
-		if (mnt_flags)
-			*mnt_flags = 0;
-		return 0;
-	} else {
-		return get_mount_flags_for_directory(source, mnt_flags);
+	rc = mkdir_p(dest, 0755, domkdir);
+	if (rc)
+		return rc;
+	if (!domkdir) {
+		int fd = open(dest, O_RDWR | O_CREAT | O_CLOEXEC, 0700);
+		if (fd < 0) {
+			rc = errno;
+			pwarn("open(%s) failed", dest);
+			return -rc;
+		}
+		close(fd);
 	}
+	if (chown(dest, uid, gid)) {
+		rc = errno;
+		pwarn("chown(%s, %u, %u) failed", dest, uid, gid);
+		return -rc;
+	}
+	return get_mount_flags_for_directory(source, mnt_flags);
 }
 
 /*
