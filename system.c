@@ -14,7 +14,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -24,35 +23,6 @@
 #include <linux/securebits.h>
 
 #include "util.h"
-
-/* Old libc versions might not define all constants that we need. */
-#ifndef ST_RDONLY
-#define ST_RDONLY      0x0001
-#endif
-#ifndef ST_NOSUID
-#define ST_NOSUID      0x0002
-#endif
-#ifndef ST_NODEV
-#define ST_NODEV       0x0004
-#endif
-#ifndef ST_NOEXEC
-#define ST_NOEXEC      0x0008
-#endif
-#ifndef ST_SYNCHRONOUS
-#define ST_SYNCHRONOUS 0x0010
-#endif
-#ifndef ST_MANDLOCK
-#define ST_MANDLOCK    0x0040
-#endif
-#ifndef ST_NOATIME
-#define ST_NOATIME     0x0400
-#endif
-#ifndef ST_NODIRATIME
-#define ST_NODIRATIME  0x0800
-#endif
-#ifndef ST_RELATIME
-#define ST_RELATIME    0x1000
-#endif
 
 /*
  * SECBIT_NO_CAP_AMBIENT_RAISE was added in kernel 4.3, so fill in the
@@ -326,28 +296,6 @@ int mkdir_p(const char *path, mode_t mode, bool isdir)
 }
 
 /*
- * get_mount_flags_for_directory: Returns the mount flags for the given
- * directory.
- */
-int get_mount_flags_for_directory(const char *path, unsigned long *mnt_flags)
-{
-	int rc;
-	struct statvfs stvfs_buf;
-
-	if (!mnt_flags)
-		return 0;
-
-	rc = statvfs(path, &stvfs_buf);
-	if (rc) {
-		rc = errno;
-		pwarn("failed to look up mount flags: source=%s", path);
-		return -rc;
-	}
-	*mnt_flags = vfs_flags_to_mount_flags(stvfs_buf.f_flag);
-	return 0;
-}
-
-/*
  * setup_mount_destination: Ensures the mount target exists.
  * Creates it if needed and possible.
  */
@@ -360,7 +308,7 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 
 	rc = stat(dest, &st_buf);
 	if (rc == 0) /* destination exists */
-		return get_mount_flags_for_directory(source, mnt_flags);
+		return 0;
 
 	/*
 	 * Try to create the destination.
@@ -394,6 +342,19 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 			  (!bind && (S_ISBLK(st_buf.st_mode) ||
 				     S_ISCHR(st_buf.st_mode)));
 
+		/* If bind mounting, also grab the mount flags of the source. */
+		if (bind && mnt_flags) {
+			struct statvfs stvfs_buf;
+			rc = statvfs(source, &stvfs_buf);
+			if (rc) {
+				rc = errno;
+				pwarn(
+				    "failed to look up mount flags: source=%s",
+				    source);
+				return -rc;
+			}
+			*mnt_flags = stvfs_buf.f_flag;
+		}
 	} else {
 		/* The source is a relative path -- assume it's a pseudo fs. */
 
@@ -431,35 +392,7 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 		pwarn("chown(%s, %u, %u) failed", dest, uid, gid);
 		return -rc;
 	}
-	return get_mount_flags_for_directory(source, mnt_flags);
-}
-
-/*
- * vfs_flags_to_mount_flags: Converts the given flags returned by statvfs to
- * flags that can be used by mount().
- */
-unsigned long vfs_flags_to_mount_flags(unsigned long vfs_flags)
-{
-	unsigned int i;
-	unsigned long mount_flags = 0;
-
-	static struct {
-		unsigned long mount_flag;
-		unsigned long vfs_flag;
-	} const flag_translation_table[] = {
-	    {MS_NOSUID, ST_NOSUID},	    {MS_NODEV, ST_NODEV},
-	    {MS_NOEXEC, ST_NOEXEC},	    {MS_SYNCHRONOUS, ST_SYNCHRONOUS},
-	    {MS_MANDLOCK, ST_MANDLOCK},	    {MS_NOATIME, ST_NOATIME},
-	    {MS_NODIRATIME, ST_NODIRATIME}, {MS_RELATIME, ST_RELATIME},
-	};
-
-	for (i = 0; i < ARRAY_SIZE(flag_translation_table); i++) {
-		if (vfs_flags & flag_translation_table[i].vfs_flag) {
-			mount_flags |= flag_translation_table[i].mount_flag;
-		}
-	}
-
-	return mount_flags;
+	return 0;
 }
 
 /*
