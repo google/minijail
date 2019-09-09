@@ -1540,11 +1540,10 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 	int remount = 0;
 	unsigned long original_mnt_flags = 0;
 
-	/* This assumes |m->dest| has a leading "/". */
+	/* We assume |dest| has a leading "/". */
 	if (dev_path && strncmp("/dev/", m->dest, 5) == 0) {
 		/*
-		 * Since the temp path is rooted at /dev, skip that part of
-		 * |m->dest|.
+		 * Since the temp path is rooted at /dev, skip that dest part.
 		 */
 		if (asprintf(&dest, "%s%s", dev_path, m->dest + 4) < 0)
 			return -ENOMEM;
