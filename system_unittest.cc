@@ -273,7 +273,7 @@ TEST(setup_mount_destination, mount_flags) {
   std::string proc = dir.path + "/proc";
   EXPECT_EQ(0, setup_mount_destination("/proc", proc.c_str(), -1, -1, true,
                                        &mount_flags));
-  EXPECT_EQ(vfs_flags_to_mount_flags(stvfs_buf.f_flag), mount_flags);
+  EXPECT_EQ(stvfs_buf.f_flag, mount_flags);
   EXPECT_EQ(0, rmdir(proc.c_str()));
 
   // Same thing holds for children of a mount.
@@ -281,7 +281,7 @@ TEST(setup_mount_destination, mount_flags) {
   std::string proc_self = dir.path + "/proc_self";
   EXPECT_EQ(0, setup_mount_destination("/proc/self", proc_self.c_str(), -1, -1,
                                        true, &mount_flags));
-  EXPECT_EQ(vfs_flags_to_mount_flags(stvfs_buf.f_flag), mount_flags);
+  EXPECT_EQ(stvfs_buf.f_flag, mount_flags);
   EXPECT_EQ(0, rmdir(proc_self.c_str()));
 }
 
