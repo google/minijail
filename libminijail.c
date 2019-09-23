@@ -2802,7 +2802,11 @@ static int minijail_run_internal(struct minijail *j,
 		if (use_preload) {
 			free(oldenv_copy);
 		}
-		die("failed to fork child");
+		if (pid_namespace && errno == EPERM) {
+			warn("clone(CLONE_NEWPID) failed with EPERM, maybe "
+			     "this process is not running with CAP_SYS_ADMIN?");
+		}
+		pdie("failed to fork child");
 	}
 
 	if (child_pid) {
