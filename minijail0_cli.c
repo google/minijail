@@ -547,7 +547,7 @@ static void usage(const char *progn)
 	       "  --ambient:    Raise ambient capabilities. Requires -c.\n"
 	       "  --uts[=name]: Enter a new UTS namespace (and set hostname).\n"
 	       "  --logging=<s>:Use <s> as the logging system.\n"
-	       "                <s> must be 'syslog' (default) or 'stderr'.\n"
+	       "                <s> must be 'auto' (default), 'syslog', or 'stderr'.\n"
 	       "  --profile <p>:Configure minijail0 to run with the <p> sandboxing profile,\n"
 	       "                which is a convenient way to express multiple flags\n"
 	       "                that are typically used together.\n"
@@ -593,7 +593,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	int set_uidmap = 0, set_gidmap = 0;
 	size_t tmp_size = 0;
 	const char *filter_path = NULL;
-	int log_to_stderr = 0;
+	int log_to_stderr = -1;
 
 	const char *optstring =
 	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUK::wyYzd";
@@ -829,9 +829,11 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				minijail_namespace_set_hostname(j, optarg);
 			break;
 		case 130: /* Logging. */
-			if (!strcmp(optarg, "syslog"))
+			if (!strcmp(optarg, "auto")) {
+				log_to_stderr = -1;
+			} else if (!strcmp(optarg, "syslog")) {
 				log_to_stderr = 0;
-			else if (!strcmp(optarg, "stderr")) {
+			} else if (!strcmp(optarg, "stderr")) {
 				log_to_stderr = 1;
 			} else {
 				fprintf(stderr, "--logger must be 'syslog' or "
@@ -863,6 +865,10 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		}
 	}
 
+	if (log_to_stderr == -1) {
+		/* Autodetect default logging output. */
+		log_to_stderr = isatty(STDERR_FILENO) ? 1 : 0;
+	}
 	if (log_to_stderr) {
 		init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
 		/*

@@ -282,7 +282,10 @@ namespace to \fIhostname\fR.
 .TP
 \fB--logging=<system>\fR
 Use \fIsystem\fR as the logging system. \fIsystem\fR must be one of
-\fBsyslog\fR (the default) or \fBstderr\fR.
+\fBauto\fR (the default), \fBsyslog\fR, or \fBstderr\fR.
+
+\fBauto\fR will use \fBstderr\fR if connected to a tty (e.g. run directly by a
+user), otherwise it will use \fBsyslog\fR.
 .TP
 \fB--profile <profile>\fR
 Choose from one of the available sandboxing profiles, which are simple way to
