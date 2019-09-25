@@ -867,7 +867,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 
 	if (log_to_stderr == -1) {
 		/* Autodetect default logging output. */
-		log_to_stderr = isatty(STDERR_FILENO) ? 1 : 0;
+		log_to_stderr = isatty(STDIN_FILENO) ? 1 : 0;
 	}
 	if (log_to_stderr) {
 		init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
