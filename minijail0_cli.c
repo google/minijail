@@ -582,7 +582,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	int forward = 1;
 	int binding = 0;
 	int chroot = 0, pivot_root = 0;
-	int mount_ns = 0, skip_remount = 0;
+	int mount_ns = 0, change_remount = 0;
 	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
 	int caps = 0, ambient_caps = 0;
 	int seccomp = -1;
@@ -681,11 +681,12 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			add_mount(j, optarg);
 			break;
 		case 'K':
-			if (optarg)
+			if (optarg) {
 				set_remount_mode(j, optarg);
-			else
+			} else {
 				minijail_skip_remount_private(j);
-			skip_remount = 1;
+			}
+			change_remount = 1;
 			break;
 		case 'P':
 			use_pivot_root(j, optarg, &pivot_root, chroot);
@@ -909,12 +910,14 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	}
 
 	/*
-	 * Remounting / as MS_PRIVATE only happens when entering a new mount
-	 * namespace, so skipping it only applies in that case.
+	 * / is only remounted when entering a new mount namespace, so unless
+	 * that's set there is no need for the -K/-K<mode> flags.
 	 */
-	if (skip_remount && !mount_ns) {
-		fprintf(stderr, "Can't skip marking mounts as MS_PRIVATE"
-				" without mount namespaces.\n");
+	if (change_remount && !mount_ns) {
+		fprintf(stderr, "No need to use -K (skip remounting '/') or "
+				"-K<mode> (remount '/' as <mode>)\n"
+				"without -v (new mount namespace).\n"
+				"Do you need to add '-v' explicitly?\n");
 		exit(1);
 	}
 
