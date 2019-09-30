@@ -260,7 +260,7 @@ TEST(setup_mount_destination, dest_exists) {
   EXPECT_EQ(0, setup_mount_destination(nullptr, "/dev", 0, 0, false, nullptr));
 }
 
-// Mount flags should be obtained for bind-mounts
+// Mount flags should be obtained for bind-mounts.
 TEST(setup_mount_destination, mount_flags) {
   struct statvfs stvfs_buf;
   ASSERT_EQ(0, statvfs("/proc", &stvfs_buf));
