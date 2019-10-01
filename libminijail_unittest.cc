@@ -314,6 +314,73 @@ TEST(WaitTest, can_wait_only_once) {
   EXPECT_EQ(minijail_wait(j.get()), -ECHILD);
 }
 
+TEST(Test, close_original_pipes_after_dup2) {
+  // Pipe used by child process to signal that it continued after reading from
+  // stdin.
+  int to_wait[2];
+  ASSERT_EQ(pipe(to_wait), 0);
+
+  const ScopedMinijail j(minijail_new());
+  char* program;
+  ASSERT_GT(asprintf(&program, R"(
+      echo Hi >&1;
+      echo There >&2;
+      exec 1>&-;
+      exec 2>&-;
+      read line1;
+      read line2;
+      echo "$line1$line2 and Goodbye" >&%d;
+      exit 42;
+    )", to_wait[1]), 0);
+  char *const argv[] = {"sh", "-c", program, nullptr};
+
+  int in = -1;
+  int out = -1;
+  int err = -1;
+  EXPECT_EQ(minijail_run_pid_pipes(j.get(), kShellPath, argv, nullptr, &in,
+				   &out, &err),
+	    0);
+  free(program);
+
+  EXPECT_GT(in, 0);
+  EXPECT_GT(out, 0);
+  EXPECT_GT(err, 0);
+
+  char buf[PIPE_BUF];
+  ssize_t n;
+
+  // Check that stdout and stderr pipes work.
+  n = read(out, buf, PIPE_BUF);
+  ASSERT_GT(n, 0);
+  EXPECT_EQ(std::string(buf, n), "Hi\n");
+
+  n = read(err, buf, PIPE_BUF);
+  ASSERT_GT(n, 0);
+  EXPECT_EQ(std::string(buf, n), "There\n");
+
+  // Check that the write ends of stdout and stderr pipes got closed by the
+  // child process. If the child process kept other file descriptors connected
+  // to stdout and stderr, then the parent process wouldn't be able to detect
+  // that all write ends of these pipes are closed and it would block here.
+  EXPECT_EQ(read(out, buf, PIPE_BUF), 0);
+  EXPECT_EQ(read(err, buf, PIPE_BUF), 0);
+
+  // Check that stdin pipe works.
+  const std::string s = "Greetings\n";
+  EXPECT_EQ(write(in, s.data(), s.size()), s.size());
+
+  // Close write end of pipe connected to child's stdin. If there was another
+  // file descriptor connected to this write end, then the child wouldn't be
+  // able to detect that this write end is closed and it would block.
+  ASSERT_EQ(close(in), 0);
+
+  // Check that child process continued and ended.
+  n = read(to_wait[0], buf, PIPE_BUF);
+  ASSERT_GT(n, 0);
+  EXPECT_EQ(std::string(buf, n), "Greetings and Goodbye\n");
+  EXPECT_EQ(minijail_wait(j.get()), 42);
+}
+
 TEST(Test, minijail_run_pid_pipes) {
   // TODO(crbug.com/895875): The preload library interferes with ASan since they
   // both need to use LD_PRELOAD.
