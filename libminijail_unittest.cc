@@ -217,6 +217,68 @@ TEST_F(MarshalTest, 0xff) {
   EXPECT_EQ(-EINVAL, minijail_unmarshal(j_, buf_, sizeof(buf_)));
 }
 
+TEST(WaitTest, return_zero) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "exit 0", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), 0);
+}
+
+TEST(WaitTest, return_max) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "exit 255", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), 255);
+}
+
+TEST(WaitTest, return_modulo) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "exit 256", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), 0);
+}
+
+TEST(WaitTest, killed_by_sigkill) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "kill -KILL $$; sleep 1000", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), MINIJAIL_ERR_SIG_BASE  + SIGKILL);
+}
+
+TEST(WaitTest, killed_by_sigsys) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "kill -SYS $$; sleep 1000", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), MINIJAIL_ERR_JAIL);
+}
+
+TEST(WaitTest, command_not_found) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"whatever", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), "command that cannot be found", argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), MINIJAIL_ERR_NO_COMMAND);
+}
+
+TEST(WaitTest, command_not_run) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"whatever", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), "/dev/null", argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), MINIJAIL_ERR_NO_ACCESS);
+}
+
+TEST(WaitTest, no_process) {
+  const ScopedMinijail j(minijail_new());
+  EXPECT_EQ(minijail_wait(j.get()), -ECHILD);
+}
+
+TEST(WaitTest, can_wait_only_once) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "exit 0", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), 0);
+  EXPECT_EQ(minijail_wait(j.get()), -ECHILD);
+}
+
 TEST(Test, minijail_run_pid_pipes) {
   // TODO(crbug.com/895875): The preload library interferes with ASan since they
   // both need to use LD_PRELOAD.
