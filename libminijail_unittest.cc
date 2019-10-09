@@ -332,7 +332,7 @@ TEST(Test, close_original_pipes_after_dup2) {
       echo "$line1$line2 and Goodbye" >&%d;
       exit 42;
     )", to_wait[1]), 0);
-  char *const argv[] = {"sh", "-c", program, nullptr};
+  char* const argv[] = {"sh", "-c", program, nullptr};
 
   int in = -1;
   int out = -1;
@@ -449,7 +449,7 @@ TEST(Test, minijail_run_pid_pipes_no_preload) {
 
   struct minijail *j = minijail_new();
 
-  argv[0] = (char*)kCatPath;
+  argv[0] = const_cast<char*>(kCatPath);
   argv[1] = NULL;
   mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv,
                                                  &pid,
@@ -470,7 +470,7 @@ TEST(Test, minijail_run_pid_pipes_no_preload) {
   ASSERT_TRUE(WIFSIGNALED(status));
   EXPECT_EQ(WTERMSIG(status), SIGTERM);
 
-  argv[0] = (char*)kShellPath;
+  argv[0] = const_cast<char*>(kShellPath);
   argv[1] = "-c";
   argv[2] = "echo test >&2";
   argv[3] = NULL;
@@ -503,7 +503,7 @@ TEST(Test, minijail_run_env_pid_pipes_no_preload) {
 
   struct minijail *j = minijail_new();
 
-  argv[0] = (char*)kShellPath;
+  argv[0] = const_cast<char*>(kShellPath);
   argv[1] = "-c";
   argv[2] = "echo \"${TEST_PARENT+set}|${TEST_VAR}\"";
   argv[3] = NULL;
@@ -549,7 +549,7 @@ TEST(Test, test_minijail_no_fd_leaks) {
 
   struct minijail *j = minijail_new();
 
-  argv[0] = (char*)kShellPath;
+  argv[0] = const_cast<char*>(kShellPath);
   argv[1] = "-c";
   argv[2] = script;
   argv[3] = NULL;
@@ -629,7 +629,7 @@ TEST(Test, test_minijail_callback) {
                         MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS);
   EXPECT_EQ(status, 0);
 
-  argv[0] = (char*)kCatPath;
+  argv[0] = const_cast<char*>(kCatPath);
   argv[1] = NULL;
   mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv, &pid, NULL,
                                                  NULL, NULL);
@@ -664,7 +664,7 @@ TEST(Test, test_minijail_preserve_fd) {
   ASSERT_EQ(status, 0);
   minijail_close_open_fds(j);
 
-  argv[0] = (char*)kCatPath;
+  argv[0] = const_cast<char*>(kCatPath);
   argv[1] = NULL;
   mj_run_ret = minijail_run_no_preload(j, argv[0], argv);
   EXPECT_EQ(mj_run_ret, 0);
@@ -818,7 +818,7 @@ TEST_F(NamespaceTest, test_tmpfs_userns) {
   minijail_gidmap(j, gidmap);
   minijail_namespace_user_disable_setgroups(j);
 
-  argv[0] = (char*)kShellPath;
+  argv[0] = const_cast<char*>(kShellPath);
   argv[1] = "-c";
   argv[2] = "exec touch /tmp/foo";
   argv[3] = NULL;
@@ -881,11 +881,11 @@ TEST_F(NamespaceTest, test_namespaces) {
       minijail_close_open_fds(j.get());
       test_function(j.get());
 
-      const char* argv[] = {kCatPath, nullptr};
+      char* const argv[] = {const_cast<char*>(kCatPath), nullptr};
       pid_t container_pid;
       int child_stdin, child_stdout;
       int mj_run_ret =
-          run_function(j.get(), argv[0], const_cast<char* const*>(argv),
+          run_function(j.get(), argv[0], argv,
                        &container_pid, &child_stdin, &child_stdout, nullptr);
       EXPECT_EQ(mj_run_ret, 0);
 
