@@ -3102,10 +3102,10 @@ static int minijail_run_internal(struct minijail *j,
 	 *   -> init()-ing process
 	 *      -> execve()-ing process
 	 */
-	ret = execve(config->filename, config->argv, child_env);
-	if (ret == -1) {
-		pwarn("execve(%s) failed", config->filename);
-	}
+	execve(config->filename, config->argv, child_env);
+
+	ret = (errno == ENOENT ? MINIJAIL_ERR_NO_COMMAND : MINIJAIL_ERR_NO_ACCESS);
+	pwarn("execve(%s) failed", config->filename);
 	_exit(ret);
 }
 
@@ -3121,6 +3121,9 @@ int API minijail_kill(struct minijail *j)
 
 int API minijail_wait(struct minijail *j)
 {
+	if (j->initpid <= 0)
+		return -ECHILD;
+
 	int st;
 	if (waitpid(j->initpid, &st, 0) < 0)
 		return -errno;
@@ -3141,7 +3144,7 @@ int API minijail_wait(struct minijail *j)
 			if (signum == SIGSYS) {
 				error_status = MINIJAIL_ERR_JAIL;
 			} else {
-				error_status = 128 + signum;
+				error_status = MINIJAIL_ERR_SIG_BASE + signum;
 			}
 		}
 		return error_status;
