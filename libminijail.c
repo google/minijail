@@ -3111,12 +3111,13 @@ static int minijail_run_internal(struct minijail *j,
 
 int API minijail_kill(struct minijail *j)
 {
-	int st;
+	if (j->initpid <= 0)
+		return -ECHILD;
+
 	if (kill(j->initpid, SIGTERM))
 		return -errno;
-	if (waitpid(j->initpid, &st, 0) < 0)
-		return -errno;
-	return st;
+
+	return minijail_wait(j);
 }
 
 int API minijail_wait(struct minijail *j)
