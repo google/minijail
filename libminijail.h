@@ -404,19 +404,23 @@ int minijail_run_env_pid_pipes_no_preload(struct minijail *j,
 pid_t minijail_fork(struct minijail *j);
 
 /*
- * Kill the specified minijail. The minijail must have been created with pid
- * namespacing; if it was, all processes inside it are atomically killed.
+ * Send SIGTERM to the process in the minijail and wait for it to terminate.
+ *
+ * Return the same nonnegative exit status as minijail_wait(), or a negative
+ * error code (eg -ESRCH if the process has already been waited for).
+ *
+ * This is most useful if the minijail has been created with PID namespacing
+ * since, in this case, all processes inside it are atomically killed.
  */
 int minijail_kill(struct minijail *j);
 
 /*
  * Wait for the first process spawned in the specified minijail to exit, and
- * return its exit status. A process can only be awaited once.
+ * return its exit status. A process can only be waited once.
  *
  * Return:
- *   A negative error code if the process cannot be awaited for (eg -ECHILD if
- *   no process has been started or if the process has already been awaited
- *   for).
+ *   A negative error code if the process cannot be waited for (eg -ECHILD if no
+ *   process has been started or if the process has already been waited for).
  *   MINIJAIL_ERR_NO_COMMAND if command cannot be found.
  *   MINIJAIL_ERR_NO_ACCESS if command cannot be run.
  *   MINIJAIL_ERR_JAIL if process was killed by SIGSYS.
