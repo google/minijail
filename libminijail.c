@@ -2989,8 +2989,8 @@ static int minijail_run_internal(struct minijail *j,
 	 * set up the read end of the pipe.
 	 */
 	if (status_out->pstdin_fd) {
-		if (setup_and_dupe_pipe_end(stdin_fds, 0 /* read end */,
-					    STDIN_FILENO) < 0)
+		if (dupe_and_close_fd(stdin_fds, 0 /* read end */,
+                          STDIN_FILENO) < 0)
 			die("failed to set up stdin pipe");
 	}
 
@@ -2999,8 +2999,8 @@ static int minijail_run_internal(struct minijail *j,
 	 * set up the write end of the pipe.
 	 */
 	if (status_out->pstdout_fd) {
-		if (setup_and_dupe_pipe_end(stdout_fds, 1 /* write end */,
-					    STDOUT_FILENO) < 0)
+		if (dupe_and_close_fd(stdout_fds, 1 /* write end */,
+                          STDOUT_FILENO) < 0)
 			die("failed to set up stdout pipe");
 	}
 
@@ -3009,8 +3009,8 @@ static int minijail_run_internal(struct minijail *j,
 	 * set up the write end of the pipe.
 	 */
 	if (status_out->pstderr_fd) {
-		if (setup_and_dupe_pipe_end(stderr_fds, 1 /* write end */,
-					    STDERR_FILENO) < 0)
+		if (dupe_and_close_fd(stderr_fds, 1 /* write end */,
+                          STDERR_FILENO) < 0)
 			die("failed to set up stderr pipe");
 	}
 
