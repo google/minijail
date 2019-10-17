@@ -217,6 +217,41 @@ TEST_F(MarshalTest, 0xff) {
   EXPECT_EQ(-EINVAL, minijail_unmarshal(j_, buf_, sizeof(buf_)));
 }
 
+TEST(KillTest, running_process) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "sleep 1000", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  EXPECT_EQ(minijail_kill(j.get()), 128 + SIGTERM);
+  EXPECT_EQ(minijail_kill(j.get()), -ESRCH);
+}
+
+TEST(KillTest, process_already_awaited) {
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "sleep 1; exit 42", nullptr};
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  EXPECT_EQ(minijail_wait(j.get()), 42);
+  EXPECT_EQ(minijail_kill(j.get()), -ESRCH);
+}
+
+TEST(KillTest, process_already_finished_but_not_awaited) {
+  int fds[2];
+  const ScopedMinijail j(minijail_new());
+  char* const argv[] = {"sh", "-c", "exit 42", nullptr};
+  ASSERT_EQ(pipe(fds), 0);
+  EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
+  ASSERT_EQ(close(fds[1]), 0);
+  // Wait for process to finish.
+  char buf[PIPE_BUF];
+  EXPECT_EQ(read(fds[0], buf, PIPE_BUF), 0);
+  EXPECT_EQ(minijail_kill(j.get()), 42);
+  EXPECT_EQ(minijail_wait(j.get()), -ECHILD);
+}
+
+TEST(KillTest, process_not_started) {
+  const ScopedMinijail j(minijail_new());
+  EXPECT_EQ(minijail_kill(j.get()), -ECHILD);
+}
+
 TEST(WaitTest, return_zero) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "exit 0", nullptr};
