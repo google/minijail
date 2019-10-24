@@ -337,9 +337,9 @@ TEST(Test, close_original_pipes_after_dup2) {
   int in = -1;
   int out = -1;
   int err = -1;
-  EXPECT_EQ(minijail_run_pid_pipes(j.get(), kShellPath, argv, nullptr, &in,
-				   &out, &err),
-	    0);
+  EXPECT_EQ(minijail_run_pid_pipes_no_preload(j.get(), kShellPath, argv,
+                                              nullptr, &in, &out, &err),
+            0);
   free(program);
 
   EXPECT_GT(in, 0);
