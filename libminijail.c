@@ -220,6 +220,29 @@ static void free_mounts_list(struct minijail *j)
 }
 
 /*
+ * Writes exactly n bytes from buf to file descriptor fd.
+ * Returns 0 on success or a negative error code on error.
+ */
+static int write_exactly(int fd, const void *buf, size_t n)
+{
+	const char *p = buf;
+	while (n > 0) {
+		const ssize_t written = write(fd, p, n);
+		if (written < 0) {
+			if (errno == EINTR)
+				continue;
+
+			return -errno;
+		}
+
+		p += written;
+		n -= written;
+	}
+
+	return 0;
+}
+
+/*
  * Strip out flags meant for the parent.
  * We keep things that are not inherited across execve(2) (e.g. capabilities),
  * or are easier to set after execve(2) (e.g. seccomp filters).
@@ -2348,32 +2371,28 @@ int API minijail_from_fd(int fd, struct minijail *j)
 
 int API minijail_to_fd(struct minijail *j, int fd)
 {
-	char *buf;
 	size_t sz = minijail_size(j);
-	ssize_t written;
-	int r;
-
 	if (!sz)
 		return -EINVAL;
-	buf = malloc(sz);
-	r = minijail_marshal(j, buf, sz);
-	if (r) {
-		free(buf);
-		return r;
-	}
+
+	char *buf = malloc(sz);
+	if (!buf)
+		return -ENOMEM;
+
+	int err = minijail_marshal(j, buf, sz);
+	if (err)
+		goto error;
+
 	/* Sends [size][minijail]. */
-	written = write(fd, &sz, sizeof(sz));
-	if (written != sizeof(sz)) {
-		free(buf);
-		return -EFAULT;
-	}
-	written = write(fd, buf, sz);
-	if (written < 0 || (size_t) written != sz) {
-		free(buf);
-		return -EFAULT;
-	}
+	err = write_exactly(fd, &sz, sizeof(sz));
+	if (err)
+		goto error;
+
+	err = write_exactly(fd, buf, sz);
+
+error:
 	free(buf);
-	return 0;
+	return err;
 }
 
 static int setup_preload(const struct minijail *j attribute_unused,
@@ -2743,9 +2762,9 @@ static int minijail_run_internal(struct minijail *j,
 	}
 
 	/*
-         * If the parent process needs to configure the child's runtime
-         * environment after forking, create a pipe(2) to block the child until
-         * configuration is done.
+	 * If the parent process needs to configure the child's runtime
+	 * environment after forking, create a pipe(2) to block the child until
+	 * configuration is done.
 	 */
 	if (j->flags.forward_signals || j->flags.pid_file || j->flags.cgroups ||
 	    j->rlimit_count || j->flags.userns) {
@@ -2856,13 +2875,49 @@ static int minijail_run_internal(struct minijail *j,
 			parent_setup_complete(child_sync_pipe_fds);
 
 		if (use_preload) {
+			/*
+			 * Add SIGPIPE to the signal mask to avoid getting
+			 * killed if the child process finishes or closes its
+			 * end of the pipe prematurely.
+			 *
+			 * TODO(crbug.com/1022170): Use pthread_sigmask instead
+			 * of sigprocmask if Minijail is used in multithreaded
+			 * programs.
+			 */
+			sigset_t to_block, to_restore;
+			if (sigemptyset(&to_block) < 0)
+				pdie("sigemptyset failed");
+			if (sigaddset(&to_block, SIGPIPE) < 0)
+				pdie("sigaddset failed");
+			if (sigprocmask(SIG_BLOCK, &to_block, &to_restore) < 0)
+				pdie("sigprocmask failed");
+
 			/* Send marshalled minijail. */
-			close(pipe_fds[0]);	/* read endpoint */
+			close(pipe_fds[0]); /* read endpoint */
 			ret = minijail_to_fd(j, pipe_fds[1]);
-			close(pipe_fds[1]);	/* write endpoint */
+			close(pipe_fds[1]); /* write endpoint */
+
+			/* Accept any pending SIGPIPE. */
+			while (true) {
+				const struct timespec zero_time = {0, 0};
+				const int sig = sigtimedwait(&to_block, NULL, &zero_time);
+				if (sig < 0) {
+					if (errno != EINTR)
+						break;
+				} else {
+					if (sig != SIGPIPE)
+						die("unexpected signal %d", sig);
+				}
+			}
+
+			/* Restore the signal mask to its original state. */
+			if (sigprocmask(SIG_SETMASK, &to_restore, NULL) < 0)
+				pdie("sigprocmask failed");
+
 			if (ret) {
+				warn("failed to send marshalled minijail: %s",
+				     strerror(-ret));
 				kill(j->initpid, SIGKILL);
-				die("failed to send marshalled minijail");
 			}
 		}
 
