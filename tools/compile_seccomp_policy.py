@@ -73,10 +73,9 @@ def main(argv):
     override_default_action = None
     if opts.default_action:
         parser_state = parser.ParserState('<memory>')
-        parser_state.set_line(opts.default_action)
         override_default_action = parser.PolicyParser(
             parsed_arch, kill_action=bpf.KillProcess()).parse_action(
-                parser_state.tokenize())
+                next(parser_state.tokenize([opts.default_action])))
     with opts.output as outf:
         outf.write(
             policy_compiler.compile_file(
