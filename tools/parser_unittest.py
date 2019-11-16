@@ -426,6 +426,14 @@ class ParseFilterStatementTests(unittest.TestCase):
             ), [
                 parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
             ]))
+        self.assertEqual(
+            self.parser.parse_filter_statement(
+                self._tokenize('kill: arg0 == 0')),
+            parser.ParsedFilterStatement((
+                parser.Syscall('kill', 62),
+            ), [
+                parser.Filter([[parser.Atom(0, '==', 0)]], bpf.Allow()),
+            ]))
 
     def test_parse_metadata(self):
         """Accept valid filter statements with metadata."""
