@@ -518,7 +518,10 @@ class PolicyParser:
         if not tokens:
             self._parser_state.error('missing syscall descriptor')
         syscall_descriptor = tokens.pop(0)
-        if syscall_descriptor.type != 'IDENTIFIER':
+        # `kill` as a syscall name is a special case since kill is also a valid
+        # action and actions have precendence over identifiers.
+        if (syscall_descriptor.type != 'IDENTIFIER' and
+            syscall_descriptor.value != 'kill'):
             self._parser_state.error(
                 'invalid syscall descriptor', token=syscall_descriptor)
         if tokens and tokens[0].type == 'LBRACKET':
