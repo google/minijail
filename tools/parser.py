@@ -35,9 +35,9 @@ _TOKEN_SPECIFICATION = (
     ('COMMENT', r'#.*$'),
     ('WHITESPACE', r'\s+'),
     ('CONTINUATION', r'\\$'),
-    ('DEFAULT', r'@default'),
-    ('INCLUDE', r'@include'),
-    ('FREQUENCY', r'@frequency'),
+    ('DEFAULT', r'@default\b'),
+    ('INCLUDE', r'@include\b'),
+    ('FREQUENCY', r'@frequency\b'),
     ('PATH', r'(?:\.)?/\S+'),
     ('NUMERIC_CONSTANT', r'-?0[xX][0-9a-fA-F]+|-?0[Oo][0-7]+|-?[0-9]+'),
     ('COLON', r':'),
@@ -53,11 +53,14 @@ _TOKEN_SPECIFICATION = (
     ('OR', r'\|\|'),
     ('AND', r'&&'),
     ('BITWISE_OR', r'\|'),
-    ('OP', r'&|in|==|!=|<=|<|>=|>'),
+    ('OP', r'&|\bin\b|==|!=|<=|<|>=|>'),
     ('EQUAL', r'='),
-    ('ARGUMENT', r'arg[0-9]+'),
-    ('RETURN', r'return'),
-    ('ACTION', r'allow|kill-process|kill-thread|kill|trap|trace|log'),
+    ('ARGUMENT', r'\barg[0-9]+\b'),
+    ('RETURN', r'\breturn\b'),
+    ('ACTION',
+     r'\ballow\b|\bkill-process\b|\bkill-thread\b|\bkill\b|\btrap\b|'
+     r'\btrace\b|\blog\b'
+    ),
     ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z_0-9-@]*'),
 )
 _TOKEN_RE = re.compile('|'.join(
