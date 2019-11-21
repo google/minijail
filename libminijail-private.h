@@ -73,7 +73,7 @@ extern int minijail_from_fd(int fd, struct minijail *j);
  * @j  minijail to send
  * @fd fd to send over
  *
- * Returns 0 on success.
+ * Returns 0 on success, or a negative error code on error.
  */
 extern int minijail_to_fd(struct minijail *j, int fd);
 
