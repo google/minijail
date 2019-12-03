@@ -1,0 +1,16 @@
+{
+  "presubmit": [
+    {
+      "name": "libminijail_unittest_gtest"
+    },
+    {
+      "name": "mj_system_unittest_gtest"
+    },
+    {
+      "name": "mj_util_unittest_gtest"
+    },
+    {
+      "name": "syscall_filter_unittest_gtest"
+    }
+  ]
+}
