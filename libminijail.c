@@ -2815,23 +2815,23 @@ static int minijail_run_internal(struct minijail *j,
 	 * case.
 	 */
 	if (pid_namespace) {
-		int clone_flags = CLONE_NEWPID | SIGCHLD;
+		unsigned long clone_flags = CLONE_NEWPID | SIGCHLD;
 		if (j->flags.userns)
 			clone_flags |= CLONE_NEWUSER;
-		child_pid = syscall(SYS_clone, clone_flags, NULL);
+
+		child_pid = syscall(SYS_clone, clone_flags, NULL, 0L, 0L, 0L);
+
+		if (child_pid < 0) {
+			if (errno == EPERM)
+				pdie("clone(CLONE_NEWPID | ...) failed with EPERM; "
+				     "is this process missing CAP_SYS_ADMIN?");
+			pdie("clone(CLONE_NEWPID | ...) failed");
+		}
 	} else {
 		child_pid = fork();
-	}
 
-	if (child_pid < 0) {
-		if (use_preload) {
-			free(oldenv_copy);
-		}
-		if (pid_namespace && errno == EPERM) {
-			warn("clone(CLONE_NEWPID) failed with EPERM, maybe "
-			     "this process is not running with CAP_SYS_ADMIN?");
-		}
-		pdie("failed to fork child");
+		if (child_pid < 0)
+			pdie("fork failed");
 	}
 
 	if (child_pid) {
