@@ -1,0 +1,16 @@
+[package]
+name = "minijail-sys"
+version = "0.0.11"
+authors = ["The Chromium OS Authors"]
+edition = "2018"
+build = "build.rs"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+libc = "0.2.44"
+
+[build-dependencies]
+cc = "1.0"
+pkg-config = "0.3"
