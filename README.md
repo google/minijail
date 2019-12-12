@@ -33,6 +33,10 @@ See the [HACKING.md](./HACKING.md) document for more details.
 
 See the [RELEASE.md](./RELEASE.md) document for more details.
 
+## Additional tools
+
+See the [tools/README.md](./tools/README.md) document for more details.
+
 ## Contact
 
 We've got a couple of contact points.
