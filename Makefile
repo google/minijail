@@ -79,6 +79,9 @@ CC_LIBRARY(libminijail.so): LDLIBS += -lcap
 CC_LIBRARY(libminijail.so): $(CORE_OBJECT_FILES)
 clean: CLEAN(libminijail.so)
 
+CC_STATIC_LIBRARY(libminijail.pic.a): $(CORE_OBJECT_FILES)
+CC_STATIC_LIBRARY(libminijail.pie.a): $(CORE_OBJECT_FILES)
+clean: CLEAN(libminijail.*.a)
 
 CXX_BINARY(libminijail_unittest): CXXFLAGS += -Wno-write-strings \
 						$(GTEST_CXXFLAGS)

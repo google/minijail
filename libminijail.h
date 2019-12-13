@@ -19,6 +19,14 @@
 #include <sys/resource.h>
 #include <sys/types.h>
 
+/*
+ * Rust's bindgen needs the actual definition of sock_fprog in order to
+ * generate usable bindings.
+ */
+#ifdef USE_BINDGEN
+#include <linux/filter.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
