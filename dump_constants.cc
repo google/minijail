@@ -16,9 +16,9 @@
 
 int main() {
   std::cout << "{\n";
-  std::cout << "  \"arch_nr\": " << ARCH_NR << ",\n";
-  std::cout << "  \"arch_name\": \"" << ARCH_NAME << "\",\n";
-  std::cout << "  \"bits\": " << (sizeof(uintptr_t) * 8) << ",\n";
+  std::cout << "  \"arch_nr\": " << MINIJAIL_ARCH_NR << ",\n";
+  std::cout << "  \"arch_name\": \"" << MINIJAIL_ARCH_NAME << "\",\n";
+  std::cout << "  \"bits\": " << MINIJAIL_ARCH_BITS << ",\n";
   std::cout << "  \"syscalls\": {\n";
   bool first = true;
   for (const struct syscall_entry* entry = syscall_table; entry->name;
