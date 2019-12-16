@@ -38,9 +38,9 @@ The generated BPF code can be analyzed using
 [libseccomp](https://github.com/seccomp/libseccomp)'s `tools/scmp_bpf_disasm`.
 
 *** note
-**Note:** This tool currently only works for native builds, since the generation
-of `constants.json` uses the same compiler toolchain that is used to build
-`minijail0` and `libminijail`.
+**Note:** This tool is currently only supported for native and Android builds.
+In Chrome OS builds, the build-time generation of arch-specific `constants.json`
+is not yet enabled.
 ***
 
 ### Sample usage
@@ -62,5 +62,11 @@ EOF
 # Load the filter to sandbox your program.
 ./minijail0 --seccomp-bpf-binary=test/seccomp.bpf -- <program>
 ```
+
+## generate_constants_json.py
+
+This script generates the `constants.json` file from LLVM IR assembly files.
+This makes it easier to generate architecture-specific `constants.json` files at
+build-time.
 
 [1]: https://docs.google.com/document/d/e/2PACX-1vQOeYLWmJJrRWvglnMo5cynkUe0gZ9wVsndLLePkJg6dfUXSOUWoveBBeY3u5nQMlEU4dt_vRgj0ifR/pub
