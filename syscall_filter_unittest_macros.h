@@ -96,13 +96,15 @@ do {	\
 			BPF_RET+BPF_K, SECCOMP_RET_ALLOW);	\
 } while (0)
 
-#define EXPECT_ARCH_VALIDATION(_filter) \
-do {	\
-	EXPECT_EQ_STMT(&(_filter)[0], BPF_LD+BPF_W+BPF_ABS, arch_nr);	\
-	EXPECT_EQ_BLOCK(&(_filter)[1],					\
-			BPF_JMP+BPF_JEQ+BPF_K, ARCH_NR, SKIP, NEXT);	\
-	EXPECT_EQ_STMT(&(_filter)[2], BPF_RET+BPF_K, SECCOMP_RET_KILL);	\
-} while (0)
+#define EXPECT_ARCH_VALIDATION(_filter)                                        \
+	do {                                                                   \
+		EXPECT_EQ_STMT(&(_filter)[0], BPF_LD + BPF_W + BPF_ABS,        \
+			       arch_nr);                                       \
+		EXPECT_EQ_BLOCK(&(_filter)[1], BPF_JMP + BPF_JEQ + BPF_K,      \
+				MINIJAIL_ARCH_NR, SKIP, NEXT);                 \
+		EXPECT_EQ_STMT(&(_filter)[2], BPF_RET + BPF_K,                 \
+			       SECCOMP_RET_KILL);                              \
+	} while (0)
 
 #define EXPECT_ALLOW_SYSCALL(_filter, _nr) \
 do {	\

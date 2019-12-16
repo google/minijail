@@ -16,8 +16,8 @@ size_t bpf_validate_arch(struct sock_filter *filter)
 {
 	struct sock_filter *curr_block = filter;
 	set_bpf_stmt(curr_block++, BPF_LD + BPF_W + BPF_ABS, arch_nr);
-	set_bpf_jump(curr_block++, BPF_JMP + BPF_JEQ + BPF_K, ARCH_NR, SKIP,
-		     NEXT);
+	set_bpf_jump(curr_block++, BPF_JMP + BPF_JEQ + BPF_K, MINIJAIL_ARCH_NR,
+		     SKIP, NEXT);
 	set_bpf_ret_kill(curr_block++);
 	return curr_block - filter;
 }

@@ -21,6 +21,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "arch.h"
+
 // These defines use C structures that are not defined in the same headers which
 // cause our CPP logic to fail w/undefined identifiers.  Remove them to avoid
 // build errors on such broken systems.
