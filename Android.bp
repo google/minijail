@@ -117,6 +117,48 @@ cc_library_static {
     },
 }
 
+cc_object {
+    name: "libminijail_gen_constants_llvmir",
+    vendor_available: true,
+    recovery_available: true,
+    host_supported: true,
+    cflags: [
+        "-S",
+        "-O0",
+        "-emit-llvm",
+    ],
+
+    target: {
+        android: {
+            generated_sources: ["libminijail_gen_constants"],
+        },
+        host: {
+            srcs: ["linux-x86/libconstants.gen.c"],
+        },
+    },
+}
+
+cc_object {
+    name: "libminijail_gen_syscall_llvmir",
+    vendor_available: true,
+    recovery_available: true,
+    host_supported: true,
+    cflags: [
+        "-S",
+        "-O0",
+        "-emit-llvm",
+    ],
+
+    target: {
+        android: {
+            generated_sources: ["libminijail_gen_syscall"],
+        },
+        host: {
+            srcs: ["linux-x86/libsyscalls.gen.c"],
+        },
+    },
+}
+
 // libminijail shared and static library for target.
 // =========================================================
 cc_library {
