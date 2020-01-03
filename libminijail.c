@@ -832,10 +832,14 @@ int API minijail_mount_with_data(struct minijail *j, const char *src,
 	m->flags = flags;
 
 	/*
-	 * Force vfs namespacing so the mounts don't leak out into the
-	 * containing vfs namespace.
+	 * Unless asked to enter an existing namespace, force vfs namespacing
+	 * so the mounts don't leak out into the containing vfs namespace.
+	 * If Minijail is being asked to enter the root vfs namespace this will
+	 * leak mounts, but it's unlikely that the user would ask to do that by
+	 * mistake.
 	 */
-	minijail_namespace_vfs(j);
+	if (!j->flags.enter_vfs)
+		minijail_namespace_vfs(j);
 
 	if (j->mounts_tail)
 		j->mounts_tail->next = m;
