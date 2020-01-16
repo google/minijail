@@ -62,6 +62,10 @@ ArgInspectionEntry = collections.namedtuple('ArgInspectionEntry',
 def parse_args(argv):
     """Returns the parsed CLI arguments for this tool."""
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--frequency', nargs='?', type=argparse.FileType('w'),
+                        help='frequency file')
+    parser.add_argument('--policy', nargs='?', type=argparse.FileType('w'),
+                        default=sys.stdout, help='policy file')
     parser.add_argument('traces', nargs='+', help='The strace logs.')
     return parser.parse_args(argv)
 
@@ -139,22 +143,34 @@ def main(argv):
         if basic_syscall not in syscalls:
             syscalls[basic_syscall] = 1
 
-    # Sort the syscalls based on frequency.  This way the calls that are used
-    # more often come first which in turn speeds up the filter slightly.
-    sorted_syscalls = list(
-        x[0] for x in sorted(syscalls.items(), key=lambda pair: pair[1],
-                             reverse=True)
-    )
+    # If a frequency file isn't used then sort the syscalls based on frequency
+    # to make the common case fast (by checking frequent calls earlier).
+    # Otherwise, sort alphabetically to make it easier for humans to see which
+    # calls are in use (and if necessary manually add a new syscall to the
+    # list).
+    if opts.frequency is None:
+        sorted_syscalls = list(
+            x[0] for x in sorted(syscalls.items(), key=lambda pair: pair[1],
+                                 reverse=True)
+        )
+    else:
+        sorted_syscalls = list(
+            x[0] for x in sorted(syscalls.items(), key=lambda pair: pair[0])
+        )
 
-    print(NOTICE)
+    print(NOTICE, file=opts.policy)
+    if opts.frequency is not None:
+        print(NOTICE, file=opts.frequency)
 
     for syscall in sorted_syscalls:
         if syscall in arg_inspection:
             arg_filter = get_seccomp_bpf_filter(syscall, arg_inspection[syscall])
         else:
             arg_filter = ALLOW
-        print('%s: %s' % (syscall, arg_filter))
-
+        print('%s: %s' % (syscall, arg_filter), file=opts.policy)
+        if opts.frequency is not None:
+            print('%s: %s' % (syscall, syscalls[syscall]),
+                  file=opts.frequency)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
