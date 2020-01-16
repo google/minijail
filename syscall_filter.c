@@ -595,9 +595,18 @@ int compile_file(const char *filename, FILE *policy_file,
 			continue;
 		}
 
-		/* Allow @include statements. */
+		/* Allow @include and @frequency statements. */
 		if (*policy_line == '@') {
 			const char *filename = NULL;
+
+			/* Ignore @frequency statements. */
+			if (strncmp("@frequency", policy_line,
+				    strlen("@frequency")) == 0) {
+				compiler_warn(&state,
+					      "ignored @frequency statement");
+				continue;
+			}
+
 			if (parse_include_statement(&state, policy_line,
 						    include_level,
 						    &filename) != 0) {
