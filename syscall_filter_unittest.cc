@@ -1745,6 +1745,17 @@ TEST(FilterTest, allow_log_but_kill) {
   free(actual.filter);
 }
 
+TEST(FilterTest, frequency) {
+  struct sock_fprog actual;
+  std::string frequency = "@frequency ./path/is/ignored.frequency\n";
+
+  FILE* policy_file = write_policy_to_pipe(frequency);
+  ASSERT_NE(policy_file, nullptr);
+  int res = test_compile_filter("policy", policy_file, &actual);
+  fclose(policy_file);
+  EXPECT_EQ(res, 0);
+}
+
 TEST(FilterTest, include_invalid_token) {
   struct sock_fprog actual;
   std::string invalid_token = "@unclude ./test/seccomp.policy\n";
