@@ -554,6 +554,8 @@ static void usage(const char *progn)
 	       "                See the minijail0(1) man page for the full list.\n"
 	       "  --preload-library=<f>:Overrides the path to \"" PRELOADPATH "\".\n"
 	       "                This is only really useful for local testing.\n"
+	       "  --child-ld-preload=<l>:Set <l> as the value of the LD_PRELOAD variable\n"
+	       "                in the environment of the child before starting it.\n"
 	       "  --seccomp-bpf-binary=<f>:Set a pre-compiled seccomp filter using <f>.\n"
 	       "                E.g., '-S /usr/share/filters/<prog>.$(uname -m).bpf'.\n"
 	       "                Requires -n when not running as root.\n"
@@ -593,6 +595,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	int set_uidmap = 0, set_gidmap = 0;
 	size_t tmp_size = 0;
 	const char *filter_path = NULL;
+	char *child_ld_preload = NULL;
 	int log_to_stderr = -1;
 
 	const char *optstring =
@@ -607,6 +610,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		{"profile", required_argument, 0, 131},
 		{"preload-library", required_argument, 0, 132},
 		{"seccomp-bpf-binary", required_argument, 0, 133},
+		{"child-ld-preload", required_argument, 0, 134},
 		{0, 0, 0, 0},
 	};
 	/* clang-format on */
@@ -860,6 +864,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			filter_path = optarg;
 			use_seccomp_filter_binary = 1;
 			break;
+		case 134: /* Child LD_PRELOAD */
+			child_ld_preload = strdup(optarg);
+			break;
 		default:
 			usage(argv[0]);
 			exit(opt == 'h' ? 0 : 1);
@@ -966,6 +973,12 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		/* Check if target is statically or dynamically linked. */
 		*elftype = get_elf_linkage(program_path);
 		free(program_path);
+	}
+
+	/* Does our caller want the child to get a LD_PRELOAD? */
+	if (child_ld_preload) {
+		setenv("LD_PRELOAD", child_ld_preload, 1);
+		free(child_ld_preload);
 	}
 
 	/*
