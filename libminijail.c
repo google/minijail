@@ -164,6 +164,7 @@ struct minijail {
 		int new_session_keyring : 1;
 		int forward_signals : 1;
 		int setsid : 1;
+		int child_ld_preload_keep : 1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -199,6 +200,7 @@ struct minijail {
 	struct hook *hooks_tail;
 	struct preserved_fd preserved_fds[MAX_PRESERVED_FDS];
 	size_t preserved_fd_count;
+	char *child_ld_preload;
 };
 
 static void run_hooks_or_die(const struct minijail *j,
@@ -278,6 +280,7 @@ void minijail_preexec(struct minijail *j)
 	int uts = j->flags.uts;
 	int remount_proc_ro = j->flags.remount_proc_ro;
 	int userns = j->flags.userns;
+	int child_ld_preload_keep = j->flags.child_ld_preload_keep;
 	if (j->user)
 		free(j->user);
 	j->user = NULL;
@@ -297,6 +300,7 @@ void minijail_preexec(struct minijail *j)
 	j->flags.uts = uts;
 	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
+	j->flags.child_ld_preload_keep = child_ld_preload_keep;
 	/* Note, |pids| will already have been used before this call. */
 }
 
@@ -520,6 +524,21 @@ void API minijail_skip_setting_securebits(struct minijail *j,
 					  uint64_t securebits_skip_mask)
 {
 	j->securebits_skip_mask = securebits_skip_mask;
+}
+
+int API minijail_set_child_ld_preload(struct minijail *j, const char *s)
+{
+	if (j->child_ld_preload)
+		free(j->child_ld_preload);
+	j->child_ld_preload = strdup(s);
+	if (!j->child_ld_preload)
+		return -ENOMEM;
+	return 0;
+}
+
+void API minijail_set_child_ld_preload_keep(struct minijail *j)
+{
+	j->flags.child_ld_preload_keep = 1;
 }
 
 void API minijail_remount_mode(struct minijail *j, unsigned long mode)
@@ -1130,6 +1149,11 @@ int API minijail_use_alt_syscall(struct minijail *j, const char *table)
 		return -ENOMEM;
 	j->flags.alt_syscall = 1;
 	return 0;
+}
+
+int minijail_get_child_ld_preload_keep(struct minijail *j)
+{
+	return j->flags.child_ld_preload_keep;
 }
 
 struct marshal_state {
@@ -2415,6 +2439,14 @@ static int setup_preload(const struct minijail *j attribute_unused,
 		return -1;
 	}
 
+	if (j->child_ld_preload) {
+		char *newenv2 = NULL;
+		if (asprintf(&newenv2, "%s %s", j->child_ld_preload, newenv) < 0)
+			return -1;
+		free(newenv);
+		newenv = newenv2;
+	}
+
 	/*
 	 * Avoid using putenv(3), since that requires us to hold onto a
 	 * reference to that string until the environment is no longer used to
@@ -3254,6 +3286,10 @@ void API minijail_destroy(struct minijail *j)
 		free(j->alt_syscall_table);
 	for (i = 0; i < j->cgroup_count; ++i)
 		free(j->cgroups[i]);
+/*
+	if (j->child_ld_preload)
+		free(j->child_ld_preload);
+*/
 	free(j);
 }
 

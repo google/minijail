@@ -87,6 +87,8 @@ extern void minijail_preexec(struct minijail *j);
  */
 extern void minijail_preenter(struct minijail *j);
 
+extern int minijail_get_child_ld_preload_keep(struct minijail *j);
+
 #ifdef __cplusplus
 }; /* extern "C" */
 #endif

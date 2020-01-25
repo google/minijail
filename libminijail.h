@@ -121,6 +121,8 @@ void minijail_namespace_enter_vfs(struct minijail *j, const char *ns_path);
 void minijail_new_session_keyring(struct minijail *j);
 void minijail_skip_setting_securebits(struct minijail *j,
 				      uint64_t securebits_skip_mask);
+int minijail_set_child_ld_preload(struct minijail *j, const char *s);
+void minijail_set_child_ld_preload_keep(struct minijail *j);
 
 /*
  * This option is *dangerous* as it negates most of the functionality of

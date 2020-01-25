@@ -130,6 +130,9 @@ extern "C" {
     pub fn minijail_namespace_enter_vfs(j: *mut minijail, ns_path: *const ::std::os::raw::c_char);
 }
 extern "C" {
+    pub fn minijail_set_child_ld_preload(j: *mut minijail, s: *const ::std::os::raw::c_char);
+}
+extern "C" {
     pub fn minijail_new_session_keyring(j: *mut minijail);
 }
 extern "C" {

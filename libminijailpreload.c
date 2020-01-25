@@ -29,12 +29,18 @@ static void die(const char *failed)
 	abort();
 }
 
-static void unset_in_env(char **envp, const char *name)
+static void unset_in_env(char **envp, const char *name, const int keep)
 {
 	int i;
 	for (i = 0; envp[i]; i++)
 		if (!strncmp(envp[i], name, strlen(name)))
-			envp[i][0] = '\0';
+		{
+			char *space = rindex(envp[i], ' ');
+			if (space && keep)
+				*space = '\0';
+			else
+				envp[i][0] = '\0';
+		}
 }
 
 /** @brief Fake main(), spliced in before the real call to main() by
@@ -75,7 +81,7 @@ static int fake_main(int argc, char **argv, char **envp)
 	 * LD_PRELOAD="/tmp/test.so libminijailpreload.so" prog; the
 	 * descendants of prog will have no LD_PRELOAD set at all.
 	 */
-	unset_in_env(envp, kLdPreloadEnvVar);
+	unset_in_env(envp, kLdPreloadEnvVar, minijail_get_child_ld_preload_keep(j));
 	/* Strip out flags meant for the parent. */
 	minijail_preenter(j);
 	minijail_enter(j);
