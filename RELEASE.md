@@ -14,8 +14,8 @@ new feature).
 Minijail v<N+1>.
 
 New in this release:
-*New feature (author@domain).
-*New feature 2 (author2@domain2).
+* New feature (author@domain).
+* New feature 2 (author2@domain2).
 ```
 
 * Push the tag:
