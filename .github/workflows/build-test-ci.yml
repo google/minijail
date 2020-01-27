@@ -1,0 +1,28 @@
+# GitHub actions workflow.
+# https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions
+
+name: Build+Test CI
+
+on:
+  push:
+    branches: [master]
+    tags: [linux-v*]
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        cc: [gcc, clang]
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install system packages
+      run: sudo apt-get install libcap-dev
+    - name: Install Googletest (gtest/gmock)
+      run: ./get_googletest.sh
+    - run: make VERBOSE=1
+    - run: make VERBOSE=1 check
