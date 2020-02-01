@@ -60,7 +60,7 @@ all: CC_BINARY(minijail0) CC_LIBRARY(libminijail.so) \
 	CC_LIBRARY(libminijailpreload.so)
 
 parse_seccomp_policy: CXX_BINARY(parse_seccomp_policy)
-dump_constants: CXX_BINARY(dump_constants)
+dump_constants: CXX_STATIC_BINARY(dump_constants)
 
 tests: TEST(CXX_BINARY(libminijail_unittest)) \
 	TEST(CXX_BINARY(minijail0_cli_unittest)) \
@@ -147,12 +147,14 @@ CXX_BINARY(parse_seccomp_policy): parse_seccomp_policy.o syscall_filter.o \
 clean: CLEAN(parse_seccomp_policy)
 
 
-CXX_BINARY(dump_constants): dump_constants.o \
+# Compiling dump_constants as a static executable makes it easy to run under
+# qemu-user, which in turn simplifies cross-compiling bpf policies.
+CXX_STATIC_BINARY(dump_constants): dump_constants.o \
 		libconstants.gen.o libsyscalls.gen.o
 clean: CLEAN(dump_constants)
 
 
-constants.json: CXX_BINARY(dump_constants)
+constants.json: CXX_STATIC_BINARY(dump_constants)
 	./dump_constants > $@
 clean: CLEANFILE(constants.json)
 
