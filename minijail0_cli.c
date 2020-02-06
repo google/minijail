@@ -376,7 +376,8 @@ static void use_profile(struct minijail *j, const char *profile,
 {
 	/* Note: New profiles should be added in minijail0_cli_unittest.cc. */
 
-	if (!strcmp(profile, "minimalistic-mountns")) {
+	if (!strcmp(profile, "minimalistic-mountns") ||
+	    !strcmp(profile, "minimalistic-mountns-nodev")) {
 		minijail_namespace_vfs(j);
 		if (minijail_bind(j, "/", "/", 0)) {
 			fprintf(stderr, "minijail_bind(/) failed.\n");
@@ -386,11 +387,13 @@ static void use_profile(struct minijail *j, const char *profile,
 			fprintf(stderr, "minijail_bind(/proc) failed.\n");
 			exit(1);
 		}
-		if (minijail_bind(j, "/dev/log", "/dev/log", 0)) {
-			fprintf(stderr, "minijail_bind(/dev/log) failed.\n");
-			exit(1);
+		if (!strcmp(profile, "minimalistic-mountns")) {
+			if (minijail_bind(j, "/dev/log", "/dev/log", 0)) {
+				fprintf(stderr, "minijail_bind(/dev/log) failed.\n");
+				exit(1);
+			}
+			minijail_mount_dev(j);
 		}
-		minijail_mount_dev(j);
 		if (!*tmp_size) {
 			/* Avoid clobbering |tmp_size| if it was already set. */
 			*tmp_size = DEFAULT_TMP_SIZE;
