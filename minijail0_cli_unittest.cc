@@ -286,6 +286,7 @@ TEST_F(CliTest, valid_profile) {
   // This should list all valid profiles.
   const std::vector<std::string> profiles = {
     "minimalistic-mountns",
+    "minimalistic-mountns-nodev",
   };
 
   for (const auto profile : profiles) {
