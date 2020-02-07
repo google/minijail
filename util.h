@@ -195,6 +195,46 @@ char *consumestr(char **buf, size_t *buflength);
  */
 void init_logging(enum logging_system_t logger, int fd, int min_priority);
 
+/*
+ * minjail_free_env: Frees an environment array plus the environment strings it
+ * points to. The environment and its constituent strings must have been
+ * allocated (as opposed to pointing to static data), e.g. by using
+ * minijail_copy_env() and minijail_setenv().
+ *
+ * @env The environment to free.
+ */
+void minijail_free_env(char **env);
+
+/*
+ * minjail_copy_env: Copy an environment array (such as passed to execve),
+ * duplicating the environment strings and the array pointing at them.
+ *
+ * @env The environment to copy.
+ *
+ * Returns a pointer to the copied environment or NULL on memory allocation
+ * failure.
+ */
+char **minijail_copy_env(char *const *env);
+
+/*
+ * minjail_setenv: Set an environment variable in @env. Semantics match the
+ * standard setenv() function, but this operates on @env, not the global
+ * environment. @env must be dynamically allocated (as opposed to pointing to
+ * static data), e.g. via minijail_copy_env(). @name and @value get copied into
+ * newly-allocated memory.
+ *
+ * @env       Address of the environment to modify. Might be re-allocated to
+ *            make room for the new entry.
+ * @name      Name of the key to set.
+ * @value     The value to set.
+ * @overwrite Whether to replace the existing value for @name. If non-zero and
+ *            the entry is already present, no changes will be made.
+ *
+ * Returns 0 and modifies *@env on success, returns an error code otherwise.
+ */
+int minijail_setenv(char ***env, const char *name, const char *value,
+		    int overwrite);
+
 #ifdef __cplusplus
 }; /* extern "C" */
 #endif
