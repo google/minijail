@@ -25,7 +25,11 @@ import itertools
 import os.path
 import re
 
-import bpf
+try:
+    import bpf
+except ImportError:
+    from minijail import bpf
+
 
 Token = collections.namedtuple(
     'Token', ['type', 'value', 'filename', 'line', 'line_number', 'column'])
