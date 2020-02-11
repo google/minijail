@@ -213,28 +213,6 @@ int config_net_loopback(void)
 	return 0;
 }
 
-int setup_pipe_end(int fds[2], size_t index)
-{
-	if (index > 1)
-		return -1;
-
-	close(fds[1 - index]);
-	return fds[index];
-}
-
-int dupe_and_close_fd(int fds[2], size_t index, int fd)
-{
-	if (index > 1)
-		return -1;
-
-	/* dup2(2) the corresponding end of the pipe into |fd|. */
-	fd = dup2(fds[index], fd);
-
-	close(fds[0]);
-	close(fds[1]);
-	return fd;
-}
-
 int write_pid_to_path(pid_t pid, const char *path)
 {
 	FILE *fp = fopen(path, "we");

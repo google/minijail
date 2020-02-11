@@ -157,42 +157,6 @@ TEST(cap_ambient_supported, smoke) {
   cap_ambient_supported();
 }
 
-// Invalid indexes should return errors, not crash.
-TEST(setup_pipe_end, bad_index) {
-  EXPECT_LT(setup_pipe_end(nullptr, 2), 0);
-  EXPECT_LT(setup_pipe_end(nullptr, 3), 0);
-  EXPECT_LT(setup_pipe_end(nullptr, 4), 0);
-}
-
-// Verify getting the first fd works.
-TEST(setup_pipe_end, index0) {
-  int fds[2];
-  EXPECT_EQ(0, pipe(fds));
-  // This should close fds[1] and return fds[0].
-  EXPECT_EQ(fds[0], setup_pipe_end(fds, 0));
-  // Use close() to verify open/close state.
-  EXPECT_EQ(-1, close(fds[1]));
-  EXPECT_EQ(0, close(fds[0]));
-}
-
-// Verify getting the second fd works.
-TEST(setup_pipe_end, index1) {
-  int fds[2];
-  EXPECT_EQ(0, pipe(fds));
-  // This should close fds[0] and return fds[1].
-  EXPECT_EQ(fds[1], setup_pipe_end(fds, 1));
-  // Use close() to verify open/close state.
-  EXPECT_EQ(-1, close(fds[0]));
-  EXPECT_EQ(0, close(fds[1]));
-}
-
-// Invalid indexes should return errors, not crash.
-TEST(dupe_and_close_fd, bad_index) {
-  EXPECT_LT(dupe_and_close_fd(nullptr, 2, -1), 0);
-  EXPECT_LT(dupe_and_close_fd(nullptr, 3, -1), 0);
-  EXPECT_LT(dupe_and_close_fd(nullptr, 4, -1), 0);
-}
-
 // An invalid path should return an error.
 TEST(write_pid_to_path, bad_path) {
   EXPECT_NE(0, write_pid_to_path(0, kNoSuchDir));
