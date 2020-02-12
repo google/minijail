@@ -72,8 +72,12 @@ def parse_llvm_ir(ir):
     return ParseResults(table_name=table_name, table_entries=table_entries)
 
 
-def main(argv):
+def main(argv=None):
     """Main entrypoint."""
+
+    if argv is None:
+        argv = sys.argv[1:]
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',
                         help='The path of the generated constants.json file.',
