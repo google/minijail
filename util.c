@@ -3,6 +3,8 @@
  * found in the LICENSE file.
  */
 
+#define _GNU_SOURCE
+
 #include "util.h"
 
 #include <ctype.h>
@@ -461,4 +463,83 @@ void init_logging(enum logging_system_t logger, int fd, int min_priority)
 	logging_config.logger = logger;
 	logging_config.fd = fd;
 	logging_config.min_priority = min_priority;
+}
+
+void minijail_free_env(char **env)
+{
+	if (!env)
+		return;
+
+	for (char **entry = env; *entry; ++entry) {
+		free(*entry);
+	}
+
+	free(env);
+}
+
+char **minijail_copy_env(char *const *env)
+{
+	if (!env)
+		return calloc(1, sizeof(char *));
+
+	int len = 0;
+	while (env[len])
+		++len;
+
+	char **copy = calloc(len + 1, sizeof(char *));
+	if (!copy)
+		return NULL;
+
+	for (char **entry = copy; *env; ++env, ++entry) {
+		*entry = strdup(*env);
+		if (!*entry) {
+			minijail_free_env(copy);
+			return NULL;
+		}
+	}
+
+	return copy;
+}
+
+int minijail_setenv(char ***env, const char *name, const char *value,
+		    int overwrite)
+{
+	if (!env || !*env || !name || !*name || !value)
+		return EINVAL;
+
+	size_t name_len = strlen(name);
+
+	char **dest = NULL;
+	size_t env_len = 0;
+	for (char **entry = *env; *entry; ++entry, ++env_len) {
+		if (!dest && strncmp(name, *entry, name_len) == 0 &&
+		    (*entry)[name_len] == '=') {
+			if (!overwrite)
+				return 0;
+
+			dest = entry;
+		}
+	}
+
+	char *new_entry = NULL;
+	if (asprintf(&new_entry, "%s=%s", name, value) == -1)
+		return ENOMEM;
+
+	if (dest) {
+		free(*dest);
+		*dest = new_entry;
+		return 0;
+	}
+
+	env_len++;
+	char **new_env = realloc(*env, (env_len + 1) * sizeof(char *));
+	if (!new_env) {
+		free(new_entry);
+		return ENOMEM;
+	}
+
+	new_env[env_len - 1] = new_entry;
+	new_env[env_len] = NULL;
+	*env = new_env;
+	return 0;
 }

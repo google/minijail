@@ -381,153 +381,126 @@ TEST(Test, close_original_pipes_after_dup2) {
   EXPECT_EQ(minijail_wait(j.get()), 42);
 }
 
-TEST(Test, minijail_run_pid_pipes) {
+TEST(Test, minijail_run_env_pid_pipes) {
   // TODO(crbug.com/895875): The preload library interferes with ASan since they
   // both need to use LD_PRELOAD.
   if (running_with_asan()) {
     SUCCEED();
     return;
   }
-  constexpr char teststr[] = "test\n";
 
   ScopedMinijail j(minijail_new());
   minijail_set_preload_path(j.get(), kPreloadPath);
 
-  char* argv[4];
+  char *argv[4];
   argv[0] = const_cast<char*>(kCatPath);
-  argv[1] = nullptr;
+  argv[1] = NULL;
+
   pid_t pid;
   int child_stdin, child_stdout;
-  int mj_run_ret = minijail_run_pid_pipes(j.get(), argv[0], argv, &pid,
-                                          &child_stdin, &child_stdout, nullptr);
+  int mj_run_ret = minijail_run_pid_pipes(
+      j.get(), argv[0], argv, &pid, &child_stdin, &child_stdout, NULL);
   EXPECT_EQ(mj_run_ret, 0);
 
+  char teststr[] = "test\n";
   const size_t teststr_len = strlen(teststr);
   ssize_t write_ret = write(child_stdin, teststr, teststr_len);
   EXPECT_EQ(write_ret, static_cast<ssize_t>(teststr_len));
 
-  char buf[kBufferSize];
-  ssize_t read_ret = read(child_stdout, buf, 8);
+  char buf[kBufferSize] = {};
+  ssize_t read_ret = read(child_stdout, buf, sizeof(buf) - 1);
   EXPECT_EQ(read_ret, static_cast<ssize_t>(teststr_len));
-  buf[teststr_len] = 0;
-  EXPECT_EQ(strcmp(buf, teststr), 0);
+  EXPECT_STREQ(buf, teststr);
 
   int status;
   EXPECT_EQ(kill(pid, SIGTERM), 0);
-  waitpid(pid, &status, 0);
+  EXPECT_EQ(waitpid(pid, &status, 0), pid);
   ASSERT_TRUE(WIFSIGNALED(status));
   EXPECT_EQ(WTERMSIG(status), SIGTERM);
 
   argv[0] = const_cast<char*>(kShellPath);
   argv[1] = "-c";
-  argv[2] = "echo test >&2";
+  argv[2] = "echo \"${TEST_PARENT+set}|${TEST_VAR}\" >&2";
   argv[3] = nullptr;
-  int child_stderr;
-  mj_run_ret = minijail_run_pid_pipes(j.get(), argv[0], argv, &pid,
-                                      &child_stdin, &child_stdout,
-                                      &child_stderr);
-  EXPECT_EQ(mj_run_ret, 0);
 
-  read_ret = read(child_stderr, buf, sizeof(buf));
-  EXPECT_GE(read_ret, static_cast<ssize_t>(teststr_len));
-
-  waitpid(pid, &status, 0);
-  ASSERT_TRUE(WIFEXITED(status));
-  EXPECT_EQ(WEXITSTATUS(status), 0);
-}
-
-TEST(Test, minijail_run_pid_pipes_no_preload) {
-  pid_t pid;
-  int child_stdin, child_stdout, child_stderr;
-  int mj_run_ret;
-  ssize_t write_ret, read_ret;
-  char buf[kBufferSize];
-  int status;
-  char teststr[] = "test\n";
-  size_t teststr_len = strlen(teststr);
-  char *argv[4];
-
-  struct minijail *j = minijail_new();
-
-  argv[0] = const_cast<char*>(kCatPath);
-  argv[1] = NULL;
-  mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv,
-                                                 &pid,
-                                                 &child_stdin, &child_stdout,
-                                                 NULL);
-  EXPECT_EQ(mj_run_ret, 0);
-
-  write_ret = write(child_stdin, teststr, teststr_len);
-  EXPECT_EQ(write_ret, (int)teststr_len);
-
-  read_ret = read(child_stdout, buf, 8);
-  EXPECT_EQ(read_ret, (int)teststr_len);
-  buf[teststr_len] = 0;
-  EXPECT_EQ(strcmp(buf, teststr), 0);
-
-  EXPECT_EQ(kill(pid, SIGTERM), 0);
-  waitpid(pid, &status, 0);
-  ASSERT_TRUE(WIFSIGNALED(status));
-  EXPECT_EQ(WTERMSIG(status), SIGTERM);
-
-  argv[0] = const_cast<char*>(kShellPath);
-  argv[1] = "-c";
-  argv[2] = "echo test >&2";
-  argv[3] = NULL;
-  mj_run_ret = minijail_run_pid_pipes_no_preload(j, argv[0], argv, &pid,
-                                                 &child_stdin, &child_stdout,
-                                                 &child_stderr);
-  EXPECT_EQ(mj_run_ret, 0);
-
-  read_ret = read(child_stderr, buf, sizeof(buf));
-  EXPECT_GE(read_ret, (int)teststr_len);
-
-  waitpid(pid, &status, 0);
-  ASSERT_TRUE(WIFEXITED(status));
-  EXPECT_EQ(WEXITSTATUS(status), 0);
-
-  minijail_destroy(j);
-}
-
-TEST(Test, minijail_run_env_pid_pipes_no_preload) {
-  pid_t pid;
-  int child_stdin, child_stdout, child_stderr;
-  int mj_run_ret;
-  ssize_t read_ret;
-  char buf[kBufferSize];
-  int status;
-  char test_envvar[] = "TEST_VAR=test";
-  size_t testvar_len = strlen("test");
-  char *argv[4];
   char *envp[2];
-
-  struct minijail *j = minijail_new();
-
-  argv[0] = const_cast<char*>(kShellPath);
-  argv[1] = "-c";
-  argv[2] = "echo \"${TEST_PARENT+set}|${TEST_VAR}\"";
-  argv[3] = NULL;
-
-  envp[0] = test_envvar;
+  envp[0] = "TEST_VAR=test";
   envp[1] = NULL;
 
   // Set a canary env var in the parent that should not be present in the child.
   ASSERT_EQ(setenv("TEST_PARENT", "test", 1 /*overwrite*/), 0);
 
-  mj_run_ret = minijail_run_env_pid_pipes_no_preload(
-      j, argv[0], argv, envp, &pid, &child_stdin, &child_stdout, &child_stderr);
+  int child_stderr;
+  mj_run_ret =
+      minijail_run_env_pid_pipes(j.get(), argv[0], argv, envp, &pid,
+                                 &child_stdin, &child_stdout, &child_stderr);
   EXPECT_EQ(mj_run_ret, 0);
 
-  read_ret = read(child_stdout, buf, sizeof(buf));
-  EXPECT_EQ(read_ret, (int)testvar_len + 2);
-
-  EXPECT_EQ("|test\n", std::string(buf, 0, testvar_len + 2));
+  memset(buf, 0, sizeof(buf));
+  read_ret = read(child_stderr, buf, sizeof(buf) - 1);
+  EXPECT_GE(read_ret, 0);
+  EXPECT_STREQ(buf, "|test\n");
 
   EXPECT_EQ(waitpid(pid, &status, 0), pid);
   ASSERT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 0);
+}
 
-  minijail_destroy(j);
+TEST(Test, minijail_run_env_pid_pipes_no_preload) {
+  ScopedMinijail j(minijail_new());
+
+  char *argv[4];
+  argv[0] = const_cast<char*>(kCatPath);
+  argv[1] = NULL;
+
+  pid_t pid;
+  int child_stdin, child_stdout;
+  int mj_run_ret = minijail_run_pid_pipes(
+      j.get(), argv[0], argv, &pid, &child_stdin, &child_stdout, NULL);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  char teststr[] = "test\n";
+  const size_t teststr_len = strlen(teststr);
+  ssize_t write_ret = write(child_stdin, teststr, teststr_len);
+  EXPECT_EQ(write_ret, static_cast<ssize_t>(teststr_len));
+
+  char buf[kBufferSize] = {};
+  ssize_t read_ret = read(child_stdout, buf, 8);
+  EXPECT_EQ(read_ret, static_cast<ssize_t>(teststr_len));
+  EXPECT_STREQ(buf, teststr);
+
+  int status;
+  EXPECT_EQ(kill(pid, SIGTERM), 0);
+  EXPECT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFSIGNALED(status));
+  EXPECT_EQ(WTERMSIG(status), SIGTERM);
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "echo \"${TEST_PARENT+set}|${TEST_VAR}\" >&2";
+  argv[3] = nullptr;
+
+  char *envp[2];
+  envp[0] = "TEST_VAR=test";
+  envp[1] = NULL;
+
+  // Set a canary env var in the parent that should not be present in the child.
+  ASSERT_EQ(setenv("TEST_PARENT", "test", 1 /*overwrite*/), 0);
+
+  int child_stderr;
+  mj_run_ret =
+      minijail_run_env_pid_pipes(j.get(), argv[0], argv, envp, &pid,
+                                 &child_stdin, &child_stdout, &child_stderr);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  memset(buf, 0, sizeof(buf));
+  read_ret = read(child_stderr, buf, sizeof(buf));
+  EXPECT_GE(read_ret, 0);
+  EXPECT_STREQ(buf, "|test\n");
+
+  EXPECT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
 }
 
 TEST(Test, test_minijail_no_fd_leaks) {
