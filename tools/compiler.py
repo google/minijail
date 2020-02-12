@@ -20,8 +20,12 @@ from __future__ import print_function
 
 import enum
 
-import bpf
-import parser  # pylint: disable=wrong-import-order
+try:
+    import bpf
+    import parser  # pylint: disable=wrong-import-order
+except ImportError:
+    from minijail import bpf
+    from minijail import parser  # pylint: disable=wrong-import-order
 
 
 class OptimizationStrategy(enum.Enum):
