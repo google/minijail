@@ -242,6 +242,14 @@ static int write_exactly(int fd, const void *buf, size_t n)
 	return 0;
 }
 
+/* Closes *pfd and sets it to -1. */
+static void close_and_reset(int *pfd)
+{
+	if (*pfd != -1)
+		close(*pfd);
+	*pfd = -1;
+}
+
 /*
  * Strip out flags meant for the parent.
  * We keep things that are not inherited across execve(2) (e.g. capabilities),
@@ -1854,8 +1862,8 @@ static void enter_user_namespace(const struct minijail *j)
 
 static void parent_setup_complete(int *pipe_fds)
 {
-	close(pipe_fds[0]);
-	close(pipe_fds[1]);
+	close_and_reset(&pipe_fds[0]);
+	close_and_reset(&pipe_fds[1]);
 }
 
 /*
@@ -1866,12 +1874,12 @@ static void wait_for_parent_setup(int *pipe_fds)
 {
 	char buf;
 
-	close(pipe_fds[1]);
+	close_and_reset(&pipe_fds[1]);
 
 	/* Wait for parent to complete setup and close the pipe. */
 	if (read(pipe_fds[0], &buf, 1) != 0)
 		die("failed to sync with parent");
-	close(pipe_fds[0]);
+	close_and_reset(&pipe_fds[0]);
 }
 
 static void drop_ugid(const struct minijail *j)
@@ -2483,28 +2491,87 @@ static int close_open_fds(int *inheritable_fds, size_t size)
 
 static int redirect_fds(struct minijail *j)
 {
-	size_t i, i2;
-	int closeable;
-	for (i = 0; i < j->preserved_fd_count; i++) {
+	for (size_t i = 0; i < j->preserved_fd_count; i++) {
 		if (dup2(j->preserved_fds[i].parent_fd,
 			 j->preserved_fds[i].child_fd) == -1) {
 			return -1;
 		}
 	}
-	/*
-	 * After all fds have been duped, we are now free to close all parent
-	 * fds that are *not* child fds.
-	 */
-	for (i = 0; i < j->preserved_fd_count; i++) {
-		closeable = true;
-		for (i2 = 0; i2 < j->preserved_fd_count; i2++) {
-			closeable &= j->preserved_fds[i].parent_fd !=
-				     j->preserved_fds[i2].child_fd;
-		}
-		if (closeable)
-			close(j->preserved_fds[i].parent_fd);
-	}
 	return 0;
+}
+
+/*
+ * Structure holding resources and state created when running a minijail.
+ */
+struct minijail_run_state {
+	char *oldenv;
+	pid_t child_pid;
+	int pipe_fds[2];
+	int stdin_fds[2];
+	int stdout_fds[2];
+	int stderr_fds[2];
+	int child_sync_pipe_fds[2];
+};
+
+static void minijail_free_run_state(struct minijail_run_state *state)
+{
+	free(state->oldenv);
+	state->oldenv = NULL;
+
+	state->child_pid = -1;
+
+	int *fd_pairs[] = {state->pipe_fds, state->stdin_fds, state->stdout_fds,
+			   state->stderr_fds, state->child_sync_pipe_fds};
+	for (size_t i = 0; i < ARRAY_SIZE(fd_pairs); ++i) {
+		close_and_reset(&fd_pairs[i][0]);
+		close_and_reset(&fd_pairs[i][1]);
+	}
+}
+
+/* Set up stdin/stdout/stderr file descriptors in the child. */
+static void setup_child_std_fds(struct minijail *j,
+				struct minijail_run_state *state)
+{
+	struct {
+		const char *name;
+		int from;
+		int to;
+	} fd_map[] = {
+	    {"stdin", state->stdin_fds[0], STDIN_FILENO},
+	    {"stdout", state->stdout_fds[1], STDOUT_FILENO},
+	    {"stderr", state->stderr_fds[1], STDERR_FILENO},
+	};
+
+	for (size_t i = 0; i < ARRAY_SIZE(fd_map); ++i) {
+		if (fd_map[i].from != -1) {
+			if (dup2(fd_map[i].from, fd_map[i].to) == -1)
+				die("failed to set up %s pipe", fd_map[i].name);
+		}
+	}
+
+	/* Close temporary pipe file descriptors. */
+	int *std_pipes[] = {state->stdin_fds, state->stdout_fds,
+			    state->stderr_fds};
+	for (size_t i = 0; i < ARRAY_SIZE(std_pipes); ++i) {
+		close_and_reset(&std_pipes[i][0]);
+		close_and_reset(&std_pipes[i][1]);
+	}
+
+	/*
+	 * If any of stdin, stdout, or stderr are TTYs, or setsid flag is
+	 * set, create a new session. This prevents the jailed process from
+	 * using the TIOCSTI ioctl to push characters into the parent process
+	 * terminal's input buffer, therefore escaping the jail.
+	 *
+	 * Since it has just forked, the child will not be a process group
+	 * leader, and this call to setsid() should always succeed.
+	 */
+	if (j->flags.setsid || isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) ||
+	    isatty(STDERR_FILENO)) {
+		if (setsid() < 0) {
+			pdie("setsid() failed");
+		}
+	}
 }
 
 /*
@@ -2517,6 +2584,10 @@ static int redirect_fds(struct minijail *j)
  * use_preload - If true use LD_PRELOAD.
  * exec_in_child - If true, run |filename|. Otherwise, the child will return to
  *     the caller.
+ * pstdin_fd - Filled with stdin pipe if non-NULL.
+ * pstdout_fd - Filled with stdout pipe if non-NULL.
+ * pstderr_fd - Filled with stderr pipe if non-NULL.
+ * pchild_pid - Filled with the pid of the child process if non-NULL.
  */
 struct minijail_run_config {
 	const char *filename;
@@ -2524,72 +2595,55 @@ struct minijail_run_config {
 	char *const *envp;
 	int use_preload;
 	int exec_in_child;
-};
-
-/*
- * Set of pointers to fill with values from minijail_run.
- * All arguments are allowed to be NULL if unused.
- *
- * pstdin_fd - Filled with stdin pipe if non-NULL.
- * pstdout_fd - Filled with stdout pipe if non-NULL.
- * pstderr_fd - Filled with stderr pipe if non-NULL.
- * pchild_pid - Filled with the pid of the child process if non-NULL.
- */
-struct minijail_run_status {
 	int *pstdin_fd;
 	int *pstdout_fd;
 	int *pstderr_fd;
 	pid_t *pchild_pid;
 };
 
-static int minijail_run_internal(struct minijail *j,
-				 const struct minijail_run_config *config,
-				 struct minijail_run_status *status_out);
+static int
+minijail_run_config_internal(struct minijail *j,
+			     const struct minijail_run_config *config);
 
 int API minijail_run(struct minijail *j, const char *filename,
 		     char *const argv[])
 {
 	struct minijail_run_config config = {
-		.filename = filename,
-		.argv = argv,
-		.envp = NULL,
-		.use_preload = true,
-		.exec_in_child = true,
+	    .filename = filename,
+	    .argv = argv,
+	    .envp = NULL,
+	    .use_preload = true,
+	    .exec_in_child = true,
 	};
-	struct minijail_run_status status = {};
-	return minijail_run_internal(j, &config, &status);
+	return minijail_run_config_internal(j, &config);
 }
 
 int API minijail_run_pid(struct minijail *j, const char *filename,
 			 char *const argv[], pid_t *pchild_pid)
 {
 	struct minijail_run_config config = {
-		.filename = filename,
-		.argv = argv,
-		.envp = NULL,
-		.use_preload = true,
-		.exec_in_child = true,
+	    .filename = filename,
+	    .argv = argv,
+	    .envp = NULL,
+	    .use_preload = true,
+	    .exec_in_child = true,
+	    .pchild_pid = pchild_pid,
 	};
-	struct minijail_run_status status = {
-		.pchild_pid = pchild_pid,
-	};
-	return minijail_run_internal(j, &config, &status);
+	return minijail_run_config_internal(j, &config);
 }
 
 int API minijail_run_pipe(struct minijail *j, const char *filename,
 			  char *const argv[], int *pstdin_fd)
 {
 	struct minijail_run_config config = {
-		.filename = filename,
-		.argv = argv,
-		.envp = NULL,
-		.use_preload = true,
-		.exec_in_child = true,
+	    .filename = filename,
+	    .argv = argv,
+	    .envp = NULL,
+	    .use_preload = true,
+	    .exec_in_child = true,
+	    .pstdin_fd = pstdin_fd,
 	};
-	struct minijail_run_status status = {
-		.pstdin_fd = pstdin_fd,
-	};
-	return minijail_run_internal(j, &config, &status);
+	return minijail_run_config_internal(j, &config);
 }
 
 int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
@@ -2597,33 +2651,30 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 			       int *pstdin_fd, int *pstdout_fd, int *pstderr_fd)
 {
 	struct minijail_run_config config = {
-		.filename = filename,
-		.argv = argv,
-		.envp = NULL,
-		.use_preload = true,
-		.exec_in_child = true,
+	    .filename = filename,
+	    .argv = argv,
+	    .envp = NULL,
+	    .use_preload = true,
+	    .exec_in_child = true,
+	    .pstdin_fd = pstdin_fd,
+	    .pstdout_fd = pstdout_fd,
+	    .pstderr_fd = pstderr_fd,
+	    .pchild_pid = pchild_pid,
 	};
-	struct minijail_run_status status = {
-		.pstdin_fd = pstdin_fd,
-		.pstdout_fd = pstdout_fd,
-		.pstderr_fd = pstderr_fd,
-		.pchild_pid = pchild_pid,
-	};
-	return minijail_run_internal(j, &config, &status);
+	return minijail_run_config_internal(j, &config);
 }
 
 int API minijail_run_no_preload(struct minijail *j, const char *filename,
 				char *const argv[])
 {
 	struct minijail_run_config config = {
-		.filename = filename,
-		.argv = argv,
-		.envp = NULL,
-		.use_preload = false,
-		.exec_in_child = true,
+	    .filename = filename,
+	    .argv = argv,
+	    .envp = NULL,
+	    .use_preload = false,
+	    .exec_in_child = true,
 	};
-	struct minijail_run_status status = {};
-	return minijail_run_internal(j, &config, &status);
+	return minijail_run_config_internal(j, &config);
 }
 
 int API minijail_run_pid_pipes_no_preload(struct minijail *j,
@@ -2635,19 +2686,17 @@ int API minijail_run_pid_pipes_no_preload(struct minijail *j,
 					  int *pstderr_fd)
 {
 	struct minijail_run_config config = {
-		.filename = filename,
-		.argv = argv,
-		.envp = NULL,
-		.use_preload = false,
-		.exec_in_child = true,
+	    .filename = filename,
+	    .argv = argv,
+	    .envp = NULL,
+	    .use_preload = false,
+	    .exec_in_child = true,
+	    .pstdin_fd = pstdin_fd,
+	    .pstdout_fd = pstdout_fd,
+	    .pstderr_fd = pstderr_fd,
+	    .pchild_pid = pchild_pid,
 	};
-	struct minijail_run_status status = {
-		.pstdin_fd = pstdin_fd,
-		.pstdout_fd = pstdout_fd,
-		.pstderr_fd = pstderr_fd,
-		.pchild_pid = pchild_pid,
-	};
-	return minijail_run_internal(j, &config, &status);
+	return minijail_run_config_internal(j, &config);
 }
 
 int API minijail_run_env_pid_pipes_no_preload(struct minijail *j,
@@ -2658,39 +2707,29 @@ int API minijail_run_env_pid_pipes_no_preload(struct minijail *j,
 					      int *pstdout_fd, int *pstderr_fd)
 {
 	struct minijail_run_config config = {
-		.filename = filename,
-		.argv = argv,
-		.envp = envp,
-		.use_preload = false,
-		.exec_in_child = true,
+	    .filename = filename,
+	    .argv = argv,
+	    .envp = envp,
+	    .use_preload = false,
+	    .exec_in_child = true,
+	    .pstdin_fd = pstdin_fd,
+	    .pstdout_fd = pstdout_fd,
+	    .pstderr_fd = pstderr_fd,
+	    .pchild_pid = pchild_pid,
 	};
-	struct minijail_run_status status = {
-		.pstdin_fd = pstdin_fd,
-		.pstdout_fd = pstdout_fd,
-		.pstderr_fd = pstderr_fd,
-		.pchild_pid = pchild_pid,
-	};
-	return minijail_run_internal(j, &config, &status);
+	return minijail_run_config_internal(j, &config);
 }
 
 pid_t API minijail_fork(struct minijail *j)
 {
 	struct minijail_run_config config = {};
-	struct minijail_run_status status = {};
-	return minijail_run_internal(j, &config, &status);
+	return minijail_run_config_internal(j, &config);
 }
 
 static int minijail_run_internal(struct minijail *j,
 				 const struct minijail_run_config *config,
-				 struct minijail_run_status *status_out)
+				 struct minijail_run_state *state_out)
 {
-	char *oldenv, *oldenv_copy = NULL;
-	pid_t child_pid;
-	int pipe_fds[2];
-	int stdin_fds[2];
-	int stdout_fds[2];
-	int stderr_fds[2];
-	int child_sync_pipe_fds[2];
 	int sync_child = 0;
 	int ret;
 	/* We need to remember this across the minijail_preexec() call. */
@@ -2710,10 +2749,10 @@ static int minijail_run_internal(struct minijail *j,
 		if (config->envp != NULL)
 			die("cannot pass a new environment with LD_PRELOAD");
 
-		oldenv = getenv(kLdPreloadEnvVar);
+		char *oldenv = getenv(kLdPreloadEnvVar);
 		if (oldenv) {
-			oldenv_copy = strdup(oldenv);
-			if (!oldenv_copy)
+			state_out->oldenv = strdup(oldenv);
+			if (!state_out->oldenv)
 				return -ENOMEM;
 		}
 
@@ -2734,35 +2773,24 @@ static int minijail_run_internal(struct minijail *j,
 		 * Before we fork(2) and execve(2) the child process, we need
 		 * to open a pipe(2) to send the minijail configuration over.
 		 */
-		if (setup_pipe(pipe_fds))
+		if (setup_pipe(state_out->pipe_fds))
 			return -EFAULT;
 	}
 
-	/*
-	 * If we want to write to the child process' standard input,
-	 * create the pipe(2) now.
-	 */
-	if (status_out->pstdin_fd) {
-		if (pipe(stdin_fds))
-			return -EFAULT;
-	}
+	/* Create pipes for stdin/stdout/stderr as requested by caller. */
+	struct {
+		bool requested;
+		int *pipe_fds;
+	} pipe_fd_req[] = {
+	    {config->pstdin_fd != NULL, state_out->stdin_fds},
+	    {config->pstdout_fd != NULL, state_out->stdout_fds},
+	    {config->pstderr_fd != NULL, state_out->stderr_fds},
+	};
 
-	/*
-	 * If we want to read from the child process' standard output,
-	 * create the pipe(2) now.
-	 */
-	if (status_out->pstdout_fd) {
-		if (pipe(stdout_fds))
-			return -EFAULT;
-	}
-
-	/*
-	 * If we want to read from the child process' standard error,
-	 * create the pipe(2) now.
-	 */
-	if (status_out->pstderr_fd) {
-		if (pipe(stderr_fds))
-			return -EFAULT;
+	for (size_t i = 0; i < ARRAY_SIZE(pipe_fd_req); ++i) {
+		if (pipe_fd_req[i].requested &&
+		    pipe(pipe_fd_req[i].pipe_fds) == -1)
+			return EFAULT;
 	}
 
 	/*
@@ -2773,7 +2801,7 @@ static int minijail_run_internal(struct minijail *j,
 	if (j->flags.forward_signals || j->flags.pid_file || j->flags.cgroups ||
 	    j->rlimit_count || j->flags.userns) {
 		sync_child = 1;
-		if (pipe(child_sync_pipe_fds))
+		if (pipe(state_out->child_sync_pipe_fds))
 			return -EFAULT;
 	}
 
@@ -2818,6 +2846,7 @@ static int minijail_run_internal(struct minijail *j,
 	 * problem is fixable or not. It would be nice if we worked in this
 	 * case.
 	 */
+	pid_t child_pid;
 	if (pid_namespace) {
 		unsigned long clone_flags = CLONE_NEWPID | SIGCHLD;
 		if (j->flags.userns)
@@ -2838,12 +2867,12 @@ static int minijail_run_internal(struct minijail *j,
 			pdie("fork failed");
 	}
 
+	state_out->child_pid = child_pid;
 	if (child_pid) {
 		if (use_preload) {
 			/* Restore parent's LD_PRELOAD. */
-			if (oldenv_copy) {
-				setenv(kLdPreloadEnvVar, oldenv_copy, 1);
-				free(oldenv_copy);
+			if (state_out->oldenv) {
+				setenv(kLdPreloadEnvVar, state_out->oldenv, 1);
 			} else {
 				unsetenv(kLdPreloadEnvVar);
 			}
@@ -2876,7 +2905,7 @@ static int minijail_run_internal(struct minijail *j,
 			close(j->netns_fd);
 
 		if (sync_child)
-			parent_setup_complete(child_sync_pipe_fds);
+			parent_setup_complete(state_out->child_sync_pipe_fds);
 
 		if (use_preload) {
 			/*
@@ -2897,9 +2926,9 @@ static int minijail_run_internal(struct minijail *j,
 				pdie("sigprocmask failed");
 
 			/* Send marshalled minijail. */
-			close(pipe_fds[0]); /* read endpoint */
-			ret = minijail_to_fd(j, pipe_fds[1]);
-			close(pipe_fds[1]); /* write endpoint */
+			close_and_reset(&state_out->pipe_fds[0]);
+			ret = minijail_to_fd(j, state_out->pipe_fds[1]);
+			close_and_reset(&state_out->pipe_fds[1]);
 
 			/* Accept any pending SIGPIPE. */
 			while (true) {
@@ -2925,44 +2954,10 @@ static int minijail_run_internal(struct minijail *j,
 			}
 		}
 
-		if (status_out->pchild_pid)
-			*status_out->pchild_pid = child_pid;
-
-		/*
-		 * If we want to write to the child process' standard input,
-		 * set up the write end of the pipe.
-		 */
-		if (status_out->pstdin_fd)
-			*status_out->pstdin_fd =
-				setup_pipe_end(stdin_fds, 1 /* write end */);
-
-		/*
-		 * If we want to read from the child process' standard output,
-		 * set up the read end of the pipe.
-		 */
-		if (status_out->pstdout_fd)
-			*status_out->pstdout_fd =
-				setup_pipe_end(stdout_fds, 0 /* read end */);
-
-		/*
-		 * If we want to read from the child process' standard error,
-		 * set up the read end of the pipe.
-		 */
-		if (status_out->pstderr_fd)
-			*status_out->pstderr_fd =
-				setup_pipe_end(stderr_fds, 0 /* read end */);
-
-		/*
-		 * If forking return the child pid, in the normal exec case
-		 * return 0 for success.
-		 */
-		if (!config->exec_in_child)
-			return child_pid;
 		return 0;
 	}
-	/* Child process. */
-	free(oldenv_copy);
 
+	/* Child process. */
 	if (j->flags.reset_signal_mask) {
 		sigset_t signal_mask;
 		if (sigemptyset(&signal_mask) != 0)
@@ -2990,26 +2985,20 @@ static int minijail_run_internal(struct minijail *j,
 		const size_t kMaxInheritableFdsSize = 10 + MAX_PRESERVED_FDS;
 		int inheritable_fds[kMaxInheritableFdsSize];
 		size_t size = 0;
-		size_t i;
-		if (use_preload) {
-			inheritable_fds[size++] = pipe_fds[0];
-			inheritable_fds[size++] = pipe_fds[1];
-		}
-		if (sync_child) {
-			inheritable_fds[size++] = child_sync_pipe_fds[0];
-			inheritable_fds[size++] = child_sync_pipe_fds[1];
-		}
-		if (status_out->pstdin_fd) {
-			inheritable_fds[size++] = stdin_fds[0];
-			inheritable_fds[size++] = stdin_fds[1];
-		}
-		if (status_out->pstdout_fd) {
-			inheritable_fds[size++] = stdout_fds[0];
-			inheritable_fds[size++] = stdout_fds[1];
-		}
-		if (status_out->pstderr_fd) {
-			inheritable_fds[size++] = stderr_fds[0];
-			inheritable_fds[size++] = stderr_fds[1];
+
+		int *pipe_fds[] = {
+		    state_out->pipe_fds,   state_out->child_sync_pipe_fds,
+		    state_out->stdin_fds,  state_out->stdout_fds,
+		    state_out->stderr_fds,
+		};
+
+		for (size_t i = 0; i < ARRAY_SIZE(pipe_fds); ++i) {
+			if (pipe_fds[i][0] != -1) {
+				inheritable_fds[size++] = pipe_fds[i][0];
+			}
+			if (pipe_fds[i][1] != -1) {
+				inheritable_fds[size++] = pipe_fds[i][1];
+			}
 		}
 
 		/*
@@ -3022,7 +3011,7 @@ static int minijail_run_internal(struct minijail *j,
 		if (j->flags.enter_net)
 			minijail_preserve_fd(j, j->netns_fd, j->netns_fd);
 
-		for (i = 0; i < j->preserved_fd_count; i++) {
+		for (size_t i = 0; i < j->preserved_fd_count; i++) {
 			/*
 			 * Preserve all parent_fds. They will be dup2(2)-ed in
 			 * the child later.
@@ -3038,56 +3027,12 @@ static int minijail_run_internal(struct minijail *j,
 		die("failed to set up fd redirections");
 
 	if (sync_child)
-		wait_for_parent_setup(child_sync_pipe_fds);
+		wait_for_parent_setup(state_out->child_sync_pipe_fds);
 
 	if (j->flags.userns)
 		enter_user_namespace(j);
 
-	/*
-	 * If we want to write to the jailed process' standard input,
-	 * set up the read end of the pipe.
-	 */
-	if (status_out->pstdin_fd) {
-		if (dupe_and_close_fd(stdin_fds, 0 /* read end */,
-                          STDIN_FILENO) < 0)
-			die("failed to set up stdin pipe");
-	}
-
-	/*
-	 * If we want to read from the jailed process' standard output,
-	 * set up the write end of the pipe.
-	 */
-	if (status_out->pstdout_fd) {
-		if (dupe_and_close_fd(stdout_fds, 1 /* write end */,
-                          STDOUT_FILENO) < 0)
-			die("failed to set up stdout pipe");
-	}
-
-	/*
-	 * If we want to read from the jailed process' standard error,
-	 * set up the write end of the pipe.
-	 */
-	if (status_out->pstderr_fd) {
-		if (dupe_and_close_fd(stderr_fds, 1 /* write end */,
-                          STDERR_FILENO) < 0)
-			die("failed to set up stderr pipe");
-	}
-
-	/*
-	 * If any of stdin, stdout, or stderr are TTYs, or setsid flag is
-	 * set, create a new session. This prevents the jailed process from
-	 * using the TIOCSTI ioctl to push characters into the parent process
-	 * terminal's input buffer, therefore escaping the jail.
-	 *
-	 * Since it has just forked, the child will not be a process group
-	 * leader, and this call to setsid() should always succeed.
-	 */
-	if (j->flags.setsid || isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) ||
-	    isatty(STDERR_FILENO)) {
-		if (setsid() < 0) {
-			pdie("setsid() failed");
-		}
-	}
+	setup_child_std_fds(j, state_out);
 
 	/* If running an init program, let it decide when/how to mount /proc. */
 	if (pid_namespace && !do_init)
@@ -3127,18 +3072,29 @@ static int minijail_run_internal(struct minijail *j,
 		if (child_pid < 0) {
 			_exit(child_pid);
 		} else if (child_pid > 0) {
+			minijail_free_run_state(state_out);
+
 			/*
 			 * Best effort. Don't bother checking the return value.
 			 */
 			prctl(PR_SET_NAME, "minijail-init");
 			init(child_pid);	/* Never returns. */
 		}
+		state_out->child_pid = child_pid;
 	}
 
 	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_EXECVE);
 
 	if (!config->exec_in_child)
 		return 0;
+
+	/*
+	 * We're going to execve(), so make sure any remaining resources are
+	 * freed. The exception is the read side of the LD_PRELOAD pipe, which
+	 * we need to hand down into the target.
+	 */
+	state_out->pipe_fds[0] = -1;
+	minijail_free_run_state(state_out);
 
 	/*
 	 * If not using LD_PRELOAD, support passing a new environment instead of
@@ -3166,6 +3122,51 @@ static int minijail_run_internal(struct minijail *j,
 	ret = (errno == ENOENT ? MINIJAIL_ERR_NO_COMMAND : MINIJAIL_ERR_NO_ACCESS);
 	pwarn("execve(%s) failed", config->filename);
 	_exit(ret);
+}
+
+static int
+minijail_run_config_internal(struct minijail *j,
+			     const struct minijail_run_config *config)
+{
+	struct minijail_run_state state = {
+	    .oldenv = NULL,
+	    .child_pid = -1,
+	    .pipe_fds = {-1, -1},
+	    .stdin_fds = {-1, -1},
+	    .stdout_fds = {-1, -1},
+	    .stderr_fds = {-1, -1},
+	    .child_sync_pipe_fds = {-1, -1},
+	};
+	int ret = minijail_run_internal(j, config, &state);
+
+	if (ret == 0) {
+		if (config->pchild_pid)
+			*config->pchild_pid = state.child_pid;
+
+		/* Grab stdin/stdout/stderr descriptors requested by caller. */
+		struct {
+			int *pfd;
+			int *psrc;
+		} fd_map[] = {
+		    {config->pstdin_fd, &state.stdin_fds[1]},
+		    {config->pstdout_fd, &state.stdout_fds[0]},
+		    {config->pstderr_fd, &state.stderr_fds[0]},
+		};
+
+		for (size_t i = 0; i < ARRAY_SIZE(fd_map); ++i) {
+			if (fd_map[i].pfd) {
+				*fd_map[i].pfd = *fd_map[i].psrc;
+				*fd_map[i].psrc = -1;
+			}
+		}
+
+		if (!config->exec_in_child)
+			ret = state.child_pid;
+	}
+
+	minijail_free_run_state(&state);
+
+	return ret;
 }
 
 int API minijail_kill(struct minijail *j)
