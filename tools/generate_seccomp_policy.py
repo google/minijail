@@ -117,8 +117,12 @@ def parse_trace_file(trace_filename, syscalls, arg_inspection):
                 arg_inspection[syscall].value_set.add(arg_value)
 
 
-def main(argv):
+def main(argv=None):
     """Main entrypoint."""
+
+    if argv is None:
+        argv = sys.argv[1:]
+
     opts = parse_args(argv)
 
     syscalls = collections.defaultdict(int)

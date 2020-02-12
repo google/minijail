@@ -37,12 +37,6 @@ profile-guided optimization of the generated BPF code.
 The generated BPF code can be analyzed using
 [libseccomp](https://github.com/seccomp/libseccomp)'s `tools/scmp_bpf_disasm`.
 
-*** note
-**Note:** This tool is currently only supported for native and Android builds.
-In Chrome OS builds, the build-time generation of arch-specific `constants.json`
-is not yet enabled.
-***
-
 ### Sample usage
 
 ```shell
