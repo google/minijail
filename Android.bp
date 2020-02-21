@@ -430,4 +430,9 @@ rust_library_host_rlib {
     shared_libs: [
         "libcap",
     ],
+    target: {
+        darwin: {
+            enabled: false,
+        }
+    },
 }
