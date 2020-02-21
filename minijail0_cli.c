@@ -72,6 +72,41 @@ static void set_group(struct minijail *j, const char *arg, gid_t *out_gid)
 	}
 }
 
+/*
+ * Helper function used by --add-suppl-group (possibly more than once),
+ * to build the supplementary gids array.
+ */
+static void suppl_group_add(size_t *suppl_gids_count, gid_t **suppl_gids,
+                            char *arg) {
+	char *end = NULL;
+	int groupid = strtod(arg, &end);
+	gid_t gid;
+	if (!*end && *arg) {
+		/* A gid number has been specified, proceed. */
+		gid = groupid;
+	} else if (lookup_group(arg, &gid)) {
+		/*
+		 * A group name has been specified,
+		 * but doesn't exist: we bail out.
+		 */
+		fprintf(stderr, "Bad group: '%s'\n", arg);
+		exit(1);
+	}
+
+	/*
+	 * From here, gid is guaranteed to be set and valid,
+	 * we add it to our supplementary gids array.
+	 */
+	*suppl_gids = realloc(*suppl_gids,
+			      sizeof(gid_t) * ++(*suppl_gids_count));
+	if (!suppl_gids) {
+		fprintf(stderr, "failed to allocate memory.\n");
+		exit(1);
+	}
+
+	(*suppl_gids)[*suppl_gids_count - 1] = gid;
+}
+
 static void skip_securebits(struct minijail *j, const char *arg)
 {
 	uint64_t securebits_skip_mask;
@@ -496,10 +531,13 @@ static void usage(const char *progn)
 	       "  -e[file]:     Enter new network namespace, or existing one if |file| is provided.\n"
 	       "  -f <file>:    Write the pid of the jailed process to <file>.\n"
 	       "  -g <group>:   Change gid to <group>.\n"
-	       "  -G:           Inherit supplementary groups from uid.\n"
-	       "                Not compatible with -y.\n"
-	       "  -y:           Keep uid's supplementary groups.\n"
-	       "                Not compatible with -G.\n"
+	       "  -G:           Inherit supplementary groups from new uid.\n"
+	       "                Not compatible with -y or --add-suppl-group.\n"
+	       "  -y:           Keep original uid's supplementary groups.\n"
+	       "                Not compatible with -G or --add-suppl-group.\n"
+	       "  --add-suppl-group <g>:Add <g> to the proccess' supplementary groups,\n"
+	       "                can be specified multiple times to add several groups.\n"
+	       "                Not compatible with -y or -G.\n"
 	       "  -h:           Help (this message).\n"
 	       "  -H:           Seccomp filter help message.\n"
 	       "  -i:           Exit immediately after fork(2). The jailed process will run\n"
@@ -592,6 +630,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	bool use_uid = false, use_gid = false;
 	uid_t uid = 0;
 	gid_t gid = 0;
+	gid_t *suppl_gids = NULL;
+	size_t suppl_gids_count = 0;
 	char *uidmap = NULL, *gidmap = NULL;
 	int set_uidmap = 0, set_gidmap = 0;
 	size_t tmp_size = 0;
@@ -610,6 +650,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		{"profile", required_argument, 0, 131},
 		{"preload-library", required_argument, 0, 132},
 		{"seccomp-bpf-binary", required_argument, 0, 133},
+		{"add-suppl-group", required_argument, 0, 134},
 		{0, 0, 0, 0},
 	};
 	/* clang-format on */
@@ -863,6 +904,10 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			filter_path = optarg;
 			use_seccomp_filter_binary = 1;
 			break;
+		case 134:
+			suppl_group_add(&suppl_gids_count, &suppl_gids,
+			                optarg);
+			break;
 		default:
 			usage(argv[0]);
 			exit(opt == 'h' ? 0 : 1);
@@ -922,6 +967,16 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				"without -v (new mount namespace).\n"
 				"Do you need to add '-v' explicitly?\n");
 		exit(1);
+	}
+
+	/*
+	 * Proceed in setting the supplementary gids specified on the
+	 * cmdline options.
+	 */
+	if (suppl_gids_count) {
+		minijail_set_supplementary_gids(j, suppl_gids_count,
+		                                suppl_gids);
+		free(suppl_gids);
 	}
 
 	/*
