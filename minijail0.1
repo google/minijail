@@ -59,14 +59,18 @@ network namespace specified by \fIfile\fR which is typically of the form
 \fB-f <file>\fR
 Write the pid of the jailed process to \fIfile\fR.
 .TP
-\fB-g <group>\fR
-Change groups to \fIgroup\fR, which may be either a group name or a numeric
-group ID.
+\fB-g <group|gid>
+Change groups to the specified \fIgroup\fR name, or numeric group ID \fIgid\fR.
 .TP
 \fB-G\fR
 Inherit all the supplementary groups of the user specified with \fB-u\fR. It
 is an error to use this option without having specified a \fBuser name\fR to
 \fB-u\fR.
+.TP
+\fB--add-suppl-group <group|gid>\fR
+Add the specified \fIgroup\fR name, or numeric group ID \fIgid\fR,
+to the process' supplementary groups list. Can be specified
+multiple times to add several groups. Incompatible with -y and -G.
 .TP
 \fB-h\fR
 Print a help message.
@@ -241,9 +245,8 @@ program is executed. Type 'dynamic' will force minijail0 to preload
 \fIlibminijailpreload.so\fR to setup hooks, but will fail on actually
 statically-linked binaries.
 .TP
-\fB-u <user>\fR
-Change users to \fIuser\fR, which may be either a user name or a numeric user
-ID.
+\fB-u <user|uid>\fR
+Change users to the specified \fIuser\fR name, or numeric user ID \fIuid\fR.
 .TP
 \fB-U\fR
 Enter a new user namespace (implies \fB-p\fR).

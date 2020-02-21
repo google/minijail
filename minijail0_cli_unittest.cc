@@ -158,6 +158,36 @@ TEST_F(CliTest, invalid_set_group) {
               "-g provided multiple times");
 }
 
+// Valid calls to the add-suppl-group option.
+TEST_F(CliTest, valid_add_supp_group) {
+  std::vector<std::string> argv = {"--add-suppl-group", "", "/bin/sh"};
+
+  argv[1] = kValidGroup;
+  ASSERT_TRUE(parse_args_(argv));
+
+  argv[1] = kValidGid;
+  ASSERT_TRUE(parse_args_(argv));
+
+  std::vector<std::string> argv2 = {"--add-suppl-group", "",
+                                    "--add-suppl-group", "", "/bin/sh"};
+  argv[1] = kValidGroup;
+  argv[2] = kValidGid;
+  ASSERT_TRUE(parse_args_(argv));
+}
+
+// Invalid calls to the add-suppl-group option.
+TEST_F(CliTest, invalid_add_supp_group) {
+  std::vector<std::string> argv = {"--add-suppl-group", "", "/bin/sh"};
+
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  argv[1] = "j;lX:J*Pj;oijfs;jdlkjC;j";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  argv[1] = "1000x";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+}
+
 // Valid calls to the skip securebits option.
 TEST_F(CliTest, valid_skip_securebits) {
   // An empty string is the same as 0.
