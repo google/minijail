@@ -395,7 +395,8 @@ int lookup_user(const char *user, uid_t *uid, gid_t *gid)
 	buf = malloc(sz);
 	if (!buf)
 		return -ENOMEM;
-	getpwnam_r(user, &pw, buf, sz, &ppw);
+
+	int ret = getpwnam_r(user, &pw, buf, sz, &ppw);
 	/*
 	 * We're safe to free the buffer here. The strings inside |pw| point
 	 * inside |buf|, but we don't use any of them; this leaves the pointers
@@ -403,9 +404,11 @@ int lookup_user(const char *user, uid_t *uid, gid_t *gid)
 	 * succeeded.
 	 */
 	free(buf);
-	/* getpwnam_r(3) does *not* set errno when |ppw| is NULL. */
+
+	if (ret != 0)
+		return -ret;  /* Error */
 	if (!ppw)
-		return -1;
+		return -ENOENT;  /* Not found */
 
 	*uid = ppw->pw_uid;
 	*gid = ppw->pw_gid;
@@ -431,16 +434,18 @@ int lookup_group(const char *group, gid_t *gid)
 	buf = malloc(sz);
 	if (!buf)
 		return -ENOMEM;
-	getgrnam_r(group, &gr, buf, sz, &pgr);
+	int ret = getgrnam_r(group, &gr, buf, sz, &pgr);
 	/*
 	 * We're safe to free the buffer here. The strings inside gr point
 	 * inside buf, but we don't use any of them; this leaves the pointers
 	 * dangling but it's safe. pgr points at gr if getgrnam_r succeeded.
 	 */
 	free(buf);
-	/* getgrnam_r(3) does *not* set errno when |pgr| is NULL. */
+
+	if (ret != 0)
+		return -ret;  /* Error */
 	if (!pgr)
-		return -1;
+		return -ENOENT;  /* Not found */
 
 	*gid = pgr->gr_gid;
 	return 0;
