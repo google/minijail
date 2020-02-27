@@ -40,13 +40,16 @@ static void set_user(struct minijail *j, const char *arg, uid_t *out_uid,
 		return;
 	}
 
-	if (lookup_user(arg, out_uid, out_gid)) {
-		fprintf(stderr, "Bad user: '%s'\n", arg);
+	int ret = lookup_user(arg, out_uid, out_gid);
+	if (ret) {
+		fprintf(stderr, "Bad user '%s': %s\n", arg, strerror(-ret));
 		exit(1);
 	}
 
-	if (minijail_change_user(j, arg)) {
-		fprintf(stderr, "Bad user: '%s'\n", arg);
+	ret = minijail_change_user(j, arg);
+	if (ret) {
+		fprintf(stderr, "minijail_change_user('%s') failed: %s\n", arg,
+			strerror(-ret));
 		exit(1);
 	}
 }
@@ -61,15 +64,13 @@ static void set_group(struct minijail *j, const char *arg, gid_t *out_gid)
 		return;
 	}
 
-	if (lookup_group(arg, out_gid)) {
-		fprintf(stderr, "Bad group: '%s'\n", arg);
+	int ret = lookup_group(arg, out_gid);
+	if (ret) {
+		fprintf(stderr, "Bad group '%s': %s\n", arg, strerror(-ret));
 		exit(1);
 	}
 
-	if (minijail_change_group(j, arg)) {
-		fprintf(stderr, "Bad group: '%s'\n", arg);
-		exit(1);
-	}
+	minijail_change_gid(j, *out_gid);
 }
 
 /*
@@ -81,15 +82,16 @@ static void suppl_group_add(size_t *suppl_gids_count, gid_t **suppl_gids,
 	char *end = NULL;
 	int groupid = strtod(arg, &end);
 	gid_t gid;
+	int ret;
 	if (!*end && *arg) {
 		/* A gid number has been specified, proceed. */
 		gid = groupid;
-	} else if (lookup_group(arg, &gid)) {
+	} else if ((ret = lookup_group(arg, &gid))) {
 		/*
 		 * A group name has been specified,
 		 * but doesn't exist: we bail out.
 		 */
-		fprintf(stderr, "Bad group: '%s'\n", arg);
+		fprintf(stderr, "Bad group '%s': %s\n", arg, strerror(-ret));
 		exit(1);
 	}
 
