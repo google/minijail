@@ -957,5 +957,86 @@ const struct syscall_entry syscall_table[] = {
 #ifdef __NR_seccomp
 { "seccomp", __NR_seccomp },
 #endif
+#ifdef __NR_getrandom
+{ "getrandom", __NR_getrandom },
+#endif
+#ifdef __NR_memfd_create
+{ "memfd_create", __NR_memfd_create },
+#endif
+#ifdef __NR_kexec_file_load
+{ "kexec_file_load", __NR_kexec_file_load },
+#endif
+#ifdef __NR_bpf
+{ "bpf", __NR_bpf },
+#endif
+#ifdef __NR_execveat
+{ "execveat", __NR_execveat },
+#endif
+#ifdef __NR_userfaultfd
+{ "userfaultfd", __NR_userfaultfd },
+#endif
+#ifdef __NR_membarrier
+{ "membarrier", __NR_membarrier },
+#endif
+#ifdef __NR_mlock2
+{ "mlock2", __NR_mlock2 },
+#endif
+#ifdef __NR_copy_file_range
+{ "copy_file_range", __NR_copy_file_range },
+#endif
+#ifdef __NR_preadv2
+{ "preadv2", __NR_preadv2 },
+#endif
+#ifdef __NR_pwritev2
+{ "pwritev2", __NR_pwritev2 },
+#endif
+#ifdef __NR_pkey_mprotect
+{ "pkey_mprotect", __NR_pkey_mprotect },
+#endif
+#ifdef __NR_pkey_alloc
+{ "pkey_alloc", __NR_pkey_alloc },
+#endif
+#ifdef __NR_pkey_free
+{ "pkey_free", __NR_pkey_free },
+#endif
+#ifdef __NR_statx
+{ "statx", __NR_statx },
+#endif
+#ifdef __NR_io_pgetevents
+{ "io_pgetevents", __NR_io_pgetevents },
+#endif
+#ifdef __NR_rseq
+{ "rseq", __NR_rseq },
+#endif
+#ifdef __NR_pidfd_send_signal
+{ "pidfd_send_signal", __NR_pidfd_send_signal },
+#endif
+#ifdef __NR_io_uring_setup
+{ "io_uring_setup", __NR_io_uring_setup },
+#endif
+#ifdef __NR_io_uring_enter
+{ "io_uring_enter", __NR_io_uring_enter },
+#endif
+#ifdef __NR_io_uring_register
+{ "io_uring_register", __NR_io_uring_register },
+#endif
+#ifdef __NR_open_tree
+{ "open_tree", __NR_open_tree },
+#endif
+#ifdef __NR_move_mount
+{ "move_mount", __NR_move_mount },
+#endif
+#ifdef __NR_fsopen
+{ "fsopen", __NR_fsopen },
+#endif
+#ifdef __NR_fsconfig
+{ "fsconfig", __NR_fsconfig },
+#endif
+#ifdef __NR_fsmount
+{ "fsmount", __NR_fsmount },
+#endif
+#ifdef __NR_fspick
+{ "fspick", __NR_fspick },
+#endif
   { NULL, -1 },
 };
