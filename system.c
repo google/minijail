@@ -48,6 +48,10 @@
 _Static_assert(SECURE_ALL_BITS == 0x55, "SECURE_ALL_BITS == 0x55.");
 #endif
 
+/* Used by lookup_(user|group) functions. */
+#define MAX_PWENT_SZ (1 << 20)
+#define MAX_GRENT_SZ (1 << 20)
+
 int secure_noroot_set_and_locked(uint64_t mask)
 {
 	return (mask & (SECBIT_NOROOT | SECBIT_NOROOT_LOCKED)) ==
@@ -384,35 +388,45 @@ int lookup_user(const char *user, uid_t *uid, gid_t *gid)
 	char *buf = NULL;
 	struct passwd pw;
 	struct passwd *ppw = NULL;
+	/*
+	 * sysconf(_SC_GETPW_R_SIZE_MAX), under glibc, is documented to return
+	 * a suggested starting size for the buffer, so let's try getting this
+	 * size first, and fallback to a default othersise.
+	 */
 	ssize_t sz = sysconf(_SC_GETPW_R_SIZE_MAX);
 	if (sz == -1)
 		sz = 65536; /* your guess is as good as mine... */
 
-	/*
-	 * sysconf(_SC_GETPW_R_SIZE_MAX), under glibc, is documented to return
-	 * the maximum needed size of the buffer, so we don't have to search.
-	 */
-	buf = malloc(sz);
-	if (!buf)
-		return -ENOMEM;
+	do {
+		buf = malloc(sz);
+		if (!buf)
+			return -ENOMEM;
+		int err = getpwnam_r(user, &pw, buf, sz, &ppw);
+		/*
+		 * We're safe to free the buffer here. The strings inside |pw|
+		 * point inside |buf|, but we don't use any of them; this leaves
+		 * the pointers dangling but it's safe.
+		 * |ppw| points at |pw| if getpwnam_r(3) succeeded.
+		 */
+		free(buf);
+		if (err == ERANGE) {
+			/* |buf| was too small, retry with a bigger one. */
+			sz <<= 1;
+		} else if (err != 0) {
+			/* We got an error not related to the size of |buf|. */
+			return -err;
+		} else if (!ppw) {
+			/* Not found. */
+			return -ENOENT;
+		} else {
+			*uid = ppw->pw_uid;
+			*gid = ppw->pw_gid;
+			return 0;
+		}
+	} while (sz <= MAX_PWENT_SZ);
 
-	int ret = getpwnam_r(user, &pw, buf, sz, &ppw);
-	/*
-	 * We're safe to free the buffer here. The strings inside |pw| point
-	 * inside |buf|, but we don't use any of them; this leaves the pointers
-	 * dangling but it's safe. |ppw| points at |pw| if getpwnam_r(3)
-	 * succeeded.
-	 */
-	free(buf);
-
-	if (ret != 0)
-		return -ret;  /* Error */
-	if (!ppw)
-		return -ENOENT;  /* Not found */
-
-	*uid = ppw->pw_uid;
-	*gid = ppw->pw_gid;
-	return 0;
+	/* A buffer of size MAX_PWENT_SZ is still too small, return an error. */
+	return -ERANGE;
 }
 
 /*
@@ -423,32 +437,44 @@ int lookup_group(const char *group, gid_t *gid)
 	char *buf = NULL;
 	struct group gr;
 	struct group *pgr = NULL;
+	/*
+	 * sysconf(_SC_GETGR_R_SIZE_MAX), under glibc, is documented to return
+	 * a suggested starting size for the buffer, so let's try getting this
+	 * size first, and fallback to a default otherwise.
+	 */
 	ssize_t sz = sysconf(_SC_GETGR_R_SIZE_MAX);
 	if (sz == -1)
 		sz = 65536; /* and mine is as good as yours, really */
 
-	/*
-	 * sysconf(_SC_GETGR_R_SIZE_MAX), under glibc, is documented to return
-	 * the maximum needed size of the buffer, so we don't have to search.
-	 */
-	buf = malloc(sz);
-	if (!buf)
-		return -ENOMEM;
-	int ret = getgrnam_r(group, &gr, buf, sz, &pgr);
-	/*
-	 * We're safe to free the buffer here. The strings inside gr point
-	 * inside buf, but we don't use any of them; this leaves the pointers
-	 * dangling but it's safe. pgr points at gr if getgrnam_r succeeded.
-	 */
-	free(buf);
+	do {
+		buf = malloc(sz);
+		if (!buf)
+			return -ENOMEM;
+		int err = getgrnam_r(group, &gr, buf, sz, &pgr);
+		/*
+		 * We're safe to free the buffer here. The strings inside |gr|
+		 * point inside |buf|, but we don't use any of them; this leaves
+		 * the pointers dangling but it's safe.
+		 * |pgr| points at |gr| if getgrnam_r(3) succeeded.
+		 */
+		free(buf);
+		if (err == ERANGE) {
+			/* |buf| was too small, retry with a bigger one. */
+			sz <<= 1;
+		} else if (err != 0) {
+			/* We got an error not related to the size of |buf|. */
+			return -err;
+		} else if (!pgr) {
+			/* Not found. */
+			return -ENOENT;
+		} else {
+			*gid = pgr->gr_gid;
+			return 0;
+		}
+	} while (sz <= MAX_GRENT_SZ);
 
-	if (ret != 0)
-		return -ret;  /* Error */
-	if (!pgr)
-		return -ENOENT;  /* Not found */
-
-	*gid = pgr->gr_gid;
-	return 0;
+	/* A buffer of size MAX_GRENT_SZ is still too small, return an error. */
+	return -ERANGE;
 }
 
 static int seccomp_action_is_available(const char *wanted)
