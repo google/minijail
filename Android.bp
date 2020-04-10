@@ -59,6 +59,11 @@ cc_object {
         "-Wall",
         "-Werror",
     ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.adbd",
+        "com.android.media.swcodec",
+    ],
 }
 
 cc_genrule {
@@ -69,6 +74,11 @@ cc_genrule {
     cmd: "$(location gen_syscalls.sh) $(in) $(out)",
     srcs: [":libminijail_gen_syscall_obj"],
     out: ["libsyscalls.c"],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.adbd",
+        "com.android.media.swcodec",
+    ],
 }
 
 cc_object {
@@ -82,6 +92,11 @@ cc_object {
         "-Wall",
         "-Werror",
     ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.adbd",
+        "com.android.media.swcodec",
+    ],
 }
 
 cc_genrule {
@@ -92,6 +107,11 @@ cc_genrule {
     cmd: "$(location gen_constants.sh) $(in) $(out)",
     srcs: [":libminijail_gen_constants_obj"],
     out: ["libconstants.c"],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.adbd",
+        "com.android.media.swcodec",
+    ],
 }
 
 cc_library_static {
@@ -115,6 +135,11 @@ cc_library_static {
             ],
         },
     },
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.adbd",
+        "com.android.media.swcodec",
+    ],
 }
 
 cc_object {
@@ -191,6 +216,11 @@ cc_library {
             ],
         },
     },
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.adbd",
+        "com.android.media.swcodec",
+    ],
 }
 
 // Example ASan-ified libminijail shared library for target.
