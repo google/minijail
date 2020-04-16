@@ -314,6 +314,88 @@ TEST(WaitTest, can_wait_only_once) {
   EXPECT_EQ(minijail_wait(j.get()), -ECHILD);
 }
 
+TEST(Test, minijail_preserve_fd_no_leak) {
+  const ScopedMinijail j(minijail_new());
+  char* const script = R"(
+      echo Hi >&1;
+      exec 1>&-;
+      read line1;
+      read line2;
+      echo "$line1$line2 and Goodbye" >&2;
+      exit 42;
+    )";
+  char* const argv[] = {"sh", "-c", script, nullptr};
+
+  const int npipes = 3;
+  int fds[npipes][2];
+
+  // Create pipes.
+  for (int i = 0; i < npipes; ++i) {
+    ASSERT_EQ(pipe(fds[i]), 0);
+  }
+
+  // All pipes are output pipes except for the first one which is used as
+  // input pipe.
+  std::swap(fds[0][0], fds[0][1]);
+
+  for (int i = 0; i < npipes; ++i) {
+    const int fd = fds[i][1];
+    minijail_preserve_fd(j.get(), fd, i);
+  }
+
+  minijail_close_open_fds(j.get());
+
+  EXPECT_EQ(minijail_run_no_preload(j.get(), kShellPath, argv), 0);
+
+  // Close unused end of pipes.
+  for (int i = 0; i < npipes; ++i) {
+    const int fd = fds[i][1];
+    ASSERT_EQ(close(fd), 0);
+  }
+
+  const int in = fds[0][0];
+  const int out = fds[1][0];
+  const int err = fds[2][0];
+
+  char buf[PIPE_BUF];
+  ssize_t nbytes;
+
+  // Check that stdout pipe works.
+  nbytes = read(out, buf, PIPE_BUF);
+  ASSERT_GT(nbytes, 0);
+  EXPECT_EQ(std::string(buf, nbytes), "Hi\n");
+
+  // Check that the write end of stdout pipe got closed by the child process. If
+  // the child process kept other file descriptors connected to stdout, then the
+  // parent process wouldn't be able to detect that all write ends of this pipe
+  // are closed and it would block here.
+  EXPECT_EQ(read(out, buf, PIPE_BUF), 0);
+  ASSERT_EQ(close(out), 0);
+
+  // Check that stdin pipe works.
+  const std::string s = "Greetings\n";
+  EXPECT_EQ(write(in, s.data(), s.size()), s.size());
+
+  // Close write end of pipe connected to child's stdin. If there was another
+  // file descriptor connected to this write end, then the child process
+  // wouldn't be able to detect that this write end is closed and it would
+  // block.
+  ASSERT_EQ(close(in), 0);
+
+  // Check that child process continued and ended.
+  nbytes = read(err, buf, PIPE_BUF);
+  ASSERT_GT(nbytes, 0);
+  EXPECT_EQ(std::string(buf, nbytes), "Greetings and Goodbye\n");
+
+  // Check that the write end of the stderr pipe is closed when the child
+  // process finishes.
+  EXPECT_EQ(read(err, buf, PIPE_BUF), 0);
+  ASSERT_EQ(close(err), 0);
+
+  // Check the child process termination status.
+  EXPECT_EQ(minijail_wait(j.get()), 42);
+}
+
 TEST(Test, close_original_pipes_after_dup2) {
   // Pipe used by child process to signal that it continued after reading from
   // stdin.
@@ -363,7 +445,9 @@ TEST(Test, close_original_pipes_after_dup2) {
   // to stdout and stderr, then the parent process wouldn't be able to detect
   // that all write ends of these pipes are closed and it would block here.
   EXPECT_EQ(read(out, buf, PIPE_BUF), 0);
+  ASSERT_EQ(close(out), 0);
   EXPECT_EQ(read(err, buf, PIPE_BUF), 0);
+  ASSERT_EQ(close(err), 0);
 
   // Check that stdin pipe works.
   const std::string s = "Greetings\n";
