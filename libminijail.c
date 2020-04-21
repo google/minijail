@@ -2491,6 +2491,19 @@ static int redirect_fds(struct minijail *j)
 			return -1;
 		}
 	}
+	/*
+	 * After all fds have been duped, we are now free to close all parent
+	 * fds that are *not* child fds.
+	 */
+	for (size_t i = 0; i < j->preserved_fd_count; i++) {
+		int closeable = true;
+		for (size_t i2 = 0; i2 < j->preserved_fd_count; i2++) {
+			closeable &= j->preserved_fds[i].parent_fd !=
+				     j->preserved_fds[i2].child_fd;
+		}
+		if (closeable)
+			close(j->preserved_fds[i].parent_fd);
+	}
 	return 0;
 }
 
