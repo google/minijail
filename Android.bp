@@ -64,6 +64,7 @@ cc_object {
         "com.android.adbd",
         "com.android.media.swcodec",
     ],
+    min_sdk_version: "29",
 }
 
 cc_genrule {
@@ -97,6 +98,7 @@ cc_object {
         "com.android.adbd",
         "com.android.media.swcodec",
     ],
+    min_sdk_version: "29",
 }
 
 cc_genrule {
@@ -140,6 +142,7 @@ cc_library_static {
         "com.android.adbd",
         "com.android.media.swcodec",
     ],
+    min_sdk_version: "29",
 }
 
 cc_object {
@@ -221,6 +224,7 @@ cc_library {
         "com.android.adbd",
         "com.android.media.swcodec",
     ],
+    min_sdk_version: "29",
 }
 
 // Example ASan-ified libminijail shared library for target.
@@ -463,6 +467,6 @@ rust_library_host_rlib {
     target: {
         darwin: {
             enabled: false,
-        }
+        },
     },
 }
