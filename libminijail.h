@@ -42,6 +42,9 @@ enum {
 	/* (MINIJAIL_ERR_SIG_BASE + n) if process killed by signal n != SIGSYS */
 	MINIJAIL_ERR_SIG_BASE = 128,
 
+	/* Cannot mount a file or folder in mount namespace */
+	MINIJAIL_ERR_MOUNT = 251,
+
 	MINIJAIL_ERR_PRELOAD = 252,
 
 	/* Process killed by SIGSYS */
