@@ -571,6 +571,9 @@ TEST(Test, minijail_run_env_pid_pipes_no_preload) {
   // Set a canary env var in the parent that should not be present in the child.
   ASSERT_EQ(setenv("TEST_PARENT", "test", 1 /*overwrite*/), 0);
 
+  // Use the preload library from this test build.
+  ASSERT_EQ(0, minijail_set_preload_path(j.get(), "./libminijailpreload.so"));
+
   int child_stderr;
   mj_run_ret =
       minijail_run_env_pid_pipes(j.get(), argv[0], argv, envp, &pid,
