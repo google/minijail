@@ -1,6 +1,7 @@
 [package]
 name = "minijail-sys"
 version = "0.0.11"
+description = "Provides raw (unsafe) bindings to the libminijail C library."
 authors = ["The Chromium OS Authors"]
 edition = "2018"
 build = "build.rs"
