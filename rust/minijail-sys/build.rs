@@ -19,7 +19,7 @@ fn main() -> io::Result<()> {
         return Ok(());
     }
 
-    let current_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let current_dir = env::var("CARGO_MANIFEST_DIR").unwrap() + "/../..";
     let out_dir = env::var("OUT_DIR").unwrap();
     let profile = env::var("PROFILE").unwrap();
 
