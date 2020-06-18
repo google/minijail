@@ -459,7 +459,7 @@ rust_library_rlib {
     name: "libminijail_sys",
     host_supported: true,
     crate_name: "minijail_sys",
-    srcs: ["lib.rs"],
+    srcs: ["rust/minijail-sys/lib.rs"],
     edition: "2018",
     rlibs: [
         "liblibc",
