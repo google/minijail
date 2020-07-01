@@ -562,6 +562,24 @@ impl Minijail {
     /// inheritable_fds list. This function may abort in the child on error because a partially
     /// entered jail isn't recoverable.
     pub fn run(&self, cmd: &Path, inheritable_fds: &[RawFd], args: &[&str]) -> Result<pid_t> {
+        self.run_remap(
+            cmd,
+            &inheritable_fds
+                .iter()
+                .map(|&a| (a, a))
+                .collect::<Vec<(RawFd, RawFd)>>(),
+            args,
+        )
+    }
+
+    /// Behaves the same as `run()` except `inheritable_fds` is a list of fd
+    /// mappings rather than just a list of fds to preserve.
+    pub fn run_remap(
+        &self,
+        cmd: &Path,
+        inheritable_fds: &[(RawFd, RawFd)],
+        args: &[&str],
+    ) -> Result<pid_t> {
         let cmd_os = cmd.to_str().ok_or(Error::PathToCString(cmd.to_owned()))?;
         let cmd_cstr = CString::new(cmd_os).map_err(|_| Error::StrToCString(cmd_os.to_owned()))?;
 
@@ -576,8 +594,8 @@ impl Minijail {
         }
         args_array.push(null());
 
-        for fd in inheritable_fds {
-            let ret = unsafe { minijail_preserve_fd(self.jail, *fd, *fd) };
+        for (src_fd, dst_fd) in inheritable_fds {
+            let ret = unsafe { minijail_preserve_fd(self.jail, *src_fd, *dst_fd) };
             if ret < 0 {
                 return Err(Error::PreservingFd(ret));
             }
@@ -591,7 +609,7 @@ impl Minijail {
         // Set stdin, stdout, and stderr to /dev/null unless they are in the inherit list.
         // These will only be closed when this process exits.
         for io_fd in &[libc::STDIN_FILENO, libc::STDOUT_FILENO, libc::STDERR_FILENO] {
-            if !inheritable_fds.contains(io_fd) {
+            if !inheritable_fds.iter().any(|(_, fd)| *fd == *io_fd) {
                 let ret = unsafe { minijail_preserve_fd(self.jail, dev_null.as_raw_fd(), *io_fd) };
                 if ret < 0 {
                     return Err(Error::PreservingFd(ret));
@@ -629,6 +647,17 @@ impl Minijail {
     /// This Function may abort in the child on error because a partially
     /// entered jail isn't recoverable.
     pub unsafe fn fork(&self, inheritable_fds: Option<&[RawFd]>) -> Result<pid_t> {
+        let m: Vec<(RawFd, RawFd)> = inheritable_fds
+            .unwrap_or(&[])
+            .iter()
+            .map(|&a| (a, a))
+            .collect();
+        self.fork_remap(&m)
+    }
+
+    /// Behaves the same as `fork()` except `inheritable_fds` is a list of fd
+    /// mappings rather than just a list of fds to preserve.
+    pub unsafe fn fork_remap(&self, inheritable_fds: &[(RawFd, RawFd)]) -> Result<pid_t> {
         if !is_single_threaded().map_err(Error::CheckingMultiThreaded)? {
             // This test will fail during `cargo test` because the test harness always spawns a test
             // thread. We will make an exception for that case because the tests for this module
@@ -637,12 +666,10 @@ impl Minijail {
             return Err(Error::ForkingWhileMultiThreaded);
         }
 
-        if let Some(keep_fds) = inheritable_fds {
-            for fd in keep_fds {
-                let ret = minijail_preserve_fd(self.jail, *fd, *fd);
-                if ret < 0 {
-                    return Err(Error::PreservingFd(ret));
-                }
+        for (src_fd, dst_fd) in inheritable_fds {
+            let ret = minijail_preserve_fd(self.jail, *src_fd, *dst_fd);
+            if ret < 0 {
+                return Err(Error::PreservingFd(ret));
             }
         }
 
@@ -654,7 +681,7 @@ impl Minijail {
         // Set stdin, stdout, and stderr to /dev/null unless they are in the inherit list.
         // These will only be closed when this process exits.
         for io_fd in &[libc::STDIN_FILENO, libc::STDOUT_FILENO, libc::STDERR_FILENO] {
-            if inheritable_fds.is_none() || !inheritable_fds.unwrap().contains(io_fd) {
+            if !inheritable_fds.iter().any(|(_, fd)| *fd == *io_fd) {
                 let ret = minijail_preserve_fd(self.jail, dev_null.as_raw_fd(), *io_fd);
                 if ret < 0 {
                     return Err(Error::PreservingFd(ret));
