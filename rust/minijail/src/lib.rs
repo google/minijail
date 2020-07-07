@@ -247,12 +247,10 @@ impl Minijail {
             minijail_keep_supplementary_gids(self.jail);
         }
     }
-    pub fn set_rlimit(
-        &mut self,
-        kind: libc::c_int,
-        cur: libc::rlim64_t,
-        max: libc::rlim64_t,
-    ) -> Result<()> {
+    // rlim_t is defined in minijail-sys to be u64 on all platforms, to avoid
+    // issues on 32-bit platforms. It's also useful to us here to avoid
+    // libc::rlim64_t, which is not defined at all on Android.
+    pub fn set_rlimit(&mut self, kind: libc::c_int, cur: rlim_t, max: rlim_t) -> Result<()> {
         let errno = unsafe { minijail_rlimit(self.jail, kind, cur, max) };
         if errno == 0 {
             Ok(())
