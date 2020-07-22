@@ -72,6 +72,17 @@ pub enum Error {
     WrongProgramAlignment,
     /// File size should be non-zero and a multiple of sock_filter
     WrongProgramSize,
+
+    /// The command was not found.
+    NoCommand,
+    /// The command could not be run.
+    NoAccess,
+    /// Process was killed by SIGSYS indicating a seccomp violation.
+    SeccompViolation(i32),
+    /// Process was killed by a signal other than SIGSYS.
+    Killed(u8),
+    /// Process finished returning a non-zero code.
+    ReturnCode(u8),
 }
 
 impl Display for Error {
@@ -155,6 +166,11 @@ impl Display for Error {
                 "the alignment of bpf file was not a multiple of that of sock_filter"
             ),
             WrongProgramSize => write!(f, "bpf file was empty or not a multiple of sock_filter"),
+            NoCommand => write!(f, "command was not found"),
+            NoAccess => write!(f, "unable to execute command"),
+            SeccompViolation(s) => write!(f, "seccomp violation syscall #{}", s),
+            Killed(s) => write!(f, "killed with signal number {}", s),
+            ReturnCode(e) => write!(f, "exited with code {}", e),
         }
     }
 }
@@ -209,6 +225,11 @@ pub struct Minijail {
     jail: *mut minijail,
 }
 
+#[link(name = "c")]
+extern "C" {
+    fn __libc_current_sigrtmax() -> libc::c_int;
+}
+
 impl Minijail {
     /// Creates a new jail configuration.
     pub fn new() -> Result<Minijail> {
@@ -236,6 +257,21 @@ impl Minijail {
         unsafe {
             minijail_change_gid(self.jail, gid);
         }
+    }
+    pub fn change_user(&mut self, user: &str) -> Result<()> {
+        let user_cstring = CString::new(user).map_err(|_| Error::StrToCString(user.to_owned()))?;
+        unsafe {
+            minijail_change_user(self.jail, user_cstring.as_ptr());
+        }
+        Ok(())
+    }
+    pub fn change_group(&mut self, group: &str) -> Result<()> {
+        let group_cstring =
+            CString::new(group).map_err(|_| Error::StrToCString(group.to_owned()))?;
+        unsafe {
+            minijail_change_group(self.jail, group_cstring.as_ptr());
+        }
+        Ok(())
     }
     pub fn set_supplementary_gids(&mut self, ids: &[libc::gid_t]) {
         unsafe {
@@ -315,7 +351,7 @@ impl Minijail {
         let pathstring = path
             .as_os_str()
             .to_str()
-            .ok_or(Error::PathToCString(path.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(path.to_owned()))?;
         let filename =
             CString::new(pathstring).map_err(|_| Error::PathToCString(path.to_owned()))?;
         unsafe {
@@ -443,7 +479,7 @@ impl Minijail {
         let pathstring = dir
             .as_os_str()
             .to_str()
-            .ok_or(Error::PathToCString(dir.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(dir.to_owned()))?;
         let dirname = CString::new(pathstring).map_err(|_| Error::PathToCString(dir.to_owned()))?;
         let ret = unsafe { minijail_enter_chroot(self.jail, dirname.as_ptr()) };
         if ret < 0 {
@@ -455,7 +491,7 @@ impl Minijail {
         let pathstring = dir
             .as_os_str()
             .to_str()
-            .ok_or(Error::PathToCString(dir.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(dir.to_owned()))?;
         let dirname = CString::new(pathstring).map_err(|_| Error::PathToCString(dir.to_owned()))?;
         let ret = unsafe { minijail_enter_pivot_root(self.jail, dirname.as_ptr()) };
         if ret < 0 {
@@ -477,12 +513,12 @@ impl Minijail {
         let src_os = src
             .as_os_str()
             .to_str()
-            .ok_or(Error::PathToCString(src.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(src.to_owned()))?;
         let src_path = CString::new(src_os).map_err(|_| Error::StrToCString(src_os.to_owned()))?;
         let dest_os = dest
             .as_os_str()
             .to_str()
-            .ok_or(Error::PathToCString(dest.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(dest.to_owned()))?;
         let dest_path =
             CString::new(dest_os).map_err(|_| Error::StrToCString(dest_os.to_owned()))?;
         let fstype_string =
@@ -529,12 +565,12 @@ impl Minijail {
         let src_os = src
             .as_os_str()
             .to_str()
-            .ok_or(Error::PathToCString(src.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(src.to_owned()))?;
         let src_path = CString::new(src_os).map_err(|_| Error::StrToCString(src_os.to_owned()))?;
         let dest_os = dest
             .as_os_str()
             .to_str()
-            .ok_or(Error::PathToCString(dest.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(dest.to_owned()))?;
         let dest_path =
             CString::new(dest_os).map_err(|_| Error::StrToCString(dest_os.to_owned()))?;
         let ret = unsafe {
@@ -578,7 +614,9 @@ impl Minijail {
         inheritable_fds: &[(RawFd, RawFd)],
         args: &[&str],
     ) -> Result<pid_t> {
-        let cmd_os = cmd.to_str().ok_or(Error::PathToCString(cmd.to_owned()))?;
+        let cmd_os = cmd
+            .to_str()
+            .ok_or_else(|| Error::PathToCString(cmd.to_owned()))?;
         let cmd_cstr = CString::new(cmd_os).map_err(|_| Error::StrToCString(cmd_os.to_owned()))?;
 
         // Converts each incoming `args` string to a `CString`, and then puts each `CString` pointer
@@ -695,6 +733,34 @@ impl Minijail {
         }
         Ok(ret as pid_t)
     }
+
+    pub fn wait(&self) -> Result<()> {
+        let ret: libc::c_int;
+        // This is safe because it does not modify the struct.
+        unsafe {
+            ret = minijail_wait(self.jail);
+        }
+        if ret == 0 {
+            return Ok(());
+        }
+        if ret == MINIJAIL_ERR_NO_COMMAND as libc::c_int {
+            return Err(Error::NoCommand);
+        }
+        if ret == MINIJAIL_ERR_NO_ACCESS as libc::c_int {
+            return Err(Error::NoAccess);
+        }
+        let sig_base: libc::c_int = MINIJAIL_ERR_SIG_BASE as libc::c_int;
+        let sig_max_code: libc::c_int = unsafe { __libc_current_sigrtmax() } + sig_base;
+        if ret > sig_base && ret <= sig_max_code {
+            return Err(Error::Killed(
+                (ret - MINIJAIL_ERR_SIG_BASE as libc::c_int) as u8,
+            ));
+        }
+        if ret > 0 && ret <= 0xff {
+            return Err(Error::ReturnCode(ret as u8));
+        }
+        unreachable!();
+    }
 }
 
 impl Drop for Minijail {
@@ -727,6 +793,8 @@ mod tests {
     use std::process::exit;
 
     use super::*;
+
+    const SHELL: &str = "/bin/sh";
 
     #[test]
     fn create_and_free() {
@@ -772,6 +840,59 @@ mod tests {
                 exit(0);
             }
         }
+    }
+
+    macro_rules! expect_result {
+        ($call:expr, $expected:pat) => {
+            let got = $call;
+            match got {
+                $expected => {}
+                _ => {
+                    panic!("got {:?} expected {:?}", got, stringify!($expected));
+                }
+            }
+        };
+    }
+
+    #[test]
+    fn wait_success() {
+        let j = Minijail::new().unwrap();
+        j.run(Path::new("/bin/true"), &[1, 2], &[]).unwrap();
+        expect_result!(j.wait(), Ok(()));
+    }
+
+    #[test]
+    fn wait_killed() {
+        let j = Minijail::new().unwrap();
+        j.run(
+            Path::new(SHELL),
+            &[1, 2],
+            &[SHELL, "-c", "kill -9 $$ &\n/usr/bin/sleep 5"],
+        )
+        .unwrap();
+        expect_result!(j.wait(), Err(Error::Killed(9)));
+    }
+
+    #[test]
+    fn wait_returncode() {
+        let j = Minijail::new().unwrap();
+        j.run(Path::new("/bin/false"), &[1, 2], &[]).unwrap();
+        expect_result!(j.wait(), Err(Error::ReturnCode(1)));
+    }
+
+    #[test]
+    fn wait_noaccess() {
+        let j = Minijail::new().unwrap();
+        j.run(Path::new("/dev/null"), &[1, 2], &[]).unwrap();
+        expect_result!(j.wait(), Err(Error::NoAccess));
+    }
+
+    #[test]
+    fn wait_nocommand() {
+        let j = Minijail::new().unwrap();
+        j.run(Path::new("/bin/does not exist"), &[1, 2], &[])
+            .unwrap();
+        expect_result!(j.wait(), Err(Error::NoCommand));
     }
 
     #[test]
