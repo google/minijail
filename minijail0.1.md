@@ -76,14 +76,19 @@ Runs PROGRAM inside a sandbox.
   - **\-f \<file\>**  
     Write the pid of the jailed process to *file*.
 
-  - **\-g \<group\>**  
-    Change groups to *group*, which may be either a group name or a
-    numeric group ID.
+  - **\-g \<group|gid\>**  
+    Change groups to the specified *group* name, or numeric group ID
+    *gid*.
 
   - **\-G**  
     Inherit all the supplementary groups of the user specified with
     **\-u**. It is an error to use this option without having specified
     a **user name** to **\-u**.
+
+  - **\-\-add\-suppl\-group \<group|gid\>**  
+    Add the specified *group* name, or numeric group ID *gid*, to the
+    process' supplementary groups list. Can be specified multiple times
+    to add several groups. Incompatible with -y and -G.
 
   - **\-h**  
     Print a help message.
@@ -288,9 +293,8 @@ translate to *RLIM\_INFINITY*).
     'dynamic' will force minijail0 to preload *libminijailpreload.so* to
     setup hooks, but will fail on actually statically-linked binaries.
 
-  - **\-u \<user\>**  
-    Change users to *user*, which may be either a user name or a numeric
-    user ID.
+  - **\-u \<user|uid\>**  
+    Change users to the specified *user* name, or numeric user ID *uid*.
 
   - **\-U**  
     Enter a new user namespace (implies **\-p**).
@@ -361,6 +365,10 @@ The following sandboxing profiles are supported:
   - **minimalistic-mountns**  
     Set up a minimalistic mount namespace. Equivalent to **\-v \-P
     /var/empty** -b / -b /proc -b /dev/log -t -r --mount-dev.
+
+  - **minimalistic-mountns-nodev**  
+    Set up a minimalistic mount namespace with an empty /dev path.
+    Equivalent to **\-v \-P /var/empty \-b/ \-b/proc \-t \-r**.
 
 ## Implementation
 
