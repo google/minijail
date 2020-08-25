@@ -14,8 +14,7 @@ For local experimentation (using Minijail libraries from the source directory):
 
 ```
 $ make LIBDIR=/lib64
-$ sudo ./minijail0 --preload-library=./libminijailpreload.so \
-  -u ${USER} -g 5000 -- /usr/bin/id
+$ sudo ./minijail0.sh -u ${USER} -g 5000 -- /usr/bin/id
 ```
 
 For system-wide usage, install `libminijail.so` and `libminijailpreload.so` to
