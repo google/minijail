@@ -474,11 +474,9 @@ rust_library {
     rustlibs: [
         "liblibc",
     ],
-    static_libs: [
-        "libminijail",
-    ],
     shared_libs: [
         "libcap",
+        "libminijail",
     ],
 }
 
