@@ -71,6 +71,7 @@ static int fake_main(int argc, char **argv, char **envp)
 		die("preload: failed to parse minijail from parent");
 	close(fd);
 
+	unset_in_env(envp, kFdEnvVar);
 	/* TODO(ellyjones): this trashes existing preloads, so one can't do:
 	 * LD_PRELOAD="/tmp/test.so libminijailpreload.so" prog; the
 	 * descendants of prog will have no LD_PRELOAD set at all.
