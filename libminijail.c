@@ -313,7 +313,9 @@ void minijail_preexec(struct minijail *j)
 struct minijail API *minijail_new(void)
 {
 	struct minijail *j = calloc(1, sizeof(struct minijail));
-	j->remount_mode = MS_PRIVATE;
+	if (j) {
+		j->remount_mode = MS_PRIVATE;
+	}
 	return j;
 }
 
