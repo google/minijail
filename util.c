@@ -434,7 +434,8 @@ char *path_join(const char *external_path, const char *internal_path)
 	/* One extra char for '/' and one for '\0', hence + 2. */
 	pathlen = strlen(external_path) + strlen(internal_path) + 2;
 	path = malloc(pathlen);
-	snprintf(path, pathlen, "%s/%s", external_path, internal_path);
+	if (path)
+		snprintf(path, pathlen, "%s/%s", external_path, internal_path);
 
 	return path;
 }
