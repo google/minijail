@@ -552,6 +552,10 @@ static ssize_t getmultiline(char **lineptr, size_t *n, FILE *stream)
 	/* Merge the lines. */
 	*n = ret + next_ret + 2;
 	line = realloc(line, *n);
+	if (!line) {
+		free(next_line);
+		return -1;
+	}
 	line[ret] = ' ';
 	memcpy(&line[ret + 1], next_line, next_ret + 1);
 	free(next_line);
@@ -815,6 +819,8 @@ int compile_filter(const char *filename, FILE *initial_file,
 
 	struct sock_filter *final_filter =
 	    calloc(final_filter_len, sizeof(struct sock_filter));
+	if (!final_filter)
+		die("could not allocate final BPF filter");
 
 	if (flatten_block_list(head, final_filter, 0, final_filter_len) < 0) {
 		free(final_filter);
