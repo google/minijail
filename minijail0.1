@@ -12,12 +12,14 @@ Runs PROGRAM inside a sandbox.
 Run using the alternate syscall table named \fItable\fR. Only available on kernels
 and architectures that support the \fBPR_ALT_SYSCALL\fR option of \fBprctl\fR(2).
 .TP
-\fB-b <src>[,<dest>[,<writeable>]]
+\fB-b <src>[,[dest][,<writeable>]]
 Bind-mount \fIsrc\fR into the chroot directory at \fIdest\fR, optionally writeable.
 The \fIsrc\fR path must be an absolute path.
+
 If \fIdest\fR is not specified, it will default to \fIsrc\fR.
 If the destination does not exist, it will be created as a file or directory
 based on the \fIsrc\fR type (including missing parent directories).
+
 To create a writable bind-mount set \fIwritable\fR to \fB1\fR. If not specified
 it will default to \fB0\fR (read-only).
 .TP
