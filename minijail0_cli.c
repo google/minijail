@@ -527,7 +527,7 @@ static void usage(const char *progn)
 	/* clang-format off */
 	printf("Usage: %s [-dGhHiIKlLnNprRstUvyYz]\n"
 	       "  [-a <table>]\n"
-	       "  [-b <src>[,<dest>[,<writeable>]]] [-k <src>,<dest>,<type>[,<flags>[,<data>]]]\n"
+	       "  [-b <src>[,[dest][,<writeable>]]] [-k <src>,<dest>,<type>[,<flags>[,<data>]]]\n"
 	       "  [-c <caps>] [-C <dir>] [-P <dir>] [-e[file]] [-f <file>] [-g <group>]\n"
 	       "  [-m[<uid> <loweruid> <count>]*] [-M[<gid> <lowergid> <count>]*] [--profile <name>]\n"
 	       "  [-R <type,cur,max>] [-S <file>] [-t[size]] [-T <type>] [-u <user>] [-V <file>]\n"
