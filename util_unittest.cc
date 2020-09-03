@@ -13,6 +13,7 @@
 
 #include <gtest/gtest.h>
 
+#include "bpf.h"
 #include "util.h"
 
 namespace {
@@ -157,4 +158,182 @@ TEST(environment, copy_and_modify) {
             dump_env(env));
 
   minijail_free_env(env);
+}
+
+TEST(parse_constant, unsigned) {
+  char *end;
+  long int c = 0;
+  std::string constant;
+
+#if defined(BITS32)
+  constant = "0x80000000";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(0x80000000U, static_cast<unsigned long int>(c));
+
+#elif defined(BITS64)
+  constant = "0x8000000000000000";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(0x8000000000000000UL, static_cast<unsigned long int>(c));
+
+#else
+# error "unknown bits!"
+#endif
+}
+
+TEST(parse_constant, unsigned_toobig) {
+  char *end;
+  long int c = 0;
+  std::string constant;
+
+#if defined(BITS32)
+  constant = "0x100000000";  // Too big for 32-bit unsigned long int.
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  // Error case should return 0.
+  EXPECT_EQ(0, c);
+
+#elif defined(BITS64)
+  constant = "0x10000000000000000";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  // Error case should return 0.
+  EXPECT_EQ(0, c);
+
+#else
+# error "unknown bits!"
+#endif
+}
+
+TEST(parse_constant, signed) {
+  char *end;
+  long int c = 0;
+  std::string constant = "-1";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(-1, c);
+}
+
+TEST(parse_constant, signed_toonegative) {
+  char *end;
+  long int c = 0;
+  std::string constant;
+
+#if defined(BITS32)
+  constant = "-0x80000001";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  // Error case should return 0.
+  EXPECT_EQ(0, c);
+
+#elif defined(BITS64)
+  constant = "-0x8000000000000001";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  // Error case should return 0.
+  EXPECT_EQ(0, c);
+
+#else
+# error "unknown bits!"
+#endif
+}
+
+TEST(parse_constant, complements) {
+  char* end;
+  long int c = 0;
+  std::string constant;
+
+#if defined(BITS32)
+  constant = "~0x005AF0FF|~0xFFA50FFF";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(c, 0xFFFFFF00);
+  constant = "0x0F|~(0x005AF000|0x00A50FFF)|0xF0";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(c, 0xFF0000FF);
+
+#elif defined(BITS64)
+  constant = "~0x00005A5AF0F0FFFF|~0xFFFFA5A50F0FFFFF";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(c, 0xFFFFFFFFFFFF0000UL);
+  constant = "0x00FF|~(0x00005A5AF0F00000|0x0000A5A50F0FFFFF)|0xFF00";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(c, 0xFFFF00000000FFFFUL);
+
+#else
+# error "unknown bits!"
+#endif
+}
+
+TEST(parse_constant, parenthesized_expresions) {
+  char* end;
+
+  const std::vector<const char*> bad_expressions = {
+      "(1", "1)", "(1)1", "|(1)", "(1)|", "()",
+      "(",  "((", "(()",  "(()1", "1(0)",
+  };
+  for (const auto* expression : bad_expressions) {
+    std::string mutable_expression = expression;
+    long int c =
+        parse_constant(const_cast<char*>(mutable_expression.data()), &end);
+    EXPECT_EQ(reinterpret_cast<const void*>(end),
+              reinterpret_cast<const void*>(mutable_expression.data()));
+    // Error case should return 0.
+    EXPECT_EQ(c, 0) << "For expression: \"" << expression << "\"";
+  }
+
+  const std::vector<const char*> good_expressions = {
+      "(3)", "(1)|2", "1|(2)", "(1)|(2)", "((3))", "0|(1|2)", "(0|1|2)",
+  };
+  for (const auto* expression : good_expressions) {
+    std::string mutable_expression = expression;
+    long int c =
+        parse_constant(const_cast<char*>(mutable_expression.data()), &end);
+    EXPECT_EQ(c, 3) << "For expression: \"" << expression << "\"";
+  }
+}
+
+TEST(parse_size, complete) {
+  size_t size;
+
+  ASSERT_EQ(0, parse_size(&size, "42"));
+  ASSERT_EQ(42U, size);
+
+  ASSERT_EQ(0, parse_size(&size, "16K"));
+  ASSERT_EQ(16384U, size);
+
+  ASSERT_EQ(0, parse_size(&size, "1M"));
+  ASSERT_EQ(1024U * 1024, size);
+
+  uint64_t gigabyte = 1024ULL * 1024 * 1024;
+  ASSERT_EQ(0, parse_size(&size, "3G"));
+  ASSERT_EQ(3U, size / gigabyte);
+  ASSERT_EQ(0U, size % gigabyte);
+
+  ASSERT_EQ(0, parse_size(&size, "4294967294"));
+  ASSERT_EQ(3U, size / gigabyte);
+  ASSERT_EQ(gigabyte - 2, size % gigabyte);
+
+#if __WORDSIZE == 64
+  uint64_t exabyte = gigabyte * 1024 * 1024 * 1024;
+  ASSERT_EQ(0, parse_size(&size, "9E"));
+  ASSERT_EQ(9U, size / exabyte);
+  ASSERT_EQ(0U, size % exabyte);
+
+  ASSERT_EQ(0, parse_size(&size, "15E"));
+  ASSERT_EQ(15U, size / exabyte);
+  ASSERT_EQ(0U, size % exabyte);
+
+  ASSERT_EQ(0, parse_size(&size, "18446744073709551614"));
+  ASSERT_EQ(15U, size / exabyte);
+  ASSERT_EQ(exabyte - 2, size % exabyte);
+
+  ASSERT_EQ(-ERANGE, parse_size(&size, "16E"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "19E"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "7GTPE"));
+#elif __WORDSIZE == 32
+  ASSERT_EQ(-ERANGE, parse_size(&size, "5G"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "9G"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "9E"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "7GTPE"));
+#endif
+
+  ASSERT_EQ(-EINVAL, parse_size(&size, ""));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "14u"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "14.2G"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "-1G"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "; /bin/rm -- "));
 }
