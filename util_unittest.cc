@@ -160,6 +160,27 @@ TEST(environment, copy_and_modify) {
   minijail_free_env(env);
 }
 
+TEST(parse_single_constant, formats) {
+  char *end;
+  long int c = 0;
+  std::string constant;
+
+  // Check base 10 works.
+  constant = "1234";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(1234, c);
+
+  // Check base 16 works.
+  constant = "0x1234";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(0x1234, c);
+
+  // Check base 8 works.
+  constant = "01234";
+  c = parse_constant(const_cast<char*>(constant.data()), &end);
+  EXPECT_EQ(01234, c);
+}
+
 TEST(parse_constant, unsigned) {
   char *end;
   long int c = 0;
