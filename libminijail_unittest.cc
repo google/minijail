@@ -1050,58 +1050,6 @@ TEST_F(NamespaceTest, test_enter_ns) {
   }
 }
 
-TEST(Test, parse_size) {
-  size_t size;
-
-  ASSERT_EQ(0, parse_size(&size, "42"));
-  ASSERT_EQ(42U, size);
-
-  ASSERT_EQ(0, parse_size(&size, "16K"));
-  ASSERT_EQ(16384U, size);
-
-  ASSERT_EQ(0, parse_size(&size, "1M"));
-  ASSERT_EQ(1024U * 1024, size);
-
-  uint64_t gigabyte = 1024ULL * 1024 * 1024;
-  ASSERT_EQ(0, parse_size(&size, "3G"));
-  ASSERT_EQ(3U, size / gigabyte);
-  ASSERT_EQ(0U, size % gigabyte);
-
-  ASSERT_EQ(0, parse_size(&size, "4294967294"));
-  ASSERT_EQ(3U, size / gigabyte);
-  ASSERT_EQ(gigabyte - 2, size % gigabyte);
-
-#if __WORDSIZE == 64
-  uint64_t exabyte = gigabyte * 1024 * 1024 * 1024;
-  ASSERT_EQ(0, parse_size(&size, "9E"));
-  ASSERT_EQ(9U, size / exabyte);
-  ASSERT_EQ(0U, size % exabyte);
-
-  ASSERT_EQ(0, parse_size(&size, "15E"));
-  ASSERT_EQ(15U, size / exabyte);
-  ASSERT_EQ(0U, size % exabyte);
-
-  ASSERT_EQ(0, parse_size(&size, "18446744073709551614"));
-  ASSERT_EQ(15U, size / exabyte);
-  ASSERT_EQ(exabyte - 2, size % exabyte);
-
-  ASSERT_EQ(-ERANGE, parse_size(&size, "16E"));
-  ASSERT_EQ(-ERANGE, parse_size(&size, "19E"));
-  ASSERT_EQ(-EINVAL, parse_size(&size, "7GTPE"));
-#elif __WORDSIZE == 32
-  ASSERT_EQ(-ERANGE, parse_size(&size, "5G"));
-  ASSERT_EQ(-ERANGE, parse_size(&size, "9G"));
-  ASSERT_EQ(-ERANGE, parse_size(&size, "9E"));
-  ASSERT_EQ(-ERANGE, parse_size(&size, "7GTPE"));
-#endif
-
-  ASSERT_EQ(-EINVAL, parse_size(&size, ""));
-  ASSERT_EQ(-EINVAL, parse_size(&size, "14u"));
-  ASSERT_EQ(-EINVAL, parse_size(&size, "14.2G"));
-  ASSERT_EQ(-EINVAL, parse_size(&size, "-1G"));
-  ASSERT_EQ(-EINVAL, parse_size(&size, "; /bin/rm -- "));
-}
-
 void TestCreateSession(bool create_session) {
   int status;
   int pipe_fds[2];
