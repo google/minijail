@@ -136,22 +136,22 @@ If the destination does not exist, it will be created as a directory (including
 missing parent directories).
 .TP
 \fB-K[mode]\fR
-Don't mark all existing mounts as MS_PRIVATE.
+Don't mark all existing mounts as MS_SLAVE.
 This option is \fBdangerous\fR as it negates most of the functionality of \fB-v\fR.
 You very likely don't need this.
 
 You may specify a mount propagation mode in which case, that will be used
-instead of the default MS_PRIVATE.  See the \fBmount\fR(2) man page and the
+instead of the default MS_SLAVE.  See the \fBmount\fR(2) man page and the
 kernel docs \fIDocumentation/filesystems/sharedsubtree.txt\fR for more
 technical details, but a brief guide:
 
 .IP
 \[bu] \fBslave\fR Changes in the parent mount namespace will propagate in, but
 changes in this mount namespace will not propagate back out.  This is usually
-what people want to use.
+what people want to use, and is the default behavior if you don't specify \fB-K\fR.
 .IP
 \[bu] \fBprivate\fR No changes in either mount namespace will propagate.
-This is the default behavior if you don't specify \fB-K\fR.
+This provides the most isolation.
 .IP
 \[bu] \fBshared\fR Changes in the parent and this mount namespace will freely
 propagate back and forth.  This is not recommended.
@@ -254,8 +254,8 @@ Change users to the specified \fIuser\fR name, or numeric user ID \fIuid\fR.
 Enter a new user namespace (implies \fB-p\fR).
 .TP
 \fB-v\fR
-Run inside a new VFS namespace. This option makes the program's mountpoints
-independent of the rest of the system's.
+Run inside a new VFS namespace. This option prevents mounts performed by the
+program from affecting the rest of the system (but see \fB-K\fR).
 .TP
 \fB-V <file>\fR
 Enter the VFS namespace specified by \fIfile\fR.
