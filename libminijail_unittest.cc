@@ -95,9 +95,6 @@ std::map<std::string, std::string> GetNamespaces(
 
 }  // namespace
 
-/* Prototypes needed only by test. */
-size_t minijail_get_tmpfs_size(const struct minijail *);
-
 /* Silence unused variable warnings. */
 TEST(silence, silence_unused) {
   EXPECT_STREQ(kLdPreloadEnvVar, kLdPreloadEnvVar);
