@@ -724,11 +724,6 @@ char API *minijail_get_original_path(struct minijail *j,
 	return strdup(path_inside_chroot);
 }
 
-size_t minijail_get_tmpfs_size(const struct minijail *j)
-{
-	return j->tmpfs_size;
-}
-
 void API minijail_mount_dev(struct minijail *j)
 {
 	j->flags.mount_dev = 1;
@@ -1152,15 +1147,16 @@ struct marshal_state {
 	char *buf;
 };
 
-void marshal_state_init(struct marshal_state *state, char *buf,
-			size_t available)
+static void marshal_state_init(struct marshal_state *state, char *buf,
+			       size_t available)
 {
 	state->available = available;
 	state->buf = buf;
 	state->total = 0;
 }
 
-void marshal_append(struct marshal_state *state, void *src, size_t length)
+static void marshal_append(struct marshal_state *state, const void *src,
+			   size_t length)
 {
 	size_t copy_len = MIN(state->available, length);
 
@@ -1174,7 +1170,8 @@ void marshal_append(struct marshal_state *state, void *src, size_t length)
 	state->total += length;
 }
 
-void marshal_mount(struct marshal_state *state, const struct mountpoint *m)
+static void marshal_mount(struct marshal_state *state,
+			  const struct mountpoint *m)
 {
 	marshal_append(state, m->src, strlen(m->src) + 1);
 	marshal_append(state, m->dest, strlen(m->dest) + 1);
@@ -1185,8 +1182,8 @@ void marshal_mount(struct marshal_state *state, const struct mountpoint *m)
 	marshal_append(state, (char *)&m->flags, sizeof(m->flags));
 }
 
-void minijail_marshal_helper(struct marshal_state *state,
-			     const struct minijail *j)
+static void minijail_marshal_helper(struct marshal_state *state,
+				    const struct minijail *j)
 {
 	struct mountpoint *m = NULL;
 	size_t i;
@@ -2336,12 +2333,12 @@ void API minijail_enter(const struct minijail *j)
 /* TODO(wad): will visibility affect this variable? */
 static int init_exitstatus = 0;
 
-void init_term(int sig attribute_unused)
+static void init_term(int sig attribute_unused)
 {
 	_exit(init_exitstatus);
 }
 
-void init(pid_t rootpid)
+static void init(pid_t rootpid)
 {
 	pid_t pid;
 	int status;
