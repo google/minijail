@@ -1170,6 +1170,11 @@ static void marshal_append(struct marshal_state *state, const void *src,
 	state->total += length;
 }
 
+static void marshal_append_string(struct marshal_state *state, const char *src)
+{
+	marshal_append(state, src, strlen(src) + 1);
+}
+
 static void marshal_mount(struct marshal_state *state,
 			  const struct mountpoint *m)
 {
@@ -1190,15 +1195,15 @@ static void minijail_marshal_helper(struct marshal_state *state,
 
 	marshal_append(state, (char *)j, sizeof(*j));
 	if (j->user)
-		marshal_append(state, j->user, strlen(j->user) + 1);
+		marshal_append_string(state, j->user);
 	if (j->suppl_gid_list) {
 		marshal_append(state, j->suppl_gid_list,
 			       j->suppl_gid_count * sizeof(gid_t));
 	}
 	if (j->chrootdir)
-		marshal_append(state, j->chrootdir, strlen(j->chrootdir) + 1);
+		marshal_append_string(state, j->chrootdir);
 	if (j->hostname)
-		marshal_append(state, j->hostname, strlen(j->hostname) + 1);
+		marshal_append_string(state, j->hostname);
 	if (j->alt_syscall_table) {
 		marshal_append(state, j->alt_syscall_table,
 			       strlen(j->alt_syscall_table) + 1);
@@ -1212,7 +1217,7 @@ static void minijail_marshal_helper(struct marshal_state *state,
 		marshal_mount(state, m);
 	}
 	for (i = 0; i < j->cgroup_count; ++i)
-		marshal_append(state, j->cgroups[i], strlen(j->cgroups[i]) + 1);
+		marshal_append_string(state, j->cgroups[i]);
 }
 
 size_t API minijail_size(const struct minijail *j)
