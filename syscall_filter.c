@@ -123,6 +123,13 @@ void append_ret_kill(struct filter_block *head)
 	append_filter_block(head, filter, ONE_INSTR);
 }
 
+void append_ret_kill_process(struct filter_block *head)
+{
+	struct sock_filter *filter = new_instr_buf(ONE_INSTR);
+	set_bpf_ret_kill_process(filter);
+	append_filter_block(head, filter, ONE_INSTR);
+}
+
 void append_ret_trap(struct filter_block *head)
 {
 	struct sock_filter *filter = new_instr_buf(ONE_INSTR);
@@ -303,6 +310,9 @@ int compile_errno(struct parser_state *state, struct filter_block *head,
 		case ACTION_RET_KILL:
 			append_ret_kill(head);
 			break;
+		case ACTION_RET_KILL_PROCESS:
+			append_ret_kill_process(head);
+			break;
 		case ACTION_RET_TRAP:
 			append_ret_trap(head);
 			break;
@@ -446,6 +456,9 @@ struct filter_block *compile_policy_line(struct parser_state *state, int nr,
 		switch (action) {
 		case ACTION_RET_KILL:
 			append_ret_kill(head);
+			break;
+		case ACTION_RET_KILL_PROCESS:
+			append_ret_kill_process(head);
 			break;
 		case ACTION_RET_TRAP:
 			append_ret_trap(head);
@@ -788,6 +801,9 @@ int compile_filter(const char *filename, FILE *initial_file,
 	switch (filteropts->action) {
 	case ACTION_RET_KILL:
 		append_ret_kill(head);
+		break;
+	case ACTION_RET_KILL_PROCESS:
+		append_ret_kill_process(head);
 		break;
 	case ACTION_RET_TRAP:
 		append_ret_trap(head);

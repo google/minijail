@@ -1408,6 +1408,45 @@ TEST(FilterTest, seccomp_mode1_log_fails) {
   ASSERT_EQ(res, -1);
 }
 
+TEST(FilterTest, seccomp_mode1_ret_kill_process) {
+  struct sock_fprog actual;
+  std::string policy =
+    "read: 1\n"
+    "write: 1\n"
+    "rt_sigreturn: 1\n"
+    "exit: 1\n";
+
+  FILE* policy_file = write_policy_to_pipe(policy);
+  ASSERT_NE(policy_file, nullptr);
+
+  int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_KILL_PROCESS,
+                                NO_LOGGING);
+  fclose(policy_file);
+
+  /*
+   * Checks return value, filter length, and that the filter
+   * validates arch, loads syscall number, and
+   * only allows expected syscalls.
+   */
+  ASSERT_EQ(res, 0);
+  EXPECT_EQ(actual.len, 13);
+  EXPECT_ARCH_VALIDATION(actual.filter);
+  EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
+      BPF_LD+BPF_W+BPF_ABS, syscall_nr);
+  EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 1,
+      __NR_read);
+  EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 3,
+      __NR_write);
+  EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 5,
+      __NR_rt_sigreturn);
+  EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 7,
+      __NR_exit);
+  EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN + 9, BPF_RET+BPF_K,
+      SECCOMP_RET_KILL_PROCESS);
+
+  free(actual.filter);
+}
+
 TEST(FilterTest, seccomp_read_write) {
   struct sock_fprog actual;
   std::string policy =
