@@ -473,7 +473,7 @@ void minijail_destroy(struct minijail *j);
 void minijail_log_to_fd(int fd, int min_priority);
 
 #ifdef __cplusplus
-}; /* extern "C" */
+} /* extern "C" */
 #endif
 
 #endif /* !_LIBMINIJAIL_H_ */
