@@ -52,7 +52,7 @@ cat <<-EOF > "${OUTFILE}"
 #include "libconstants.h"
 const struct constant_entry constant_table[] = {
 $(${BUILD} | \
-  grep -E '^#define [[:upper:]][[:upper:]0-9_]*(\s)+[[:alnum:]_]' | \
+  grep -E '^#define [[:upper:]][[:upper:]0-9_]*[[:space:]]+[[:alnum:]_]' | \
   grep -Ev '(SIGRTMAX|SIGRTMIN|SIG_|NULL)' | \
   sort -u | \
   sed -Ee "${SED_MULTILINE}")
