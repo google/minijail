@@ -1640,6 +1640,8 @@ TEST(FilterTest, frequency) {
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
   EXPECT_EQ(res, 0);
+
+  free(actual.filter);
 }
 
 TEST(FilterTest, include_invalid_token) {
