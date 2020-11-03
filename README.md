@@ -1,6 +1,9 @@
 # Minijail
 
-The Minijail homepage and main repo is
+The Minijail homepage is
+https://google.github.io/minijail/.
+
+The main source repo is
 https://android.googlesource.com/platform/external/minijail/.
 
 There might be other copies floating around, but this is the official one!
