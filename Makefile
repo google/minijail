@@ -37,6 +37,11 @@ ifeq ($(USE_EXIT_ON_DIE),yes)
 CPPFLAGS += -DUSE_EXIT_ON_DIE
 endif
 
+# Setting this flag allows duplicate syscalls definitions for seccomp filters.
+ifeq ($(ALLOW_DUPLICATE_SYSCALLS),yes)
+CPPFLAGS += -DALLOW_DUPLICATE_SYSCALLS
+endif
+
 MJ_COMMON_FLAGS = -Wunused-parameter -Wextra -Wno-missing-field-initializers
 CFLAGS += $(MJ_COMMON_FLAGS)
 CXXFLAGS += $(MJ_COMMON_FLAGS)
