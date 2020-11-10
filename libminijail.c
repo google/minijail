@@ -1045,10 +1045,15 @@ static int parse_seccomp_filters(struct minijail *j, const char *filename,
 		else
 			filteropts.action = ACTION_RET_TRAP;
 	} else {
-		if (j->flags.seccomp_filter_tsync)
-			filteropts.action = ACTION_RET_TRAP;
-		else
+		if (j->flags.seccomp_filter_tsync) {
+			if (seccomp_ret_kill_process_available()) {
+				filteropts.action = ACTION_RET_KILL_PROCESS;
+			} else {
+				filteropts.action = ACTION_RET_TRAP;
+			}
+		} else {
 			filteropts.action = ACTION_RET_KILL;
+		}
 	}
 
 	/*

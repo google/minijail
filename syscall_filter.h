@@ -29,7 +29,12 @@ struct parser_state {
 	size_t line_number;
 };
 
-enum block_action { ACTION_RET_KILL = 0, ACTION_RET_TRAP, ACTION_RET_LOG };
+enum block_action {
+	ACTION_RET_KILL = 0,
+	ACTION_RET_TRAP,
+	ACTION_RET_LOG,
+	ACTION_RET_KILL_PROCESS,
+};
 
 struct filter_options {
 	enum block_action action;
