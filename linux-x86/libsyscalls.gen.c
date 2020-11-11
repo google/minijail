@@ -1040,3 +1040,6 @@ const struct syscall_entry syscall_table[] = {
 #endif
   { NULL, -1 },
 };
+
+const size_t syscall_table_size =
+    sizeof(syscall_table) / sizeof(syscall_table[0]);
