@@ -149,12 +149,40 @@ void do_log(int priority, const char *format, ...)
 	dprintf(logging_config.fd, "\n");
 }
 
-int lookup_syscall(const char *name)
+/*
+ * TODO(crbug.com/1145660): We would like for this get the length at
+ * compile-time from gen_syscalls.sh.
+ */
+size_t get_num_syscalls(void)
 {
+	static size_t num_syscalls = 0;
+	if (num_syscalls) {
+		return num_syscalls;
+	}
 	const struct syscall_entry *entry = syscall_table;
 	for (; entry->name && entry->nr >= 0; ++entry)
-		if (!strcmp(entry->name, name))
+		num_syscalls++;
+	return num_syscalls;
+}
+
+/*
+ * Returns the syscall nr and optionally populates the index in the pointer
+ * |ind| if it is non-NULL.
+ */
+int lookup_syscall(const char *name, size_t *ind)
+{
+	size_t ind_tmp = 0;
+	const struct syscall_entry *entry = syscall_table;
+	for (; entry->name && entry->nr >= 0; ++entry) {
+		if (!strcmp(entry->name, name)) {
+			if (ind != NULL)
+				*ind = ind_tmp;
 			return entry->nr;
+		}
+		ind_tmp++;
+	}
+	if (ind != NULL)
+		*ind = -1;
 	return -1;
 }
 
