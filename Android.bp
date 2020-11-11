@@ -52,6 +52,7 @@ cc_defaults {
 cc_object {
     name: "libminijail_gen_syscall_obj",
     vendor_available: true,
+    product_available: true,
     recovery_available: true,
     header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
     srcs: ["gen_syscalls.c"],
@@ -72,6 +73,7 @@ cc_object {
 cc_genrule {
     name: "libminijail_gen_syscall",
     vendor_available: true,
+    product_available: true,
     recovery_available: true,
     tool_files: ["gen_syscalls.sh"],
     cmd: "$(location gen_syscalls.sh) $(in) $(out)",
@@ -87,6 +89,7 @@ cc_genrule {
 cc_object {
     name: "libminijail_gen_constants_obj",
     vendor_available: true,
+    product_available: true,
     recovery_available: true,
     header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
     srcs: ["gen_constants.c"],
@@ -107,6 +110,7 @@ cc_object {
 cc_genrule {
     name: "libminijail_gen_constants",
     vendor_available: true,
+    product_available: true,
     recovery_available: true,
     tool_files: ["gen_constants.sh"],
     cmd: "$(location gen_constants.sh) $(in) $(out)",
@@ -122,6 +126,7 @@ cc_genrule {
 cc_library_static {
     name: "libminijail_generated",
     vendor_available: true,
+    product_available: true,
     recovery_available: true,
     defaults: ["libminijail_flags"],
     host_supported: true,
@@ -151,6 +156,7 @@ cc_library_static {
 cc_object {
     name: "libminijail_gen_constants_llvmir",
     vendor_available: true,
+    product_available: true,
     recovery_available: true,
     host_supported: true,
     header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
@@ -173,6 +179,7 @@ cc_object {
 cc_object {
     name: "libminijail_gen_syscall_llvmir",
     vendor_available: true,
+    product_available: true,
     recovery_available: true,
     host_supported: true,
     header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
@@ -199,6 +206,7 @@ cc_library {
     host_supported: true,
 
     vendor_available: true,
+    product_available: true,
     recovery_available: true,
     vndk: {
         enabled: true,
