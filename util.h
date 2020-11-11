@@ -142,7 +142,8 @@ static inline bool debug_logging_allowed(void) {
 #endif
 }
 
-int lookup_syscall(const char *name);
+size_t get_num_syscalls(void);
+int lookup_syscall(const char *name, size_t *ind);
 const char *lookup_syscall_name(int nr);
 
 long int parse_single_constant(char *constant_str, char **endptr);
