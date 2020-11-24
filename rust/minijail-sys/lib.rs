@@ -13,7 +13,7 @@
 // unsigned long int on amd64, which will end up being 32-bit on 32-bit platforms.
 //
 // As a workaround to let us commit these bindings and still use them on 32-bit platforms, the
-// bindgen invocation blacklists some of the generated fixed-width types and redefines them
+// bindgen invocation blocklists some of the generated fixed-width types and redefines them
 // manually as Rust fixed-width types.
 //
 // Generated in CrOS SDK chroot with:
