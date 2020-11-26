@@ -620,7 +620,9 @@ static void usage(const char *progn)
 	       "                E.g., '-S /usr/share/filters/<prog>.$(uname -m).bpf'.\n"
 	       "                Requires -n when not running as root.\n"
 	       "                The user is responsible for ensuring that the binary\n"
-	       "                was compiled for the correct architecture / kernel version.\n");
+	       "                was compiled for the correct architecture / kernel version.\n"
+	       "  --allow-speculative-execution:Allow speculative execution and disable "
+	       "                mitigations for speculative execution attacks.\n");
 	/* clang-format on */
 }
 
@@ -673,6 +675,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		{"preload-library", required_argument, 0, 132},
 		{"seccomp-bpf-binary", required_argument, 0, 133},
 		{"add-suppl-group", required_argument, 0, 134},
+		{"allow-speculative-execution", no_argument, 0, 135},
 		{0, 0, 0, 0},
 	};
 	/* clang-format on */
@@ -956,6 +959,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		case 134:
 			suppl_group_add(&suppl_gids_count, &suppl_gids,
 			                optarg);
+			break;
+		case 135:
+			minijail_set_seccomp_filter_allow_speculation(j);
 			break;
 		default:
 			usage(argv[0]);
