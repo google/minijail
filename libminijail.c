@@ -67,6 +67,10 @@
 #ifndef SECCOMP_FILTER_FLAG_TSYNC
 # define SECCOMP_FILTER_FLAG_TSYNC 1
 #endif
+
+#ifndef SECCOMP_FILTER_FLAG_SPEC_ALLOW
+# define SECCOMP_FILTER_FLAG_SPEC_ALLOW (1 << 2)
+#endif
 /* End seccomp filter related flags. */
 
 /* New cgroup namespace might not be in linux-headers yet. */
@@ -149,6 +153,7 @@ struct minijail {
 		int seccomp_filter : 1;
 		int seccomp_filter_tsync : 1;
 		int seccomp_filter_logging : 1;
+		int seccomp_filter_allow_speculation : 1;
 		int chroot : 1;
 		int pivot_root : 1;
 		int mount_dev : 1;
@@ -427,6 +432,16 @@ void API minijail_set_seccomp_filter_tsync(struct minijail *j)
 	}
 
 	j->flags.seccomp_filter_tsync = 1;
+}
+
+void API minijail_set_seccomp_filter_allow_speculation(struct minijail *j)
+{
+	if (j->filter_len > 0 && j->filter_prog != NULL) {
+		die("minijail_set_seccomp_filter_allow_speculation() must be "
+		    "called before minijail_parse_seccomp_filters()");
+	}
+
+	j->flags.seccomp_filter_allow_speculation = 1;
 }
 
 void API minijail_log_seccomp_filter_failures(struct minijail *j)
@@ -933,6 +948,7 @@ static void clear_seccomp_options(struct minijail *j)
 	j->flags.seccomp_filter = 0;
 	j->flags.seccomp_filter_tsync = 0;
 	j->flags.seccomp_filter_logging = 0;
+	j->flags.seccomp_filter_allow_speculation = 0;
 	j->filter_len = 0;
 	j->filter_prog = NULL;
 	j->flags.no_new_privs = 0;
@@ -981,6 +997,16 @@ static int seccomp_should_use_filters(struct minijail *j)
 			 * we can proceed. Worst case scenario minijail_enter()
 			 * will abort() if seccomp or TSYNC fail.
 			 */
+		}
+	}
+	if (j->flags.seccomp_filter_allow_speculation) {
+		/* Is the SPEC_ALLOW flag supported? */
+		if (sys_seccomp(SECCOMP_SET_MODE_FILTER,
+				SECCOMP_FILTER_FLAG_SPEC_ALLOW, NULL) == -1 &&
+		    errno == EINVAL) {
+			warn("allowing speculative execution on seccomp "
+			     "processes not supported");
+			j->flags.seccomp_filter_allow_speculation = 0;
 		}
 	}
 	return 1;
@@ -2089,9 +2115,16 @@ static void set_seccomp_filter(const struct minijail *j)
 	 * Install the syscall filter.
 	 */
 	if (j->flags.seccomp_filter) {
-		if (j->flags.seccomp_filter_tsync) {
-			if (sys_seccomp(SECCOMP_SET_MODE_FILTER,
-					SECCOMP_FILTER_FLAG_TSYNC,
+		if (j->flags.seccomp_filter_tsync ||
+		    j->flags.seccomp_filter_allow_speculation) {
+			int filter_flags =
+			    (j->flags.seccomp_filter_tsync
+				 ? SECCOMP_FILTER_FLAG_TSYNC
+				 : 0) |
+			    (j->flags.seccomp_filter_allow_speculation
+				 ? SECCOMP_FILTER_FLAG_SPEC_ALLOW
+				 : 0);
+			if (sys_seccomp(SECCOMP_SET_MODE_FILTER, filter_flags,
 					j->filter_prog)) {
 				pdie("seccomp(tsync) failed");
 			}
