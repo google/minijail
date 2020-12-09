@@ -106,6 +106,15 @@ void minijail_use_seccomp(struct minijail *j);
 void minijail_no_new_privs(struct minijail *j);
 void minijail_use_seccomp_filter(struct minijail *j);
 void minijail_set_seccomp_filter_tsync(struct minijail *j);
+/*
+ * Allow speculative execution features that may cause data leaks across
+ * processes, by setting the SECCOMP_FILTER_FLAG_SPEC_ALLOW seccomp flag.
+ *
+ * WARNING: Enabling this may make the process vulnerable to speculative
+ * execution attacks (Branch Target Injection, and Speculative Store Bypass).
+ * This is only safe to use for processes that do not execute untrusted code.
+ */
+void minijail_set_seccomp_filter_allow_speculation(struct minijail *j);
 /* Does not take ownership of |filter|. */
 void minijail_set_seccomp_filters(struct minijail *j,
 				  const struct sock_fprog *filter);
