@@ -308,6 +308,21 @@ arch-and-kernel-version-specific pre-compiled BPF binary (such as the ones
 produced by \fBparse_seccomp_policy\fR).  Note that the filter might be
 different based on the runtime environment; see \fBminijail0\fR(5) for more
 details.
+.TP
+\fB--allow-speculative-execution\fR
+Allow speculative execution features that may cause data leaks across processes.
+This passes the \fISECCOMP_FILTER_FLAG_SPEC_ALLOW\fR flag to seccomp which
+disables mitigations against certain speculative execution attacks; namely
+Branch Target Injection (spectre-v2) and Speculative Store Bypass (spectre-v4).
+These mitigations incur a runtime performance hit, so it is useful to be able
+to disable them in order to quantify their performance impact.
+
+\fBWARNING:\fR It is dangerous to use this option on programs that process
+untrusted input, which is normally what Minijail is used for. Do not enable
+this option unless you know what you're doing.
+
+See the kernel documentation \fIDocumentation/userspace-api/spec_ctrl.rst\fR
+and \fIDocumentation/admin-guide/hw-vuln/spectre.rst\fR for more information.
 .SH SANDBOXING PROFILES
 The following sandboxing profiles are supported:
 .TP
