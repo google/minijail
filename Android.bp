@@ -310,6 +310,7 @@ cc_test {
     srcs: [
         "bpf.c",
         "syscall_filter.c",
+        "syscall_wrapper.c",
         "util.c",
         "syscall_filter_unittest.cc",
     ] + unittestSrcFiles,
@@ -338,6 +339,7 @@ cc_test {
     host_supported: true,
 
     srcs: [
+        "syscall_wrapper.c",
         "system.c",
         "util.c",
         "system_unittest.cc",
