@@ -22,6 +22,7 @@
 
 #include <linux/securebits.h>
 
+#include "syscall_wrapper.h"
 #include "util.h"
 
 /*
@@ -533,4 +534,10 @@ int seccomp_ret_kill_process_available(void)
 		    seccomp_action_is_available("kill_process");
 
 	return ret_kill_process_available;
+}
+
+bool seccomp_filter_flags_available(unsigned int flags)
+{
+	return sys_seccomp(SECCOMP_SET_MODE_FILTER, flags, NULL) != -1 ||
+	       errno != EINVAL;
 }
