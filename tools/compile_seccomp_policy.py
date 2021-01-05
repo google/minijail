@@ -52,9 +52,9 @@ def parse_args(argv):
         type=str,
         help=('Use the specified default action, overriding any @default '
               'action found in the .policy files. '
-              'This allows the use of permissive actions (allow, log, trace) '
-              'since it is not valid to specify a permissive action in '
-              '.policy files. This is useful for debugging.'))
+              'This allows the use of permissive actions (allow, log, trace, '
+              'user-notify) since it is not valid to specify a permissive '
+              'action in .policy files. This is useful for debugging.'))
     parser.add_argument(
         '--use-kill-process',
         action='store_true',
