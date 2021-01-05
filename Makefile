@@ -25,8 +25,8 @@ CPPFLAGS += -DALLOW_DEBUG_LOGGING
 endif
 
 ifeq ($(USE_ASAN),yes)
-CPPFLAGS += -fsanitize=address
-LDFLAGS += -fsanitize=address
+CPPFLAGS += -fsanitize=address -fno-omit-frame-pointer
+LDFLAGS += -fsanitize=address -fno-omit-frame-pointer
 USE_EXIT_ON_DIE = yes
 endif
 
