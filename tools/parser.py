@@ -63,7 +63,7 @@ _TOKEN_SPECIFICATION = (
     ('RETURN', r'\breturn\b'),
     ('ACTION',
      r'\ballow\b|\bkill-process\b|\bkill-thread\b|\bkill\b|\btrap\b|'
-     r'\btrace\b|\blog\b'
+     r'\btrace\b|\blog\b|\buser-notify\b'
     ),
     ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z_0-9-@]*'),
 )
@@ -370,6 +370,7 @@ class PolicyParser:
     #                | 'kill-thread'
     #                | 'kill'
     #                | 'trap'
+    #                | 'user-notify'
     #                ;
     def _parse_default_action(self, tokens):
         if not tokens:
@@ -386,6 +387,8 @@ class PolicyParser:
             return self._kill_action
         if action_token.value == 'trap':
             return bpf.Trap()
+        if action_token.value == 'user-notify':
+            return bpf.UserNotify()
         return self._parser_state.error(
             'invalid permissive default action', token=action_token)
 
@@ -396,6 +399,7 @@ class PolicyParser:
     #        | 'trap'
     #        | 'trace'
     #        | 'log'
+    #        | 'user-notify'
     #        | 'return' , single-constant
     #        ;
     def parse_action(self, tokens):
@@ -415,6 +419,8 @@ class PolicyParser:
                 return bpf.Trap()
             if action_token.value == 'trace':
                 return bpf.Trace()
+            if action_token.value == 'user-notify':
+                return bpf.UserNotify()
             if action_token.value == 'log':
                 return bpf.Log()
         elif action_token.type == 'NUMERIC_CONSTANT':
