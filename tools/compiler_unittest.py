@@ -271,6 +271,14 @@ class CompileFilterStatementTests(unittest.TestCase):
             block.simulate(self.arch.arch_nr, self.arch.syscalls['read'],
                            0)[1], 'TRACE')
 
+    def test_user_notify(self):
+        """Accept lines that notify unconditionally."""
+        block = self._compile('read: user-notify')
+
+        self.assertEqual(
+            block.simulate(self.arch.arch_nr, self.arch.syscalls['read'],
+                           0)[1], 'USER_NOTIF')
+
     def test_log(self):
         """Accept lines that log unconditionally."""
         block = self._compile('read: log')
