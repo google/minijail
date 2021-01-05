@@ -59,6 +59,7 @@ int lookup_group(const char *group, gid_t *gid);
 
 int seccomp_ret_log_available(void);
 int seccomp_ret_kill_process_available(void);
+bool seccomp_filter_flags_available(unsigned int flags);
 
 #ifdef __cplusplus
 }; /* extern "C" */
