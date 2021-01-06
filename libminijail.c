@@ -2524,6 +2524,10 @@ static int close_open_fds(int *inheritable_fds, size_t size)
 static int redirect_fds(struct minijail *j)
 {
 	for (size_t i = 0; i < j->preserved_fd_count; i++) {
+		if (j->preserved_fds[i].parent_fd ==
+		    j->preserved_fds[i].child_fd) {
+			continue;
+		}
 		if (dup2(j->preserved_fds[i].parent_fd,
 			 j->preserved_fds[i].child_fd) == -1) {
 			return -1;
@@ -2588,10 +2592,10 @@ static void setup_child_std_fds(struct minijail *j,
 	};
 
 	for (size_t i = 0; i < ARRAY_SIZE(fd_map); ++i) {
-		if (fd_map[i].from != -1) {
-			if (dup2(fd_map[i].from, fd_map[i].to) == -1)
-				die("failed to set up %s pipe", fd_map[i].name);
-		}
+		if (fd_map[i].from == -1 || fd_map[i].from == fd_map[i].to)
+			continue;
+		if (dup2(fd_map[i].from, fd_map[i].to) == -1)
+			die("failed to set up %s pipe", fd_map[i].name);
 	}
 
 	/* Close temporary pipe file descriptors. */
