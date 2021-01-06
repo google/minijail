@@ -1533,6 +1533,11 @@ static int mount_dev(char **dev_path_ret)
 			goto done;
 	}
 
+	/* Create empty dir for glibc shared mem APIs. */
+	ret = mkdirat(dev_fd, "shm", 01777);
+	if (ret)
+		goto done;
+
 	/* Restore old mask. */
  done:
 	close(dev_fd);
