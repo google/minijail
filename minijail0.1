@@ -50,8 +50,12 @@ Change root (using \fBchroot\fR(2)) to \fIdir\fR.
 \fB-d\fR, \fB--mount-dev\fR
 Create a new /dev mount with a minimal set of nodes. Implies \fB-v\fR.
 Additional nodes can be bound with the \fB-b\fR or \fB-k\fR options.
-The initial set of nodes are: full null tty urandom zero.
-Symlinks are also created for: fd ptmx stderr stdin stdout.
+
+.nf
+\[bu] The initial set of nodes are: full null tty urandom zero.
+\[bu] Symlinks are also created for: fd ptmx stderr stdin stdout.
+\[bu] Directores are also created for: shm.
+.re
 .TP
 \fB-e[file]\fR
 Enter a new network namespace, or if \fIfile\fR is specified, enter an existing
