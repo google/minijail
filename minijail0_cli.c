@@ -621,7 +621,7 @@ static void usage(const char *progn)
 	       "                Requires -n when not running as root.\n"
 	       "                The user is responsible for ensuring that the binary\n"
 	       "                was compiled for the correct architecture / kernel version.\n"
-	       "  --allow-speculative-execution:Allow speculative execution and disable "
+	       "  --allow-speculative-execution:Allow speculative execution and disable\n"
 	       "                mitigations for speculative execution attacks.\n");
 	/* clang-format on */
 }
