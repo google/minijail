@@ -61,8 +61,15 @@ std::set<pid_t> GetProcessSubtreePids(pid_t root_pid) {
       std::string path = "/proc/" + std::to_string(pid) + "/stat";
 
       FILE* f = fopen(path.c_str(), "re");
-      if (!f)
+      if (!f) {
+        if (errno == ENOENT) {
+          // This loop is inherently racy, since PIDs can be reaped in the
+          // middle of this. Not being able to find one /proc/PID/stat file is
+          // completely normal.
+          continue;
+        }
         pdie("fopen(%s)", path.c_str());
+      }
       pid_t ppid;
       int ret = fscanf(f, "%*d (%*[^)]) %*c %d", &ppid);
       fclose(f);
