@@ -66,12 +66,12 @@ def parse_args(argv):
                         help='frequency file')
     parser.add_argument('--policy', nargs='?', type=argparse.FileType('w'),
                         default=sys.stdout, help='policy file')
-    parser.add_argument('traces', nargs='+', help='The strace logs.')
+    parser.add_argument('traces', nargs='+', help='strace logs')
     return parser.parse_args(argv)
 
 
 def get_seccomp_bpf_filter(syscall, entry):
-    """Return a minijail seccomp-bpf filter expression for the syscall."""
+    """Returns a minijail seccomp-bpf filter expression for the syscall."""
     arg_index = entry.arg_index
     arg_values = entry.value_set
     atoms = []
@@ -175,6 +175,7 @@ def main(argv=None):
         if opts.frequency is not None:
             print('%s: %s' % (syscall, syscalls[syscall]),
                   file=opts.frequency)
+
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

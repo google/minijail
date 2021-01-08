@@ -41,6 +41,9 @@ _TABLE_ENTRY_CONTENTS = re.compile(r'.*?(null|@[a-zA-Z0-9.]+).* (-?\d+)')
 ParseResults = collections.namedtuple('ParseResults', ['table_name',
                                                        'table_entries'])
 
+HELP_EPILOG = """Generate LLVM IR: clang -S -emit-llvm libconstants.gen.c libsyscalls.gen.c
+"""
+
 
 def parse_llvm_ir(ir):
     """Parses a single LLVM IR file."""
@@ -78,7 +81,7 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
 
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, epilog=HELP_EPILOG)
     parser.add_argument('--output',
                         help='The path of the generated constants.json file.',
                         type=argparse.FileType('w'),
@@ -100,8 +103,8 @@ def main(argv=None):
     constants_json['arch_nr'] = constants_json['constants']['MINIJAIL_ARCH_NR']
     constants_json['bits'] = constants_json['constants']['MINIJAIL_ARCH_BITS']
 
-    # It is a bit more complicated to generate the arch_name, since the constants
-    # can only output numeric values. Use a hardcoded mapping instead.
+    # It is a bit more complicated to generate the arch_name, since the
+    # constants can only output numeric values. Use a hardcoded mapping instead.
     if constants_json['arch_nr'] == 0xC000003E:
         constants_json['arch_name'] = 'x86_64'
     elif constants_json['arch_nr'] == 0x40000003:
