@@ -232,11 +232,16 @@ def parse_audit_log(audit_log, audit_comm, syscalls, arg_inspection):
             # of integers. E.g '16' -> 'ioctl'.
             syscall = au.interpret_field()
 
-            if syscall in arg_inspection and event_type == 'SECCOMP':
-                # We'll look at it in the SYSCALL event instead.
+            if ((syscall in arg_inspection and event_type == 'SECCOMP') or
+                (syscall not in arg_inspection and event_type == 'SYSCALL')):
+                # Skip SECCOMP records for syscalls that require argument
+                # inspection. Similarly, skip SYSCALL records for syscalls
+                # that do not require argument inspection. Technically such
+                # records wouldn't exist per our setup instructions but audit
+                # sometimes lets a few records slip through.
                 au.next_record()
                 continue
-            elif syscall in arg_inspection and event_type == 'SYSCALL':
+            elif event_type == 'SYSCALL':
                 arg_field_name = f'a{arg_inspection[syscall].arg_index}'
                 if not _find_field_in_current_record(arg_field_name):
                     raise ValueError(f'Could not find field "{arg_field_name}"'
