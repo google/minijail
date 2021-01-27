@@ -20,9 +20,69 @@ strace -f -e raw=all -o strace.txt -- <program>
 ./tools/generate_seccomp_policy.py strace.txt > <program>.policy
 ```
 
+### Using linux audit logs to generate policy
+
+*** note
+**NOTE**: Certain syscalls made by `minijail0` may be misattributed to the
+sandboxed binary and may result in a policy that is overly-permissive.
+Please pay some extra attention when manually reviewing the allowable args for
+these syscalls: `ioctl`, `socket`, `prctl`, `mmap`, `mprotect`, and `mmap2`.
+***
+
+Linux kernel v4.14+ support `SECCOMP_RET_LOG`. This allows minijail to log
+syscalls via the [audit subsystem][1] (Redhat has a nice overview [here][2])
+instead of blocking them. One caveat of this approach is that `SECCOMP_RET_LOG`
+does not log syscall arguments for finer grained filtering.
+The audit subsystem itself has a mechanism to log all syscalls. Though a
+`SYSCALL` event is more voluminous than a corresponding `SECCOMP` event.
+We employ here a combination of both techniques. We rely on `SECCOMP` for all
+except the syscalls for which we want finer grained filtering.
+
+Note that this requires python3 bindings for `auparse` which are generally
+available in distro packages named `python3-audit` or `python-audit`.
+
+#### Per-boot setup of audit rules on DUT
+
+Set up `audit` rules and an empty seccomp policy for later use. This can be
+done in the `pre-start` section of your upstart conf.
+
+`$UID` is the uid for your process. Using root will lead to logspam.
+
+As mentioned above, these extra audit rules enable `SYSCALL` auditing which
+in turn lets the tool inspect arguments for a pre-selected subset of syscalls.
+The list of syscalls here matches the list of keys  in `arg_inspection`.
+
+```shell
+for arch in b32 b64; do
+  auditctl -a exit,always -F uid=$UID -F arch=$arch -S ioctl -S socket \
+           -S prctl -S mmap -S mprotect \
+           $([ "$arch" = "b32" ] && echo "-S mmap2")
+done
+touch /tmp/empty.policy
+```
+
+#### Run your program under minijail with an empty policy
+
+Again, this can be done via your upstart conf. Just be sure to stimulate all
+corner cases, error conditions, etc for comprehensive coverage.
+
+```shell
+minijail0 -u $UID -g $GID -L -S /tmp/empty.policy -- <program>
+```
+
+#### Generate policy using the audit.log
+
+```shell
+./tools/generate_seccomp_policy.py --audit-comm $PROGRAM_NAME audit.log \
+    > $PROGRAM_NAME.policy
+```
+
+Note that the tool can also consume multiple audit logs and/or strace traces to
+produce one unified policy.
+
 ## compile_seccomp_policy.py
 
-An external seccomp-bpf compiler that is documented [here][1]. This uses a
+An external seccomp-bpf compiler that is documented [here][3]. This uses a
 slightly different syntax and generates highly-optimized BPF binaries that can
 be provided to `minijail0`'s `--seccomp-bpf-binary` or `libminijail`'s
 `minijail_set_secomp_filters()`. This requires the existence of an
@@ -63,4 +123,6 @@ This script generates the `constants.json` file from LLVM IR assembly files.
 This makes it easier to generate architecture-specific `constants.json` files at
 build-time.
 
-[1]: https://docs.google.com/document/d/e/2PACX-1vQOeYLWmJJrRWvglnMo5cynkUe0gZ9wVsndLLePkJg6dfUXSOUWoveBBeY3u5nQMlEU4dt_vRgj0ifR/pub
+[1]: https://people.redhat.com/sgrubb/audit/
+[2]: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/security_guide/chap-system_auditing
+[3]: https://docs.google.com/document/d/e/2PACX-1vQOeYLWmJJrRWvglnMo5cynkUe0gZ9wVsndLLePkJg6dfUXSOUWoveBBeY3u5nQMlEU4dt_vRgj0ifR/pub
