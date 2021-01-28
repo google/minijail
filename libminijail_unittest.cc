@@ -1061,6 +1061,123 @@ TEST_F(NamespaceTest, test_enter_ns) {
   }
 }
 
+TEST_F(NamespaceTest, test_remount_all_private) {
+  pid_t pid;
+  int child_stdout;
+  int mj_run_ret;
+  ssize_t read_ret;
+  char buf[kBufferSize];
+  int status;
+  char *argv[4];
+  char uidmap[kBufferSize], gidmap[kBufferSize];
+  constexpr uid_t kTargetUid = 1000;  // Any non-zero value will do.
+  constexpr gid_t kTargetGid = 1000;
+
+  if (!userns_supported_) {
+    SUCCEED();
+    return;
+  }
+
+  struct minijail *j = minijail_new();
+
+  minijail_namespace_pids(j);
+  minijail_namespace_vfs(j);
+  minijail_run_as_init(j);
+
+  // Perform userns mapping.
+  minijail_namespace_user(j);
+  snprintf(uidmap, sizeof(uidmap), "%d %d 1", kTargetUid, getuid());
+  snprintf(gidmap, sizeof(gidmap), "%d %d 1", kTargetGid, getgid());
+  minijail_change_uid(j, kTargetUid);
+  minijail_change_gid(j, kTargetGid);
+  minijail_uidmap(j, uidmap);
+  minijail_gidmap(j, gidmap);
+  minijail_namespace_user_disable_setgroups(j);
+
+  minijail_namespace_vfs(j);
+  minijail_remount_mode(j, MS_PRIVATE);
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "grep -E 'shared:|master:|propagate_from:|unbindable:' "
+	    "/proc/self/mountinfo";
+  argv[3] = NULL;
+  mj_run_ret = minijail_run_pid_pipes_no_preload(
+      j, argv[0], argv, &pid, NULL, &child_stdout, NULL);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  // There should be no output because all mounts should be remounted as
+  // private.
+  read_ret = read(child_stdout, buf, sizeof(buf));
+  EXPECT_EQ(read_ret, 0);
+
+  // grep will exit with 1 if it does not find anything which is what we
+  // expect.
+  status = minijail_wait(j);
+  EXPECT_EQ(status, 1);
+
+  minijail_destroy(j);
+}
+
+TEST_F(NamespaceTest, test_remount_one_shared) {
+  pid_t pid;
+  int child_stdout;
+  int mj_run_ret;
+  ssize_t read_ret;
+  char buf[kBufferSize * 4];
+  int status;
+  char *argv[4];
+  char uidmap[kBufferSize], gidmap[kBufferSize];
+  constexpr uid_t kTargetUid = 1000;  // Any non-zero value will do.
+  constexpr gid_t kTargetGid = 1000;
+
+  if (!userns_supported_) {
+    SUCCEED();
+    return;
+  }
+
+  struct minijail *j = minijail_new();
+
+  minijail_namespace_pids(j);
+  minijail_namespace_vfs(j);
+  minijail_mount_tmp(j);
+  minijail_run_as_init(j);
+
+  // Perform userns mapping.
+  minijail_namespace_user(j);
+  snprintf(uidmap, sizeof(uidmap), "%d %d 1", kTargetUid, getuid());
+  snprintf(gidmap, sizeof(gidmap), "%d %d 1", kTargetGid, getgid());
+  minijail_change_uid(j, kTargetUid);
+  minijail_change_gid(j, kTargetGid);
+  minijail_uidmap(j, uidmap);
+  minijail_gidmap(j, gidmap);
+  minijail_namespace_user_disable_setgroups(j);
+
+  minijail_namespace_vfs(j);
+  minijail_remount_mode(j, MS_PRIVATE);
+  minijail_add_remount(j, "/proc", MS_SHARED);
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "grep -E 'shared:' /proc/self/mountinfo";
+  argv[3] = NULL;
+  mj_run_ret = minijail_run_pid_pipes_no_preload(
+      j, argv[0], argv, &pid, NULL, &child_stdout, NULL);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  // There should be no output because all mounts should be remounted as
+  // private.
+  read_ret = read(child_stdout, buf, sizeof(buf));
+  EXPECT_GE(read_ret, 0);
+  buf[read_ret] = '\0';
+  EXPECT_NE(std::string(buf).find("/proc"), std::string::npos);
+
+  status = minijail_wait(j);
+  EXPECT_EQ(status, 0);
+
+  minijail_destroy(j);
+}
+
 void TestCreateSession(bool create_session) {
   int status;
   int pipe_fds[2];

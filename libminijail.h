@@ -290,6 +290,18 @@ int minijail_bind(struct minijail *j, const char *src, const char *dest,
 		  int writeable);
 
 /*
+ * minijail_add_remount: when entering minijail @j, remounts @mount_name and all
+ * subdirectories as @remount_mode rather than the default MS_PRIVATE
+ * @j             minijail to bind inside
+ * @mount_name    mount to remount
+ * @remount_mode  remount mode to use
+ *
+ * This may be called multiple times; this overrides |j->remount_mode| for the
+ * given mount.
+ */
+int minijail_add_remount(struct minijail *j, const char *mount_name,
+			 unsigned long remount_mode);
+/*
  * minijail_add_hook: adds @hook to the list of hooks that will be
  * invoked when @event is reached during minijail setup. The caller is
  * responsible for the lifetime of @payload.
