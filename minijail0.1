@@ -141,11 +141,18 @@ missing parent directories).
 .TP
 \fB-K[mode]\fR
 Don't mark all existing mounts as MS_SLAVE.
-This option is \fBdangerous\fR as it negates most of the functionality of \fB-v\fR.
-You very likely don't need this.
+By default, \fB-v\fR changes all mounts in the new namespace to MS_SLAVE.
+Using \fB-K\fR with no mode means that no mount modes are changed.
+If a mount mode is supplied, the specified mode will be used instead of the
+default MS_SLAVE. This option is \fBdangerous\fR as it negates most of the
+functionality of \fB-v\fR. You very likely don't need this.
+.TP
+\fB--mount-propagation <mount_mode>:<mount>\fR
+Mark the mount specified and entire subtree as the given mount mode. Applied
+after \fB-K\fR, so will override remounts done by \fB-K\fR. A separate
+\fB--mount-propagation\fR must be specified for each specific remount to do.
 
-You may specify a mount propagation mode in which case, that will be used
-instead of the default MS_SLAVE.  See the \fBmount\fR(2) man page and the
+For information about mount modes, see the \fBmount\fR(2) man page and the
 kernel docs \fIDocumentation/filesystems/sharedsubtree.txt\fR for more
 technical details, but a brief guide:
 
