@@ -1119,6 +1119,47 @@ TEST_F(NamespaceTest, test_remount_all_private) {
   minijail_destroy(j);
 }
 
+TEST_F(NamespaceTest, test_fail_to_remount_one_private) {
+  int status;
+  char uidmap[kBufferSize], gidmap[kBufferSize];
+  constexpr uid_t kTargetUid = 1000;  // Any non-zero value will do.
+  constexpr gid_t kTargetGid = 1000;
+
+  if (!userns_supported_) {
+    SUCCEED();
+    return;
+  }
+
+  struct minijail *j = minijail_new();
+
+  minijail_namespace_pids(j);
+  minijail_namespace_vfs(j);
+  minijail_mount_tmp(j);
+  minijail_run_as_init(j);
+
+  // Perform userns mapping.
+  minijail_namespace_user(j);
+  snprintf(uidmap, sizeof(uidmap), "%d %d 1", kTargetUid, getuid());
+  snprintf(gidmap, sizeof(gidmap), "%d %d 1", kTargetGid, getgid());
+  minijail_change_uid(j, kTargetUid);
+  minijail_change_gid(j, kTargetGid);
+  minijail_uidmap(j, uidmap);
+  minijail_gidmap(j, gidmap);
+  minijail_namespace_user_disable_setgroups(j);
+
+  minijail_namespace_vfs(j);
+  minijail_remount_mode(j, MS_SHARED);
+  minijail_add_remount(j, "/proc", MS_PRIVATE);
+
+  char *argv[] = {"/bin/true", nullptr};
+  minijail_run(j, argv[0], argv);
+
+  status = minijail_wait(j);
+  EXPECT_GT(status, 0);
+
+  minijail_destroy(j);
+}
+
 TEST_F(NamespaceTest, test_remount_one_shared) {
   pid_t pid;
   int child_stdout;
