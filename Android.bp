@@ -359,6 +359,10 @@ cc_test {
             test_suites: ["device-tests"],
         },
     },
+    test_options: {
+        unit_test: true,
+    },
+    data: ["test/*"],
 }
 
 // System functionality unit tests using gtest.
