@@ -37,22 +37,20 @@ except ImportError:
     from minijail import compiler
     from minijail import parser
 
-
 CONSTANTS_ERR_MSG = """Could not find 'constants.json' file.
 See 'generate_constants_json.py -h'."""
 
 
 def parse_args(argv):
     """Return the parsed CLI arguments for this tool."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        '--optimization-strategy',
-        default=compiler.OptimizationStrategy.BST,
-        type=compiler.OptimizationStrategy,
-        choices=list(compiler.OptimizationStrategy))
-    parser.add_argument('--include-depth-limit', default=10)
-    parser.add_argument('--arch-json', default='constants.json')
-    parser.add_argument(
+    arg_parser = argparse.ArgumentParser(description=__doc__)
+    arg_parser.add_argument('--optimization-strategy',
+                            default=compiler.OptimizationStrategy.BST,
+                            type=compiler.OptimizationStrategy,
+                            choices=list(compiler.OptimizationStrategy))
+    arg_parser.add_argument('--include-depth-limit', default=10)
+    arg_parser.add_argument('--arch-json', default='constants.json')
+    arg_parser.add_argument(
         '--default-action',
         type=str,
         help=('Use the specified default action, overriding any @default '
@@ -60,16 +58,18 @@ def parse_args(argv):
               'This allows the use of permissive actions (allow, log, trace, '
               'user-notify) since it is not valid to specify a permissive '
               'action in .policy files. This is useful for debugging.'))
-    parser.add_argument(
+    arg_parser.add_argument(
         '--use-kill-process',
         action='store_true',
         help=('Use SECCOMP_RET_KILL_PROCESS instead of '
               'SECCOMP_RET_KILL_THREAD (requires Linux v4.14+).'))
-    parser.add_argument(
-        'policy', help='The seccomp policy.', type=argparse.FileType('r'))
-    parser.add_argument(
-        'output', help='The BPF program.', type=argparse.FileType('wb'))
-    return parser.parse_args(argv), parser
+    arg_parser.add_argument('policy',
+                            help='The seccomp policy.',
+                            type=argparse.FileType('r'))
+    arg_parser.add_argument('output',
+                            help='The BPF program.',
+                            type=argparse.FileType('wb'))
+    return arg_parser.parse_args(argv), arg_parser
 
 
 def main(argv=None):
@@ -78,9 +78,9 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
 
-    opts, parser = parse_args(argv)
+    opts, arg_parser = parse_args(argv)
     if not os.path.exists(opts.arch_json):
-        parser.error(CONSTANTS_ERR_MSG)
+        arg_parser.error(CONSTANTS_ERR_MSG)
 
     parsed_arch = arch.Arch.load_from_json(opts.arch_json)
     policy_compiler = compiler.PolicyCompiler(parsed_arch)
