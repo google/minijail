@@ -70,3 +70,6 @@ struct fscrypt_policy_v1 {
 #define FS_IOC_SET_ENCRYPTION_POLICY _IOR('f', 19, struct fscrypt_policy)
 #define FS_IOC_GET_ENCRYPTION_POLICY _IOW('f', 21, struct fscrypt_policy)
 #endif /* !FS_IOC_SET_ENCRYPTION_POLICY && !FS_IOC_GET_ENCRYPTION_POLICY */
+#if !defined(FS_IOC_GET_ENCRYPTION_POLICY_EX)
+#define FS_IOC_GET_ENCRYPTION_POLICY_EX _IOWR('f', 22, __u8[9])
+#endif
