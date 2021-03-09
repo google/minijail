@@ -467,7 +467,7 @@ static void use_profile(struct minijail *j, const char *profile,
 	}
 }
 
-static unsigned long get_remount_mode(const char *mode)
+static void set_remount_mode(struct minijail *j, const char *mode)
 {
 	unsigned long msmode;
 	if (!strcmp(mode, "shared"))
@@ -482,26 +482,7 @@ static unsigned long get_remount_mode(const char *mode)
 		fprintf(stderr, "Unknown remount mode: '%s'\n", mode);
 		exit(1);
 	}
-
-	return msmode;
-}
-
-static void set_remount_mode(struct minijail *j, const char *mode)
-{
-	minijail_remount_mode(j, get_remount_mode(mode));
-}
-
-static void add_remount(struct minijail *j, char *arg)
-{
-	/* mount_info should be in the format: <mount_mode>:<mount_name> */
-	char *mode = tokenize(&arg, ":");
-	char *mount_name = arg;
-
-	if (!mode || mode[0] == '\0' || !mount_name || mount_name[0] == '\0') {
-		fprintf(stderr, "Bad remount: %s %s\n", mode, mount_name);
-		exit(1);
-	}
-	minijail_add_remount(j, mount_name, get_remount_mode(mode));
+	minijail_remount_mode(j, msmode);
 }
 
 static void read_seccomp_filter(const char *filter_path,
@@ -585,8 +566,6 @@ static void usage(const char *progn)
 	       "  -I:           Run <program> as init (pid 1) inside a new pid namespace (implies -p).\n"
 	       "  -K:           Do not change share mode of any existing mounts.\n"
 	       "  -K<mode>:     Mark all existing mounts as <mode> instead of MS_PRIVATE.\n"
-	       "  --mount-propagation <mode>:<mount>: Mark the specified <mount>\n"
-               "                as <mode> instead of the global setting.\n"
 	       "  -l:           Enter new IPC namespace.\n"
 	       "  -L:           Report blocked syscalls when using seccomp filter.\n"
 	       "                If the kernel does not support SECCOMP_RET_LOG,\n"
@@ -667,7 +646,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	int forward = 1;
 	int binding = 0;
 	int chroot = 0, pivot_root = 0;
-	int mount_ns = 0, change_remount = 0, mount_propagation = 0;
+	int mount_ns = 0, change_remount = 0;
 	const char *remount_mode = NULL;
 	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
 	int caps = 0, ambient_caps = 0;
@@ -697,7 +676,6 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		{"seccomp-bpf-binary", required_argument, 0, 133},
 		{"add-suppl-group", required_argument, 0, 134},
 		{"allow-speculative-execution", no_argument, 0, 135},
-		{"mount-propagation", required_argument, 0, 136},
 		{0, 0, 0, 0},
 	};
 	/* clang-format on */
@@ -985,10 +963,6 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		case 135:
 			minijail_set_seccomp_filter_allow_speculation(j);
 			break;
-		case 136:
-                        mount_propagation = 1;
-			add_remount(j, optarg);
-			break;
 		default:
 			usage(argv[0]);
 			exit(opt == 'h' ? 0 : 1);
@@ -1048,17 +1022,6 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				"without -v (new mount namespace).\n"
 				"Do you need to add '-v' explicitly?\n");
 		exit(1);
-	}
-
-        /*
-         * If we are not entering a new mount namespace it doesn't make any
-         * sense to remount a mount with another mount propagation mode.
-         */
-        if (mount_propagation && !mount_ns) {
-        	fprintf(stderr, "--mount-propagation should only be used "
-        			"with -v (new mount namespace).\n"
-                  		"Do you need to add '-v' explicitly?\n");
-        	exit(1);
 	}
 
 	/* Configure the remount flag here to avoid having -v override it. */
