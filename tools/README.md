@@ -56,7 +56,7 @@ The list of syscalls here matches the list of keys  in `arg_inspection`.
 for arch in b32 b64; do
   auditctl -a exit,always -F uid=$UID -F arch=$arch -S ioctl -S socket \
            -S prctl -S mmap -S mprotect \
-           $([ "$arch" = "b32" ] && echo "-S mmap2")
+           $([ "$arch" = "b32" ] && echo "-S mmap2") -c
 done
 touch /tmp/empty.policy
 ```
