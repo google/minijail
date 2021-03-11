@@ -61,3 +61,15 @@
 #define __NR_statx 291
 #endif
 #endif /* __NR_statx */
+
+#ifndef __NR_io_uring_enter
+#define __NR_io_uring_enter 426
+#endif
+
+#ifndef __NR_io_uring_register
+#define __NR_io_uring_register 427
+#endif
+
+#ifndef __NR_io_uring_setup
+#define __NR_io_uring_setup 425
+#endif
