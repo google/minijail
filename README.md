@@ -93,3 +93,24 @@ CapPrm: 0000000000003000
 CapEff: 0000000000003000
 CapBnd: 0000000000003000
 ```
+
+## Historical notes
+
+Q. "Why is it called minijail0?"
+
+A. It is minijail0 because it was a rewrite of an earlier program named
+minijail, which was considerably less mini, and in particular had a dependency
+on libchrome (the Chrome OS packaged version of Chromium's //base).  We needed a
+new name to not collide with the deprecated one.
+
+We didn't want to call it minijail2 or something that would make people
+start using it before we were ready, and it was also concretely _less_ since it
+dropped libbase, etc.  Technically, we needed to be able to fork/preload with
+minimal extra syscall noise which was too hard with libbase at the time (onexit
+handlers, etc that called syscalls we didn't want to allow).  Also, Elly made a
+strong case that C would be the right choice for this for linking and ease of
+controlled surprise system call use.
+
+https://crrev.com/c/4585/ added the original implementation.
+
+Source: Conversations with original authors, ellyjones@ and wad@.
