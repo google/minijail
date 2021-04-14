@@ -46,3 +46,6 @@ googletest-release*
 # VSCode workspace.
 minijail.code-workspace
 
+# IntelliJ projects.
+.idea
+
