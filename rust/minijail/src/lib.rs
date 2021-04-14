@@ -676,6 +676,8 @@ impl Minijail {
     }
 
     /// Forks a child and puts it in the previously configured minijail.
+    ///
+    /// # Safety
     /// `fork` is unsafe because it closes all open FD for this process.  That
     /// could cause a lot of trouble if not handled carefully.  FDs 0, 1, and 2
     /// are overwritten with /dev/null FDs unless they are included in the
@@ -693,6 +695,9 @@ impl Minijail {
 
     /// Behaves the same as `fork()` except `inheritable_fds` is a list of fd
     /// mappings rather than just a list of fds to preserve.
+    ///
+    /// # Safety
+    /// See `fork`.
     pub unsafe fn fork_remap(&self, inheritable_fds: &[(RawFd, RawFd)]) -> Result<pid_t> {
         if !is_single_threaded().map_err(Error::CheckingMultiThreaded)? {
             // This test will fail during `cargo test` because the test harness always spawns a test
