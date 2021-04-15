@@ -8,3 +8,8 @@ edition = "2018"
 [dependencies]
 libc = "0.2.44"
 minijail-sys = { path = "../minijail-sys" } # provided by ebuild
+
+[[test]]
+name = "fork_remap"
+path = "tests/fork_remap.rs"
+harness = false
