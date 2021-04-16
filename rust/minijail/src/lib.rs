@@ -230,6 +230,29 @@ extern "C" {
     fn __libc_current_sigrtmax() -> libc::c_int;
 }
 
+fn translate_wait_error(ret: libc::c_int) -> Result<()> {
+    if ret == 0 {
+        return Ok(());
+    }
+    if ret == MINIJAIL_ERR_NO_COMMAND as libc::c_int {
+        return Err(Error::NoCommand);
+    }
+    if ret == MINIJAIL_ERR_NO_ACCESS as libc::c_int {
+        return Err(Error::NoAccess);
+    }
+    let sig_base: libc::c_int = MINIJAIL_ERR_SIG_BASE as libc::c_int;
+    let sig_max_code: libc::c_int = unsafe { __libc_current_sigrtmax() } + sig_base;
+    if ret > sig_base && ret <= sig_max_code {
+        return Err(Error::Killed(
+            (ret - MINIJAIL_ERR_SIG_BASE as libc::c_int) as u8,
+        ));
+    }
+    if ret > 0 && ret <= 0xff {
+        return Err(Error::ReturnCode(ret as u8));
+    }
+    unreachable!();
+}
+
 impl Minijail {
     /// Creates a new jail configuration.
     pub fn new() -> Result<Minijail> {
@@ -745,26 +768,17 @@ impl Minijail {
         unsafe {
             ret = minijail_wait(self.jail);
         }
-        if ret == 0 {
-            return Ok(());
-        }
-        if ret == MINIJAIL_ERR_NO_COMMAND as libc::c_int {
-            return Err(Error::NoCommand);
-        }
-        if ret == MINIJAIL_ERR_NO_ACCESS as libc::c_int {
-            return Err(Error::NoAccess);
-        }
-        let sig_base: libc::c_int = MINIJAIL_ERR_SIG_BASE as libc::c_int;
-        let sig_max_code: libc::c_int = unsafe { __libc_current_sigrtmax() } + sig_base;
-        if ret > sig_base && ret <= sig_max_code {
-            return Err(Error::Killed(
-                (ret - MINIJAIL_ERR_SIG_BASE as libc::c_int) as u8,
-            ));
-        }
-        if ret > 0 && ret <= 0xff {
-            return Err(Error::ReturnCode(ret as u8));
-        }
-        unreachable!();
+        translate_wait_error(ret)
+    }
+
+    /// Send a SIGTERM to the child process and wait for its return code.
+    pub fn kill(&self) -> Result<()> {
+        let ret = unsafe {
+            // The kill does not change any internal state.
+            minijail_kill(self.jail)
+        };
+        // minijail_kill waits for the process, so also translate the returned wait error.
+        translate_wait_error(ret)
     }
 }
 
@@ -898,6 +912,19 @@ mod tests {
         j.run(Path::new("/bin/does not exist"), &[1, 2], &[])
             .unwrap();
         expect_result!(j.wait(), Err(Error::NoCommand));
+    }
+
+    #[test]
+    fn kill_success() {
+        let j = Minijail::new().unwrap();
+        j.run(
+            Path::new("usr/bin/sleep"),
+            &[1, 2],
+            &["/usr/bin/sleep", "5"],
+        )
+        .unwrap();
+        const EXPECTED_SIGNAL: u8 = libc::SIGTERM as u8;
+        expect_result!(j.kill(), Err(Error::Killed(EXPECTED_SIGNAL)));
     }
 
     #[test]
