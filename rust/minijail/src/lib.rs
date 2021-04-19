@@ -189,12 +189,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// * Load seccomp policy - like "minijail0 -n -S myfilter.policy"
 ///
 /// ```
-/// # use std::path::Path;
 /// # use minijail::Minijail;
 /// # fn seccomp_filter_test() -> Result<(), ()> {
 ///       let mut j = Minijail::new().map_err(|_| ())?;
 ///       j.no_new_privs();
-///       j.parse_seccomp_filters(Path::new("my_filter.policy")).map_err(|_| ())?;
+///       j.parse_seccomp_filters("my_filter.policy").map_err(|_| ())?;
 ///       j.use_seccomp_filter();
 ///       unsafe { // `fork` will close all the programs FDs.
 ///           j.fork(None).map_err(|_| ())?;
@@ -337,9 +336,9 @@ impl Minijail {
             minijail_set_seccomp_filter_tsync(self.jail);
         }
     }
-    pub fn parse_seccomp_program(&mut self, path: &Path) -> Result<()> {
-        if !path.is_file() {
-            return Err(Error::SeccompPath(path.to_owned()));
+    pub fn parse_seccomp_program<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        if !path.as_ref().is_file() {
+            return Err(Error::SeccompPath(path.as_ref().to_owned()));
         }
 
         let buffer = fs::read(path).map_err(Error::ReadProgram)?;
@@ -366,17 +365,18 @@ impl Minijail {
         }
         Ok(())
     }
-    pub fn parse_seccomp_filters(&mut self, path: &Path) -> Result<()> {
-        if !path.is_file() {
-            return Err(Error::SeccompPath(path.to_owned()));
+    pub fn parse_seccomp_filters<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        if !path.as_ref().is_file() {
+            return Err(Error::SeccompPath(path.as_ref().to_owned()));
         }
 
         let pathstring = path
+            .as_ref()
             .as_os_str()
             .to_str()
-            .ok_or_else(|| Error::PathToCString(path.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(path.as_ref().to_owned()))?;
         let filename =
-            CString::new(pathstring).map_err(|_| Error::PathToCString(path.to_owned()))?;
+            CString::new(pathstring).map_err(|_| Error::PathToCString(path.as_ref().to_owned()))?;
         unsafe {
             minijail_parse_seccomp_filters(self.jail, filename.as_ptr());
         }
@@ -498,50 +498,65 @@ impl Minijail {
         }
         Ok(())
     }
-    pub fn enter_chroot(&mut self, dir: &Path) -> Result<()> {
+    pub fn enter_chroot<P: AsRef<Path>>(&mut self, dir: P) -> Result<()> {
         let pathstring = dir
+            .as_ref()
             .as_os_str()
             .to_str()
-            .ok_or_else(|| Error::PathToCString(dir.to_owned()))?;
-        let dirname = CString::new(pathstring).map_err(|_| Error::PathToCString(dir.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(dir.as_ref().to_owned()))?;
+        let dirname =
+            CString::new(pathstring).map_err(|_| Error::PathToCString(dir.as_ref().to_owned()))?;
         let ret = unsafe { minijail_enter_chroot(self.jail, dirname.as_ptr()) };
         if ret < 0 {
-            return Err(Error::SettingChrootDirectory(ret, dir.to_owned()));
+            return Err(Error::SettingChrootDirectory(ret, dir.as_ref().to_owned()));
         }
         Ok(())
     }
-    pub fn enter_pivot_root(&mut self, dir: &Path) -> Result<()> {
+    pub fn enter_pivot_root<P: AsRef<Path>>(&mut self, dir: P) -> Result<()> {
         let pathstring = dir
+            .as_ref()
             .as_os_str()
             .to_str()
-            .ok_or_else(|| Error::PathToCString(dir.to_owned()))?;
-        let dirname = CString::new(pathstring).map_err(|_| Error::PathToCString(dir.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(dir.as_ref().to_owned()))?;
+        let dirname =
+            CString::new(pathstring).map_err(|_| Error::PathToCString(dir.as_ref().to_owned()))?;
         let ret = unsafe { minijail_enter_pivot_root(self.jail, dirname.as_ptr()) };
         if ret < 0 {
-            return Err(Error::SettingPivotRootDirectory(ret, dir.to_owned()));
+            return Err(Error::SettingPivotRootDirectory(
+                ret,
+                dir.as_ref().to_owned(),
+            ));
         }
         Ok(())
     }
-    pub fn mount(&mut self, src: &Path, dest: &Path, fstype: &str, flags: usize) -> Result<()> {
+    pub fn mount<P1: AsRef<Path>, P2: AsRef<Path>>(
+        &mut self,
+        src: P1,
+        dest: P2,
+        fstype: &str,
+        flags: usize,
+    ) -> Result<()> {
         self.mount_with_data(src, dest, fstype, flags, "")
     }
-    pub fn mount_with_data(
+    pub fn mount_with_data<P1: AsRef<Path>, P2: AsRef<Path>>(
         &mut self,
-        src: &Path,
-        dest: &Path,
+        src: P1,
+        dest: P2,
         fstype: &str,
         flags: usize,
         data: &str,
     ) -> Result<()> {
         let src_os = src
+            .as_ref()
             .as_os_str()
             .to_str()
-            .ok_or_else(|| Error::PathToCString(src.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(src.as_ref().to_owned()))?;
         let src_path = CString::new(src_os).map_err(|_| Error::StrToCString(src_os.to_owned()))?;
         let dest_os = dest
+            .as_ref()
             .as_os_str()
             .to_str()
-            .ok_or_else(|| Error::PathToCString(dest.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(dest.as_ref().to_owned()))?;
         let dest_path =
             CString::new(dest_os).map_err(|_| Error::StrToCString(dest_os.to_owned()))?;
         let fstype_string =
@@ -560,8 +575,8 @@ impl Minijail {
         if ret < 0 {
             return Err(Error::Mount {
                 errno: ret,
-                src: src.to_owned(),
-                dest: dest.to_owned(),
+                src: src.as_ref().to_owned(),
+                dest: dest.as_ref().to_owned(),
                 fstype: fstype.to_owned(),
                 flags,
                 data: data.to_owned(),
@@ -584,16 +599,23 @@ impl Minijail {
             minijail_mount_tmp_size(self.jail, size);
         }
     }
-    pub fn mount_bind(&mut self, src: &Path, dest: &Path, writable: bool) -> Result<()> {
+    pub fn mount_bind<P1: AsRef<Path>, P2: AsRef<Path>>(
+        &mut self,
+        src: P1,
+        dest: P2,
+        writable: bool,
+    ) -> Result<()> {
         let src_os = src
+            .as_ref()
             .as_os_str()
             .to_str()
-            .ok_or_else(|| Error::PathToCString(src.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(src.as_ref().to_owned()))?;
         let src_path = CString::new(src_os).map_err(|_| Error::StrToCString(src_os.to_owned()))?;
         let dest_os = dest
+            .as_ref()
             .as_os_str()
             .to_str()
-            .ok_or_else(|| Error::PathToCString(dest.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(dest.as_ref().to_owned()))?;
         let dest_path =
             CString::new(dest_os).map_err(|_| Error::StrToCString(dest_os.to_owned()))?;
         let ret = unsafe {
@@ -607,8 +629,8 @@ impl Minijail {
         if ret < 0 {
             return Err(Error::BindMount {
                 errno: ret,
-                src: src.to_owned(),
-                dst: dest.to_owned(),
+                src: src.as_ref().to_owned(),
+                dst: dest.as_ref().to_owned(),
             });
         }
         Ok(())
@@ -618,7 +640,12 @@ impl Minijail {
     /// FDs 0, 1, and 2 are overwritten with /dev/null FDs unless they are included in the
     /// inheritable_fds list. This function may abort in the child on error because a partially
     /// entered jail isn't recoverable.
-    pub fn run(&self, cmd: &Path, inheritable_fds: &[RawFd], args: &[&str]) -> Result<pid_t> {
+    pub fn run<P: AsRef<Path>>(
+        &self,
+        cmd: P,
+        inheritable_fds: &[RawFd],
+        args: &[&str],
+    ) -> Result<pid_t> {
         self.run_remap(
             cmd,
             &inheritable_fds
@@ -631,15 +658,16 @@ impl Minijail {
 
     /// Behaves the same as `run()` except `inheritable_fds` is a list of fd
     /// mappings rather than just a list of fds to preserve.
-    pub fn run_remap(
+    pub fn run_remap<P: AsRef<Path>>(
         &self,
-        cmd: &Path,
+        cmd: P,
         inheritable_fds: &[(RawFd, RawFd)],
         args: &[&str],
     ) -> Result<pid_t> {
         let cmd_os = cmd
+            .as_ref()
             .to_str()
-            .ok_or_else(|| Error::PathToCString(cmd.to_owned()))?;
+            .ok_or_else(|| Error::PathToCString(cmd.as_ref().to_owned()))?;
         let cmd_cstr = CString::new(cmd_os).map_err(|_| Error::StrToCString(cmd_os.to_owned()))?;
 
         // Converts each incoming `args` string to a `CString`, and then puts each `CString` pointer
@@ -833,8 +861,7 @@ mod tests {
     fn seccomp_no_new_privs() {
         let mut j = Minijail::new().unwrap();
         j.no_new_privs();
-        j.parse_seccomp_filters(Path::new("src/test_filter.policy"))
-            .unwrap();
+        j.parse_seccomp_filters("src/test_filter.policy").unwrap();
         j.use_seccomp_filter();
         if unsafe { j.fork(None).unwrap() } == 0 {
             exit(0);
@@ -876,7 +903,7 @@ mod tests {
     #[test]
     fn wait_success() {
         let j = Minijail::new().unwrap();
-        j.run(Path::new("/bin/true"), &[1, 2], &[]).unwrap();
+        j.run("/bin/true", &[1, 2], &[]).unwrap();
         expect_result!(j.wait(), Ok(()));
     }
 
@@ -884,7 +911,7 @@ mod tests {
     fn wait_killed() {
         let j = Minijail::new().unwrap();
         j.run(
-            Path::new(SHELL),
+            SHELL,
             &[1, 2],
             &[SHELL, "-c", "kill -9 $$ &\n/usr/bin/sleep 5"],
         )
@@ -895,22 +922,21 @@ mod tests {
     #[test]
     fn wait_returncode() {
         let j = Minijail::new().unwrap();
-        j.run(Path::new("/bin/false"), &[1, 2], &[]).unwrap();
+        j.run("/bin/false", &[1, 2], &[]).unwrap();
         expect_result!(j.wait(), Err(Error::ReturnCode(1)));
     }
 
     #[test]
     fn wait_noaccess() {
         let j = Minijail::new().unwrap();
-        j.run(Path::new("/dev/null"), &[1, 2], &[]).unwrap();
+        j.run("/dev/null", &[1, 2], &[]).unwrap();
         expect_result!(j.wait(), Err(Error::NoAccess));
     }
 
     #[test]
     fn wait_nocommand() {
         let j = Minijail::new().unwrap();
-        j.run(Path::new("/bin/does not exist"), &[1, 2], &[])
-            .unwrap();
+        j.run("/bin/does not exist", &[1, 2], &[]).unwrap();
         expect_result!(j.wait(), Err(Error::NoCommand));
     }
 
@@ -931,7 +957,7 @@ mod tests {
     #[ignore] // privileged operation.
     fn chroot() {
         let mut j = Minijail::new().unwrap();
-        j.enter_chroot(Path::new(".")).unwrap();
+        j.enter_chroot(".").unwrap();
         if unsafe { j.fork(None).unwrap() } == 0 {
             exit(0);
         }
@@ -950,6 +976,6 @@ mod tests {
     #[test]
     fn run() {
         let j = Minijail::new().unwrap();
-        j.run(Path::new("/bin/true"), &[], &[]).unwrap();
+        j.run("/bin/true", &[], &[]).unwrap();
     }
 }
