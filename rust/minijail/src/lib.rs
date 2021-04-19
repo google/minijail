@@ -9,7 +9,7 @@ use std::fmt::{self, Display};
 use std::fs;
 use std::io;
 use std::os::raw::{c_char, c_ulong, c_ushort};
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::ptr::{null, null_mut};
 
@@ -733,6 +733,10 @@ impl Minijail {
     /// could cause a lot of trouble if not handled carefully.  FDs 0, 1, and 2
     /// are overwritten with /dev/null FDs unless they are included in the
     /// inheritable_fds list.
+    ///
+    /// Also, any Rust objects that own fds may try to close them after the fork. If they belong
+    /// to a fd number that was mapped to, the mapped fd will be closed instead.
+    ///
     /// This Function may abort in the child on error because a partially
     /// entered jail isn't recoverable.
     pub unsafe fn fork(&self, inheritable_fds: Option<&[RawFd]>) -> Result<pid_t> {
@@ -786,6 +790,10 @@ impl Minijail {
         let ret = minijail_fork(self.jail);
         if ret < 0 {
             return Err(Error::ForkingMinijail(ret));
+        }
+        if ret == 0 {
+            // Safe because dev_null was remapped.
+            dev_null.into_raw_fd();
         }
         Ok(ret as pid_t)
     }
