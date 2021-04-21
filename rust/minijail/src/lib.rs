@@ -885,9 +885,9 @@ mod tests {
             // Using libc to open/close FDs for testing.
             const FILE_PATH: &[u8] = b"/dev/null\0";
             let j = Minijail::new().unwrap();
-            let first = libc::open(FILE_PATH.as_ptr() as *const i8, libc::O_RDONLY);
+            let first = libc::open(FILE_PATH.as_ptr() as *const c_char, libc::O_RDONLY);
             assert!(first >= 0);
-            let second = libc::open(FILE_PATH.as_ptr() as *const i8, libc::O_RDONLY);
+            let second = libc::open(FILE_PATH.as_ptr() as *const c_char, libc::O_RDONLY);
             assert!(second >= 0);
             let fds: Vec<RawFd> = vec![0, 1, 2, first];
             if j.fork(Some(&fds)).unwrap() == 0 {
