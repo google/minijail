@@ -3349,18 +3349,7 @@ minijail_run_config_internal(struct minijail *j,
 	return ret;
 }
 
-int API minijail_kill(struct minijail *j)
-{
-	if (j->initpid <= 0)
-		return -ECHILD;
-
-	if (kill(j->initpid, SIGTERM))
-		return -errno;
-
-	return minijail_wait(j);
-}
-
-int API minijail_wait(struct minijail *j)
+static int minijail_wait_internal(struct minijail *j, int expected_signal)
 {
 	if (j->initpid <= 0)
 		return -ECHILD;
@@ -3378,8 +3367,10 @@ int API minijail_wait(struct minijail *j)
 		int error_status = st;
 		if (WIFSIGNALED(st)) {
 			int signum = WTERMSIG(st);
-			warn("child process %d received signal %d",
-			     j->initpid, signum);
+			if (signum != expected_signal) {
+				warn("child process %d received signal %d",
+				     j->initpid, signum);
+			}
 			/*
 			 * We return MINIJAIL_ERR_JAIL if the process received
 			 * SIGSYS, which happens when a syscall is blocked by
@@ -3402,6 +3393,22 @@ int API minijail_wait(struct minijail *j)
 		     j->initpid, exit_status);
 
 	return exit_status;
+}
+
+int API minijail_kill(struct minijail *j)
+{
+	if (j->initpid <= 0)
+		return -ECHILD;
+
+	if (kill(j->initpid, SIGTERM))
+		return -errno;
+
+	return minijail_wait_internal(j, SIGTERM);
+}
+
+int API minijail_wait(struct minijail *j)
+{
+	return minijail_wait_internal(j, 0);
 }
 
 void API minijail_destroy(struct minijail *j)
