@@ -484,6 +484,16 @@ int minijail_wait(struct minijail *j);
 void minijail_destroy(struct minijail *j);
 
 /*
+ * Deep copies the minijail in |from| to |out| providing two identical jails
+ * that can be used to contain separate children created with minijail_fork().
+ *
+ * Duplicating a jail is invalid after a jail has been passed to
+ * minijail_fork(). Many minijail_*() calls will yield undefined
+ * results when called on a jail duplicated post-fork.
+ */
+int minijail_copy_jail(const struct minijail *from, struct minijail *out);
+
+/*
  * minijail_log_to_fd: redirects the module-wide logging to an FD instead of
  * syslog.
  * @fd           FD to log to. Caller must ensure this is available after
