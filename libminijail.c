@@ -2518,6 +2518,26 @@ error:
 	return err;
 }
 
+int API minijail_copy_jail(const struct minijail *from, struct minijail *out)
+{
+	size_t sz = minijail_size(from);
+	if (!sz)
+		return -EINVAL;
+
+	char *buf = malloc(sz);
+	if (!buf)
+		return -ENOMEM;
+
+	int err = minijail_marshal(from, buf, sz);
+	if (err)
+		goto error;
+
+	err = minijail_unmarshal(out, buf, sz);
+error:
+	free(buf);
+	return err;
+}
+
 static int setup_preload(const struct minijail *j attribute_unused,
 			 char ***child_env attribute_unused)
 {
