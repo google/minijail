@@ -266,6 +266,22 @@ impl Minijail {
         Ok(Minijail { jail: j })
     }
 
+    /// Clones self to a new `Minijail`. Useful because `fork` can only be called once on a
+    /// `Minijail`.
+    pub fn try_clone(&self) -> Result<Minijail> {
+        let jail_out = Minijail::new()?;
+        unsafe {
+            // Safe to clone one minijail to the other as minijail_clone doesn't modify the source
+            // jail(`self`) and leaves a valid minijail in the destination(`jail_out`).
+            let ret = minijail_copy_jail(self.jail, jail_out.jail);
+            if ret < 0 {
+                return Err(Error::ReturnCode(ret as u8));
+            }
+        }
+
+        Ok(jail_out)
+    }
+
     // The following functions are safe because they only set values in the
     // struct already owned by minijail.  The struct's lifetime is tied to
     // `struct Minijail` so it is guaranteed to be valid
@@ -988,6 +1004,15 @@ mod tests {
     fn run() {
         let j = Minijail::new().unwrap();
         j.run("/bin/true", &[], &EMPTY_STRING_SLICE).unwrap();
+    }
+
+    #[test]
+    fn run_clone() {
+        let j = Minijail::new().unwrap();
+        let b = j.try_clone().unwrap();
+        // Pass the same FDs to both clones and make sure they don't conflict.
+        j.run("/bin/true", &[1, 2], &EMPTY_STRING_SLICE).unwrap();
+        b.run("/bin/true", &[1, 2], &EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
