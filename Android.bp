@@ -102,6 +102,7 @@ cc_object {
     apex_available: [
         "//apex_available:platform",
         "com.android.adbd",
+        "com.android.compos",
         "com.android.media.swcodec",
         "com.android.virt",
     ],
@@ -120,6 +121,7 @@ cc_genrule {
     apex_available: [
         "//apex_available:platform",
         "com.android.adbd",
+        "com.android.compos",
         "com.android.media.swcodec",
         "com.android.virt",
     ],
@@ -141,6 +143,7 @@ cc_object {
     apex_available: [
         "//apex_available:platform",
         "com.android.adbd",
+        "com.android.compos",
         "com.android.media.swcodec",
         "com.android.virt",
     ],
@@ -159,6 +162,7 @@ cc_genrule {
     apex_available: [
         "//apex_available:platform",
         "com.android.adbd",
+        "com.android.compos",
         "com.android.media.swcodec",
         "com.android.virt",
     ],
@@ -189,6 +193,7 @@ cc_library_static {
     apex_available: [
         "//apex_available:platform",
         "com.android.adbd",
+        "com.android.compos",
         "com.android.media.swcodec",
         "com.android.virt",
     ],
@@ -277,6 +282,7 @@ cc_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.adbd",
+        "com.android.compos",
         "com.android.media.swcodec",
         "com.android.virt",
     ],
@@ -538,6 +544,7 @@ rust_library {
     ],
     apex_available: [
         "//apex_available:platform",
+        "com.android.compos",
         "com.android.virt",
     ],
 }
@@ -557,6 +564,7 @@ rust_library {
     ],
     apex_available: [
         "//apex_available:platform",
+        "com.android.compos",
         "com.android.virt",
     ],
 }
