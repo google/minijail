@@ -971,7 +971,7 @@ mod tests {
     fn kill_success() {
         let j = Minijail::new().unwrap();
         j.run(
-            Path::new("usr/bin/sleep"),
+            Path::new("/usr/bin/sleep"),
             &[1, 2],
             &["/usr/bin/sleep", "5"],
         )
