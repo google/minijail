@@ -270,7 +270,8 @@ class PolicyCompiler:
                      optimization_strategy,
                      kill_action,
                      include_depth_limit=10,
-                     override_default_action=None):
+                     override_default_action=None,
+                     denylist=False):
         """Return a compiled BPF program from the provided policy file."""
         policy_parser = parser.PolicyParser(
             self._arch,
@@ -286,8 +287,12 @@ class PolicyCompiler:
 
         visitor = bpf.FlatteningVisitor(
             arch=self._arch, kill_action=kill_action)
-        accept_action = bpf.Allow()
-        reject_action = parsed_policy.default_action
+        if denylist:
+            accept_action = parsed_policy.default_action
+            reject_action = bpf.Allow()
+        else:
+            accept_action = bpf.Allow()
+            reject_action = parsed_policy.default_action
         if entries:
             if optimization_strategy == OptimizationStrategy.BST:
                 next_action = _compile_entries_bst(entries, accept_action,
