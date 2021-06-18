@@ -59,6 +59,7 @@ _TOKEN_SPECIFICATION = (
     ('BITWISE_OR', r'\|'),
     ('OP', r'&|\bin\b|==|!=|<=|<|>=|>'),
     ('EQUAL', r'='),
+    ('NOT', r'!'),
     ('ARGUMENT', r'\barg[0-9]+\b'),
     ('RETURN', r'\breturn\b'),
     ('ACTION',
@@ -219,14 +220,19 @@ class PolicyParser:
                  *,
                  kill_action,
                  include_depth_limit=10,
-                 override_default_action=None):
+                 override_default_action=None,
+                 denylist=False):
         self._parser_states = [ParserState("<memory>")]
         self._kill_action = kill_action
         self._include_depth_limit = include_depth_limit
-        self._default_action = self._kill_action
+        if denylist:
+            self._default_action = bpf.Allow()
+        else:
+            self._default_action = self._kill_action
         self._override_default_action = override_default_action
         self._frequency_mapping = collections.defaultdict(int)
         self._arch = arch
+        self._denylist = denylist
 
     @property
     def _parser_state(self):
@@ -395,7 +401,7 @@ class PolicyParser:
     # action = 'allow' | '1'
     #        | 'kill-process'
     #        | 'kill-thread'
-    #        | 'kill'
+    #        | 'kill' | '0'
     #        | 'trap'
     #        | 'trace'
     #        | 'log'
@@ -406,6 +412,11 @@ class PolicyParser:
         if not tokens:
             self._parser_state.error('missing action')
         action_token = tokens.pop(0)
+        # The only valid denylist action is 0
+        if self._denylist:
+            if action_token.type != 'NUMERIC_CONSTANT':
+                self._parser_state.error('invalid denylist policy')
+
         if action_token.type == 'ACTION':
             if action_token.value == 'allow':
                 return bpf.Allow()
@@ -426,7 +437,13 @@ class PolicyParser:
         elif action_token.type == 'NUMERIC_CONSTANT':
             constant = self._parse_single_constant(action_token)
             if constant == 1:
+                if self._denylist:
+                    self._parser_state.error('invalid denylist policy')
                 return bpf.Allow()
+            if constant == 0:
+                if not self._denylist:
+                    self._parser_state.error('invalid allowlist policy')
+                return self._kill_action
         elif action_token.type == 'RETURN':
             if not tokens:
                 self._parser_state.error('missing return value')
@@ -435,21 +452,29 @@ class PolicyParser:
 
     # single-filter = action
     #               | argument-expression , [ ';' , action ]
+    #               | '!','(', argument-expression, [ ';', action ], ')'
     #               ;
     def _parse_single_filter(self, tokens):
         if not tokens:
             self._parser_state.error('missing filter')
         if tokens[0].type == 'ARGUMENT':
-            # Only argument expressions can start with an ARGUMENT token.
-            argument_expression = self.parse_argument_expression(tokens)
-            if tokens and tokens[0].type == 'SEMICOLON':
-                tokens.pop(0)
-                action = self.parse_action(tokens)
-            else:
-                action = bpf.Allow()
-            return Filter(argument_expression, action)
+            if self._denylist:
+                self._parser_state.error('invalid denylist policy')
+            action = bpf.Allow()
+        elif tokens[0].type == 'NOT':
+            if not self._denylist:
+                self._parser_state.error('invalid allowlist policy')
+            tokens.pop(0)
+            action = self._kill_action
         else:
             return Filter(None, self.parse_action(tokens))
+        # Parse an argument expression, either allowlist or denylist.
+        # Only argument expressions can start with an ARGUMENT token.
+        argument_expression = self.parse_argument_expression(tokens)
+        if tokens and tokens[0].type == 'SEMICOLON':
+            tokens.pop(0)
+            action = self.parse_action(tokens)
+        return Filter(argument_expression, action)
 
     # filter = '{' , single-filter , [ { ',' , single-filter } ] , '}'
     #        | single-filter
