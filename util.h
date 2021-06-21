@@ -55,6 +55,31 @@ extern "C" {
 #define attribute_printf(format_idx, check_idx) \
 	__attribute__((__format__(__printf__, format_idx, check_idx)))
 
+/*
+ * Mark a local variable for automatic cleanup when exiting its scope.
+ * See attribute_cleanup_fp as an example below.
+ * Make sure any variable using this is always initialized to something.
+ * @func The function to call on (a pointer to) the variable.
+ */
+#define attribute_cleanup(func) \
+	__attribute__((__cleanup__(func)))
+
+/*
+ * Automatically close a FILE* when exiting its scope.
+ * Make sure the pointer is always initialized.
+ * Some examples:
+ *   attribute_cleanup_fp FILE *fp = fopen(...);
+ *   attribute_cleanup_fp FILE *fp = NULL;
+ *   ...
+ *   fp = fopen(...);
+ */
+#define attribute_cleanup_fp attribute_cleanup(_cleanup_fp)
+static inline void _cleanup_fp(FILE **fp)
+{
+	if (*fp)
+		fclose(*fp);
+}
+
 /* clang-format off */
 #define die(_msg, ...) \
 	do_fatal_log(LOG_ERR, "libminijail[%d]: " _msg, getpid(), ## __VA_ARGS__)

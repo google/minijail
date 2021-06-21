@@ -670,7 +670,8 @@ int compile_file(const char *filename, FILE *policy_file,
 				goto free_line;
 			}
 
-			FILE *included_file = fopen(filename, "re");
+			attribute_cleanup_fp FILE *included_file =
+			    fopen(filename, "re");
 			if (included_file == NULL) {
 				compiler_pwarn(&state, "fopen('%s') failed",
 					       filename);
@@ -683,11 +684,9 @@ int compile_file(const char *filename, FILE *policy_file,
 					 include_level + 1) == -1) {
 				compiler_warn(&state, "'@include %s' failed",
 					      filename);
-				fclose(included_file);
 				ret = -1;
 				goto free_line;
 			}
-			fclose(included_file);
 			continue;
 		}
 

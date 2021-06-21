@@ -488,20 +488,18 @@ static void set_remount_mode(struct minijail *j, const char *mode)
 static void read_seccomp_filter(const char *filter_path,
 				struct sock_fprog *filter)
 {
-	FILE *f = fopen(filter_path, "re");
+	attribute_cleanup_fp FILE *f = fopen(filter_path, "re");
 	if (!f) {
 		fprintf(stderr, "failed to open %s: %m", filter_path);
 		exit(1);
 	}
 	off_t filter_size = 0;
 	if (fseeko(f, 0, SEEK_END) == -1 || (filter_size = ftello(f)) == -1) {
-		fclose(f);
 		fprintf(stderr, "failed to get file size of %s: %m",
 			filter_path);
 		exit(1);
 	}
 	if (filter_size % sizeof(struct sock_filter) != 0) {
-		fclose(f);
 		fprintf(stderr,
 			"filter size (%" PRId64
 			") of %s is not a multiple of %zu: %m",
@@ -514,11 +512,9 @@ static void read_seccomp_filter(const char *filter_path,
 	filter->filter = xmalloc(filter_size);
 	if (fread(filter->filter, sizeof(struct sock_filter), filter->len, f) !=
 	    filter->len) {
-		fclose(f);
 		fprintf(stderr, "failed read %s: %m", filter_path);
 		exit(1);
 	}
-	fclose(f);
 }
 
 static void usage(const char *progn)
