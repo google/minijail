@@ -133,11 +133,13 @@ int write_proc_file(pid_t pid, const char *content, const char *basename)
 	written = write(fd, content, len);
 	if (written < 0) {
 		pwarn("failed to write '%s'", filename);
+		close(fd);
 		return -errno;
 	}
 
 	if ((size_t)written < len) {
 		warn("failed to write %zu bytes to '%s'", len, filename);
+		close(fd);
 		return -1;
 	}
 	close(fd);
@@ -204,6 +206,7 @@ int config_net_loopback(void)
 	strcpy(ifr.ifr_name, ifname);
 	if (ioctl(sock, SIOCGIFFLAGS, &ifr) < 0) {
 		pwarn("ioctl(SIOCGIFFLAGS) failed");
+		close(sock);
 		return -1;
 	}
 
@@ -211,6 +214,7 @@ int config_net_loopback(void)
 	ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
 	if (ioctl(sock, SIOCSIFFLAGS, &ifr) < 0) {
 		pwarn("ioctl(SIOCSIFFLAGS) failed");
+		close(sock);
 		return -1;
 	}
 
@@ -229,6 +233,7 @@ int write_pid_to_path(pid_t pid, const char *path)
 	if (fprintf(fp, "%d\n", (int)pid) < 0) {
 		/* fprintf(3) does not set errno on failure. */
 		warn("fprintf(%s) failed", path);
+		fclose(fp);
 		return -1;
 	}
 	if (fclose(fp)) {
