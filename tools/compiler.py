@@ -277,18 +277,19 @@ class PolicyCompiler:
             self._arch,
             kill_action=kill_action,
             include_depth_limit=include_depth_limit,
-            override_default_action=override_default_action)
+            override_default_action=override_default_action,
+            denylist=denylist)
         parsed_policy = policy_parser.parse_file(policy_filename)
         entries = [
             self.compile_filter_statement(
-                filter_statement, kill_action=kill_action)
+                filter_statement, kill_action=kill_action, denylist=denylist)
             for filter_statement in parsed_policy.filter_statements
         ]
 
         visitor = bpf.FlatteningVisitor(
             arch=self._arch, kill_action=kill_action)
         if denylist:
-            accept_action = parsed_policy.default_action
+            accept_action = kill_action
             reject_action = bpf.Allow()
         else:
             accept_action = bpf.Allow()
@@ -309,7 +310,11 @@ class PolicyCompiler:
             bpf.ValidateArch(reject_action).accept(visitor)
         return visitor.result
 
-    def compile_filter_statement(self, filter_statement, *, kill_action):
+    def compile_filter_statement(self,
+                                 filter_statement,
+                                 *,
+                                 kill_action,
+                                 denylist=False):
         """Compile one parser.FilterStatement into BPF."""
         policy_entry = SyscallPolicyEntry(filter_statement.syscall.name,
                                           filter_statement.syscall.number,
@@ -319,7 +324,7 @@ class PolicyCompiler:
         # false action taken here is the one that applies if the whole
         # expression fails to match.
         false_action = filter_statement.filters[-1].action
-        if false_action == bpf.Allow():
+        if not denylist and false_action == bpf.Allow():
             return policy_entry
         # We then traverse the list of filters backwards since we want
         # the root of the DAG to be the very first boolean operation in
