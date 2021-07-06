@@ -144,6 +144,14 @@ static inline bool debug_logging_allowed(void) {
 #endif
 }
 
+static inline bool seccomp_default_ret_log(void) {
+#if defined(SECCOMP_DEFAULT_RET_LOG)
+	return true;
+#else
+	return false;
+#endif
+}
+
 static inline size_t get_num_syscalls(void)
 {
 	return syscall_table_size;
