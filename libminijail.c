@@ -194,6 +194,12 @@ struct minijail {
 static void run_hooks_or_die(const struct minijail *j,
 			     minijail_hook_event_t event);
 
+
+static bool seccomp_is_logging_allowed(const struct minijail *j)
+{
+	return seccomp_default_ret_log() || j->flags.seccomp_filter_logging;
+}
+
 static void free_mounts_list(struct minijail *j)
 {
 	while (j->mounts_head) {
@@ -419,7 +425,7 @@ void API minijail_set_seccomp_filter_tsync(struct minijail *j)
 		    "before minijail_parse_seccomp_filters()");
 	}
 
-	if (j->flags.seccomp_filter_logging && !seccomp_ret_log_available()) {
+	if (seccomp_is_logging_allowed(j) && !seccomp_ret_log_available()) {
 		/*
 		 * If SECCOMP_RET_LOG is not available, we don't want to use
 		 * SECCOMP_RET_TRAP to both kill the entire process and report
@@ -1086,7 +1092,7 @@ static int parse_seccomp_filters(struct minijail *j, const char *filename,
 	 * Allow logging?
 	 */
 	filteropts.allow_logging =
-	    debug_logging_allowed() && j->flags.seccomp_filter_logging;
+	    debug_logging_allowed() && seccomp_is_logging_allowed(j);
 
 	/* What to do on a blocked system call? */
 	if (filteropts.allow_logging) {
@@ -1175,7 +1181,7 @@ void API minijail_set_seccomp_filters(struct minijail *j,
 	if (!seccomp_should_use_filters(j))
 		return;
 
-	if (j->flags.seccomp_filter_logging) {
+	if (seccomp_is_logging_allowed(j)) {
 		die("minijail_log_seccomp_filter_failures() is incompatible "
 		    "with minijail_set_seccomp_filters()");
 	}
@@ -2139,7 +2145,7 @@ static void set_seccomp_filter(const struct minijail *j)
 	}
 
 	if (j->flags.seccomp_filter) {
-		if (j->flags.seccomp_filter_logging) {
+		if (seccomp_is_logging_allowed(j)) {
 			warn("logging seccomp filter failures");
 			if (!seccomp_ret_log_available()) {
 				/*
