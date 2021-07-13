@@ -1135,7 +1135,7 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 	if (!seccomp_should_use_filters(j))
 		return;
 
-	FILE *file = fopen(path, "re");
+	attribute_cleanup_fp FILE *file = fopen(path, "re");
 	if (!file) {
 		pdie("failed to open seccomp filter file '%s'", path);
 	}
@@ -1144,13 +1144,12 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 		die("failed to compile seccomp filter BPF program in '%s'",
 		    path);
 	}
-	fclose(file);
 }
 
 void API minijail_parse_seccomp_filters_from_fd(struct minijail *j, int fd)
 {
 	char *fd_path, *path;
-	FILE *file;
+	attribute_cleanup_fp FILE *file = NULL;
 
 	if (!seccomp_should_use_filters(j))
 		return;
@@ -1172,7 +1171,6 @@ void API minijail_parse_seccomp_filters_from_fd(struct minijail *j, int fd)
 		    fd);
 	}
 	free(path);
-	fclose(file);
 }
 
 void API minijail_set_seccomp_filters(struct minijail *j,
