@@ -91,7 +91,6 @@ cc_object {
     vendor_available: true,
     product_available: true,
     recovery_available: true,
-    header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
     srcs: ["gen_syscalls.c"],
     cflags: [
         "-dD",
@@ -132,7 +131,6 @@ cc_object {
     vendor_available: true,
     product_available: true,
     recovery_available: true,
-    header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
     srcs: ["gen_constants.c"],
     cflags: [
         "-dD",
@@ -206,7 +204,6 @@ cc_object {
     product_available: true,
     recovery_available: true,
     host_supported: true,
-    header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
     cflags: [
         "-S",
         "-O0",
@@ -229,7 +226,6 @@ cc_object {
     product_available: true,
     recovery_available: true,
     host_supported: true,
-    header_libs: ["libc_headers"], // TODO(b/153662223): Clean this up.
     cflags: [
         "-S",
         "-O0",
