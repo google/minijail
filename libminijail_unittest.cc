@@ -9,6 +9,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -613,6 +614,98 @@ TEST(Test, minijail_run_env_pid_pipes) {
       minijail_run_env_pid_pipes(j.get(), argv[0], argv, envp, &pid,
                                  &child_stdin, &child_stdout, &child_stderr);
   EXPECT_EQ(mj_run_ret, 0);
+
+  memset(buf, 0, sizeof(buf));
+  read_ret = read(child_stderr, buf, sizeof(buf) - 1);
+  EXPECT_GE(read_ret, 0);
+  EXPECT_STREQ(buf, "|test\n");
+
+  EXPECT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(Test, minijail_run_fd_env_pid_pipes) {
+  // TODO(crbug.com/895875): The preload library interferes with ASan since they
+  // both need to use LD_PRELOAD.
+  if (running_with_asan())
+    GTEST_SKIP();
+
+  ScopedMinijail j(minijail_new());
+  minijail_set_preload_path(j.get(), kPreloadPath);
+
+  char *argv[4];
+  argv[0] = const_cast<char*>(kCatPath);
+  argv[1] = nullptr;
+
+  pid_t pid;
+  int child_stdin, child_stdout;
+  int mj_run_ret = minijail_run_pid_pipes(
+      j.get(), argv[0], argv, &pid, &child_stdin, &child_stdout, NULL);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  char teststr[] = "test\n";
+  const size_t teststr_len = strlen(teststr);
+  ssize_t write_ret = write(child_stdin, teststr, teststr_len);
+  EXPECT_EQ(write_ret, static_cast<ssize_t>(teststr_len));
+
+  char buf[kBufferSize] = {};
+  ssize_t read_ret = read(child_stdout, buf, sizeof(buf) - 1);
+  EXPECT_EQ(read_ret, static_cast<ssize_t>(teststr_len));
+  EXPECT_STREQ(buf, teststr);
+
+  int status;
+  EXPECT_EQ(kill(pid, SIGTERM), 0);
+  EXPECT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFSIGNALED(status));
+  EXPECT_EQ(WTERMSIG(status), SIGTERM);
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "#!/bin/sh\necho \"${TEST_PARENT+set}|${TEST_VAR}\" >&2\n";
+  argv[3] = nullptr;
+
+  char *envp[2];
+  envp[0] = "TEST_VAR=test";
+  envp[1] = nullptr;
+
+  // Set a canary env var in the parent that should not be present in the child.
+  ASSERT_EQ(setenv("TEST_PARENT", "test", 1 /*overwrite*/), 0);
+
+  // MFD_CLOEXEC cannot be used because the test fd begins with #!.
+  int elf_fd = memfd_create("test", MFD_ALLOW_SEALING);
+  if (elf_fd < 0) {
+    pdie("memfd_create(elf_fd):");
+  }
+
+  // This is technically not an ELF, but it works for the purposes of the test.
+  ssize_t script_len = strlen(argv[2]);
+  if (write(elf_fd, argv[2], script_len) != script_len) {
+    pdie("write(elf_fd):");
+  }
+  if (ftruncate(elf_fd, script_len) == -1) {
+    pdie("ftruncate(elf_fd):");
+  }
+  if (lseek(elf_fd, 0, SEEK_SET) == -1) {
+    pdie("lseek(elf_fd):");
+  }
+  if (fcntl(elf_fd, F_ADD_SEALS,
+            F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL) == -1) {
+    pdie("fcntl(elf_fd):");
+  }
+
+  int dev_null = open("/dev/null", O_RDONLY);
+  ASSERT_NE(dev_null, -1);
+  // Create a mapping to dev_null that would clobber elf_fd if it is not
+  // relocated.
+  minijail_preserve_fd(j.get(), dev_null, elf_fd);
+
+  int child_stderr;
+  mj_run_ret =
+      minijail_run_fd_env_pid_pipes(j.get(), elf_fd, argv, envp, &pid,
+                                    &child_stdin, &child_stdout, &child_stderr);
+  EXPECT_EQ(mj_run_ret, 0);
+  close(dev_null);
 
   memset(buf, 0, sizeof(buf));
   read_ret = read(child_stderr, buf, sizeof(buf) - 1);
@@ -1230,7 +1323,7 @@ TEST_F(NamespaceTest, test_remount_all_private) {
   argv[0] = const_cast<char*>(kShellPath);
   argv[1] = "-c";
   argv[2] = "grep -E 'shared:|master:|propagate_from:|unbindable:' "
-	    "/proc/self/mountinfo";
+            "/proc/self/mountinfo";
   argv[3] = NULL;
   mj_run_ret = minijail_run_pid_pipes_no_preload(
       j, argv[0], argv, &pid, NULL, &child_stdout, NULL);
