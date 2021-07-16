@@ -2689,6 +2689,23 @@ static int redirect_fds(struct minijail *j)
 	for (size_t i = 0; i < j->preserved_fd_count; i++) {
 		if (j->preserved_fds[i].parent_fd ==
 		    j->preserved_fds[i].child_fd) {
+			// Clear CLOEXEC if it is set so the FD will be
+			// inherited by the child.
+			int flags =
+			    fcntl(j->preserved_fds[i].child_fd, F_GETFD);
+			if (flags == -1 || (flags & FD_CLOEXEC) == 0) {
+				continue;
+			}
+
+			// Currently FD_CLOEXEC is cleared without being
+			// restored. It may make sense to track when this
+			// happens and restore FD_CLOEXEC in the child process.
+			flags &= ~FD_CLOEXEC;
+			if (fcntl(j->preserved_fds[i].child_fd, F_SETFD,
+				  flags) == -1) {
+				pwarn("failed to clear CLOEXEC for %d",
+				      j->preserved_fds[i].parent_fd);
+			}
 			continue;
 		}
 		if (dup2(j->preserved_fds[i].parent_fd,
