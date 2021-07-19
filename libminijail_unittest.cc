@@ -473,6 +473,94 @@ TEST(Test, close_original_pipes_after_dup2) {
   EXPECT_EQ(minijail_wait(j.get()), 42);
 }
 
+TEST(Test, minijail_no_clobber_pipe_fd) {
+  const ScopedMinijail j(minijail_new());
+  char* const script = R"(
+      echo Hi >&1;
+      exec 1>&-;
+      exec 4>&-;
+      exec 7>&-;
+      read line1;
+      read line2;
+      echo "$line1$line2 and Goodbye" >&2;
+      exit 42;
+    )";
+  char* const argv[] = {"sh", "-c", script, nullptr};
+
+  const int npipes = 3;
+  int fds[npipes][2];
+
+  // Create pipes.
+  for (int i = 0; i < npipes; ++i) {
+    ASSERT_EQ(pipe(fds[i]), 0);
+  }
+
+  // All pipes are output pipes except for the first one which is used as
+  // input pipe.
+  std::swap(fds[0][0], fds[0][1]);
+
+  // Generate a lot of mappings to try to clobber any file descriptors generated
+  // by libminijail.
+  for (int offset = 0; offset < npipes * 3; offset += npipes) {
+    for (int i = 0 ; i < npipes; ++i) {
+      const int fd = fds[i][1];
+      minijail_preserve_fd(j.get(), fd, i + offset);
+    }
+  }
+
+  minijail_close_open_fds(j.get());
+
+  EXPECT_EQ(minijail_run_no_preload(j.get(), kShellPath, argv), 0);
+
+  // Close unused end of pipes.
+  for (int i = 0; i < npipes; ++i) {
+    const int fd = fds[i][1];
+    ASSERT_EQ(close(fd), 0);
+  }
+
+  const int in = fds[0][0];
+  const int out = fds[1][0];
+  const int err = fds[2][0];
+
+  char buf[PIPE_BUF];
+  ssize_t nbytes;
+
+  // Check that stdout pipe works.
+  nbytes = read(out, buf, PIPE_BUF);
+  ASSERT_GT(nbytes, 0);
+  EXPECT_EQ(std::string(buf, nbytes), "Hi\n");
+
+  // Check that the write end of stdout pipe got closed by the child process. If
+  // the child process kept other file descriptors connected to stdout, then the
+  // parent process wouldn't be able to detect that all write ends of this pipe
+  // are closed and it would block here.
+  EXPECT_EQ(read(out, buf, PIPE_BUF), 0);
+  ASSERT_EQ(close(out), 0);
+
+  // Check that stdin pipe works.
+  const std::string s = "Greetings\n";
+  EXPECT_EQ(write(in, s.data(), s.size()), s.size());
+
+  // Close write end of pipe connected to child's stdin. If there was another
+  // file descriptor connected to this write end, then the child process
+  // wouldn't be able to detect that this write end is closed and it would
+  // block.
+  ASSERT_EQ(close(in), 0);
+
+  // Check that child process continued and ended.
+  nbytes = read(err, buf, PIPE_BUF);
+  ASSERT_GT(nbytes, 0);
+  EXPECT_EQ(std::string(buf, nbytes), "Greetings and Goodbye\n");
+
+  // Check that the write end of the stderr pipe is closed when the child
+  // process finishes.
+  EXPECT_EQ(read(err, buf, PIPE_BUF), 0);
+  ASSERT_EQ(close(err), 0);
+
+  // Check the child process termination status.
+  EXPECT_EQ(minijail_wait(j.get()), 42);
+}
+
 TEST(Test, minijail_run_env_pid_pipes) {
   // TODO(crbug.com/895875): The preload library interferes with ASan since they
   // both need to use LD_PRELOAD.
@@ -599,6 +687,56 @@ TEST(Test, minijail_run_env_pid_pipes_with_local_preload) {
   EXPECT_EQ(waitpid(pid, &status, 0), pid);
   ASSERT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(Test, test_minijail_no_clobber_fds) {
+  int dev_null = open("/dev/null", O_RDONLY);
+  ASSERT_NE(dev_null, -1);
+
+  ScopedMinijail j(minijail_new());
+
+  // Keep stderr.
+  minijail_preserve_fd(j.get(), 2, 2);
+  // Create a lot of mappings to dev_null to possibly clobber libminijail.c fds.
+  for (int i = 3; i < 15; ++i) {
+    minijail_preserve_fd(j.get(), dev_null, i);
+  }
+
+  char *argv[4];
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "echo Hello; read line1; echo \"${line1}\" >&2";
+  argv[3] = nullptr;
+
+  pid_t pid;
+  int child_stdin;
+  int child_stdout;
+  int child_stderr;
+  int mj_run_ret = minijail_run_pid_pipes_no_preload(
+      j.get(), argv[0], argv, &pid, &child_stdin, &child_stdout, &child_stderr);
+  EXPECT_EQ(mj_run_ret, 0);
+
+  char buf[kBufferSize];
+  ssize_t read_ret = read(child_stdout, buf, sizeof(buf));
+  EXPECT_GE(read_ret, 0);
+  buf[read_ret] = '\0';
+  EXPECT_STREQ(buf, "Hello\n");
+
+  constexpr char to_write[] = "test in and err\n";
+  ssize_t write_ret = write(child_stdin, to_write, sizeof(to_write));
+  EXPECT_EQ(write_ret, sizeof(to_write));
+
+  read_ret = read(child_stderr, buf, sizeof(buf));
+  EXPECT_GE(read_ret, 0);
+  buf[read_ret] = '\0';
+  EXPECT_STREQ(buf, to_write);
+
+  int status;
+  waitpid(pid, &status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+
+  close(dev_null);
 }
 
 TEST(Test, test_minijail_no_fd_leaks) {
