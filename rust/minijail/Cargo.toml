@@ -1,6 +1,6 @@
 [package]
 name = "minijail"
-version = "0.2.2"
+version = "0.2.3"
 description = "Provides a safe Rust friendly interface to libminijail."
 authors = ["The Chromium OS Authors"]
 edition = "2018"

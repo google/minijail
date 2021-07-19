@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use libc::pid_t;
-use minijail_sys::*;
 use std::ffi::CString;
 use std::fmt::{self, Display};
 use std::fs;
@@ -12,6 +10,9 @@ use std::os::raw::{c_char, c_ulong, c_ushort};
 use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::ptr::{null, null_mut};
+
+use libc::pid_t;
+use minijail_sys::*;
 
 #[derive(Debug)]
 pub enum Error {
@@ -313,7 +314,7 @@ impl Minijail {
     }
     pub fn set_supplementary_gids(&mut self, ids: &[libc::gid_t]) {
         unsafe {
-            minijail_set_supplementary_gids(self.jail, ids.len(), ids.as_ptr());
+            minijail_set_supplementary_gids(self.jail, ids.len() as size_t, ids.as_ptr());
         }
     }
     pub fn keep_supplementary_gids(&mut self) {
@@ -612,7 +613,7 @@ impl Minijail {
     }
     pub fn mount_tmp_size(&mut self, size: usize) {
         unsafe {
-            minijail_mount_tmp_size(self.jail, size);
+            minijail_mount_tmp_size(self.jail, size as size_t);
         }
     }
     pub fn mount_bind<P1: AsRef<Path>, P2: AsRef<Path>>(
