@@ -53,7 +53,7 @@ def parse_args(argv):
     arg_parser.add_argument(
         '--denylist',
         action='store_true',
-        help='Compile as a denylist policy rather than the deafult allowlist.')
+        help='Compile as a denylist policy rather than the default allowlist.')
     arg_parser.add_argument(
         '--default-action',
         type=str,
