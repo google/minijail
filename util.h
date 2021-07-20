@@ -55,6 +55,9 @@ extern "C" {
 #define attribute_printf(format_idx, check_idx) \
 	__attribute__((__format__(__printf__, format_idx, check_idx)))
 
+#ifndef __cplusplus
+/* If writing C++, use std::unique_ptr with a destructor instead. */
+
 /*
  * Mark a local variable for automatic cleanup when exiting its scope.
  * See attribute_cleanup_fp as an example below.
@@ -79,6 +82,8 @@ static inline void _cleanup_fp(FILE **fp)
 	if (*fp)
 		fclose(*fp);
 }
+
+#endif /* __cplusplus */
 
 /* clang-format off */
 #define die(_msg, ...) \
