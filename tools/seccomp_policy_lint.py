@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+#
+# Copyright (C) 2021 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""A linter for the Minijail seccomp policy file."""
+
+import argparse
+import re
+import sys
+
+from typing import List, NamedTuple
+
+# The syscalls we have determined are more dangerous and need justification
+# for inclusion in a policy.
+DANGEROUS_SYSCALLS = (
+    'clone',
+    'mount',
+    'setns',
+    'kill',
+    'execve',
+    'execveat',
+    'bpf',
+    'socket',
+    'ptrace',
+    # TODO(b/193169195): Add argument granularity for the below syscalls.
+    'prctl',
+    'ioctl',
+#   'mmap',
+#   'mprotect',
+#   'mmap2',
+)
+
+class CheckPolicyReturn(NamedTuple):
+    """Represents a return value from check_seccomp_policy
+
+    Contains a message to print to the user and a list of errors that were
+    found in the file.
+    """
+    message: str
+    errors: List[str]
+
+def parse_args(argv):
+    """Return the parsed CLI arguments for this tool."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        '--denylist',
+        action='store_true',
+        help='Check as a denylist policy rather than the default allowlist.')
+    parser.add_argument('policy',
+                            help='The seccomp policy.',
+                            type=argparse.FileType('r', encoding='utf-8'))
+    return parser.parse_args(argv), parser
+
+def check_seccomp_policy(check_file):
+    """Fail if the seccomp policy file has dangerous, undocumented syscalls.
+
+    Takes in a file object as an argument.
+    """
+
+    errors = []
+    msg = ''
+    contains_dangerous_syscall = False
+    prev_line_comment = False
+
+    for line_num, line in enumerate(check_file):
+        if re.match(r'^\s*#', line):
+            prev_line_comment = True
+        elif re.match(r'^\s*$', line):
+            # Empty lines shouldn't reset prev_line_comment
+            continue
+        else:
+            for syscall in DANGEROUS_SYSCALLS:
+                if re.match(fr'^\s*{syscall}\s*:', line):
+                    # Dangerous syscalls must be preceded with a comment.
+                    contains_dangerous_syscall = True
+                    if not prev_line_comment:
+                        errors.append(f'{check_file.name}, line {line_num},'
+                                      f' {syscall} syscall requires a comment'
+                                      ' on the preceding line')
+            prev_line_comment = False
+    if contains_dangerous_syscall:
+        msg = (f'seccomp: {check_file.name} contains dangerous syscalls, so'
+               ' requires review from chromeos-security@\n')
+    else:
+        msg = (f'seccomp: {check_file.name} does not contain any dangerous'
+               ' syscalls, so does not require review from'
+               ' chromeos-security@\n')
+
+    if errors:
+        msg += ('Dangerous syscalls must be preceded by a comment'
+                ' explaining why they are necessary:')
+        return CheckPolicyReturn(msg, errors)
+
+    return CheckPolicyReturn(msg, errors)
+
+def main(argv=None):
+    """Main entrypoint."""
+
+    if argv is None:
+        argv = sys.argv[1:]
+
+    opts, _arg_parser = parse_args(argv)
+
+    ret = check_seccomp_policy(opts.policy)
+
+    formatted_items = ''
+    if ret.errors:
+        item_prefix = '\n    * '
+        formatted_items = item_prefix + item_prefix.join(ret.errors)
+    print('* ' + ret.message + formatted_items)
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
