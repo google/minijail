@@ -1542,7 +1542,7 @@ static void mount_dev_cleanup(char *dev_path)
 static int mount_dev(char **dev_path_ret)
 {
 	int ret;
-	int dev_fd;
+	attribute_cleanup_fd int dev_fd = -1;
 	size_t i;
 	mode_t mask;
 	char *dev_path;
@@ -1597,7 +1597,6 @@ static int mount_dev(char **dev_path_ret)
 
 	/* Restore old mask. */
  done:
-	close(dev_fd);
 	umask(mask);
 
 	if (ret)
@@ -1756,7 +1755,8 @@ static int enter_chroot(const struct minijail *j)
 
 static int enter_pivot_root(const struct minijail *j)
 {
-	int oldroot, newroot;
+	attribute_cleanup_fd int oldroot = -1;
+	attribute_cleanup_fd int newroot = -1;
 
 	run_hooks_or_die(j, MINIJAIL_HOOK_EVENT_PRE_CHROOT);
 
@@ -1805,10 +1805,6 @@ static int enter_pivot_root(const struct minijail *j)
 		pdie("umount(/)");
 	/* Change back to the new root. */
 	if (fchdir(newroot))
-		return -errno;
-	if (close(oldroot))
-		return -errno;
-	if (close(newroot))
 		return -errno;
 	if (chroot("/"))
 		return -errno;
