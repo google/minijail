@@ -75,12 +75,33 @@ extern "C" {
  *   attribute_cleanup_fp FILE *fp = NULL;
  *   ...
  *   fp = fopen(...);
+ *
+ * NB: This will automatically close the underlying fd, so do not use this
+ * with fdopen calls if the fd should be left open.
  */
 #define attribute_cleanup_fp attribute_cleanup(_cleanup_fp)
 static inline void _cleanup_fp(FILE **fp)
 {
 	if (*fp)
 		fclose(*fp);
+}
+
+/*
+ * Automatically close a fd when exiting its scope.
+ * Make sure the fd is always initialized.
+ * Some examples:
+ *   attribute_cleanup_fd int fd = open(...);
+ *   attribute_cleanup_fd int fd = -1;
+ *   ...
+ *   fd = open(...);
+ *
+ * NB: Be careful when using this with attribute_cleanup_fp and fdopen.
+ */
+#define attribute_cleanup_fd attribute_cleanup(_cleanup_fd)
+static inline void _cleanup_fd(int *fd)
+{
+	if (*fd >= 0)
+		close(*fd);
 }
 
 #endif /* __cplusplus */
