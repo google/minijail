@@ -111,7 +111,8 @@ int lock_securebits(uint64_t skip_mask, bool require_keep_caps)
 
 int write_proc_file(pid_t pid, const char *content, const char *basename)
 {
-	int fd, ret;
+	attribute_cleanup_fd int fd = -1;
+	int ret;
 	size_t sz, len;
 	ssize_t written;
 	char filename[32];
@@ -133,16 +134,13 @@ int write_proc_file(pid_t pid, const char *content, const char *basename)
 	written = write(fd, content, len);
 	if (written < 0) {
 		pwarn("failed to write '%s'", filename);
-		close(fd);
 		return -errno;
 	}
 
 	if ((size_t)written < len) {
 		warn("failed to write %zu bytes to '%s'", len, filename);
-		close(fd);
 		return -1;
 	}
-	close(fd);
 	return 0;
 }
 
@@ -187,7 +185,7 @@ int cap_ambient_supported(void)
 int config_net_loopback(void)
 {
 	const char ifname[] = "lo";
-	int sock;
+	attribute_cleanup_fd int sock = -1;
 	struct ifreq ifr;
 
 	/* Make sure people don't try to add really long names. */
@@ -206,7 +204,6 @@ int config_net_loopback(void)
 	strcpy(ifr.ifr_name, ifname);
 	if (ioctl(sock, SIOCGIFFLAGS, &ifr) < 0) {
 		pwarn("ioctl(SIOCGIFFLAGS) failed");
-		close(sock);
 		return -1;
 	}
 
@@ -214,11 +211,9 @@ int config_net_loopback(void)
 	ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
 	if (ioctl(sock, SIOCSIFFLAGS, &ifr) < 0) {
 		pwarn("ioctl(SIOCSIFFLAGS) failed");
-		close(sock);
 		return -1;
 	}
 
-	close(sock);
 	return 0;
 }
 
@@ -370,13 +365,13 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 	if (rc)
 		return rc;
 	if (!domkdir) {
-		int fd = open(dest, O_RDWR | O_CREAT | O_CLOEXEC, 0700);
+		attribute_cleanup_fd int fd = open(
+			dest, O_RDWR | O_CREAT | O_CLOEXEC, 0700);
 		if (fd < 0) {
 			rc = errno;
 			pwarn("open(%s) failed", dest);
 			return -rc;
 		}
-		close(fd);
 	}
 	if (chown(dest, uid, gid)) {
 		rc = errno;
