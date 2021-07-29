@@ -68,6 +68,7 @@ def check_seccomp_policy(check_file):
     Takes in a file object as an argument.
     """
 
+    found_syscalls = set()
     errors = []
     msg = ''
     contains_dangerous_syscall = False
@@ -80,26 +81,39 @@ def check_seccomp_policy(check_file):
             # Empty lines shouldn't reset prev_line_comment
             continue
         else:
-            for syscall in DANGEROUS_SYSCALLS:
-                if re.match(fr'^\s*{syscall}\s*:', line):
-                    # Dangerous syscalls must be preceded with a comment.
-                    contains_dangerous_syscall = True
-                    if not prev_line_comment:
-                        errors.append(f'{check_file.name}, line {line_num},'
-                                      f' {syscall} syscall requires a comment'
-                                      ' on the preceding line')
-            prev_line_comment = False
+            match = re.match(fr'^\s*(\w*)\s*:', line)
+            if not match:
+                errors.append(f'{check_file.name}, {line_num}: syscall not '
+                              'found in beginning of line. '
+                              'Line must begin in the form "<syscall>:".')
+            else:
+                syscall = match.group(1)
+                if syscall in found_syscalls:
+                    errors.append(f'{check_file.name}, line {line_num}: repeat '
+                                  f'syscall: {syscall}')
+                else:
+                    found_syscalls.add(syscall)
+                    for dangerous in DANGEROUS_SYSCALLS:
+                        if dangerous == syscall:
+                            # Dangerous syscalls must be preceded with a
+                            # comment.
+                            contains_dangerous_syscall = True
+                            if not prev_line_comment:
+                                errors.append(f'{check_file.name}, line '
+                                              f'{line_num}: {syscall} syscall '
+                                              'is a dangerous syscall so '
+                                              'requires a comment on the '
+                                              'preceding line')
+                prev_line_comment = False
     if contains_dangerous_syscall:
         msg = (f'seccomp: {check_file.name} contains dangerous syscalls, so'
-               ' requires review from chromeos-security@\n')
+               ' requires review from chromeos-security@')
     else:
         msg = (f'seccomp: {check_file.name} does not contain any dangerous'
                ' syscalls, so does not require review from'
-               ' chromeos-security@\n')
+               ' chromeos-security@')
 
     if errors:
-        msg += ('Dangerous syscalls must be preceded by a comment'
-                ' explaining why they are necessary:')
         return CheckPolicyReturn(msg, errors)
 
     return CheckPolicyReturn(msg, errors)
