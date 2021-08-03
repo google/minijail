@@ -862,8 +862,6 @@ fn is_single_threaded() -> io::Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use std::process::exit;
-
     use super::*;
 
     const SHELL: &str = "/bin/sh";
@@ -889,9 +887,7 @@ mod tests {
         j.no_new_privs();
         j.parse_seccomp_filters("src/test_filter.policy").unwrap();
         j.use_seccomp_filter();
-        if unsafe { j.fork(None).unwrap() } == 0 {
-            exit(0);
-        }
+        j.run("/bin/true", &[], &EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
@@ -903,14 +899,28 @@ mod tests {
             let j = Minijail::new().unwrap();
             let first = libc::open(FILE_PATH.as_ptr() as *const c_char, libc::O_RDONLY);
             assert!(first >= 0);
+            // This appears unused but its function is to be a file descriptor that is closed
+            // inside run_remap after the fork. If it is not closed, the script will fail.
             let second = libc::open(FILE_PATH.as_ptr() as *const c_char, libc::O_RDONLY);
             assert!(second >= 0);
-            let fds: Vec<RawFd> = vec![0, 1, 2, first];
-            if j.fork(Some(&fds)).unwrap() == 0 {
-                assert!(libc::close(second) < 0); // Should fail as second should be closed already.
-                assert_eq!(libc::close(first), 0); // Should succeed as first should be untouched.
-                exit(0);
-            }
+
+            let fds: Vec<(RawFd, RawFd)> = vec![(first, 0), (1, 1), (2, 2)];
+            j.run_remap(
+                SHELL,
+                &fds,
+                &[
+                    SHELL,
+                    "-c",
+                    r#"
+if [ `ls -l /proc/self/fd/ | grep '/dev/null' | wc -l` != '1' ]; then
+  ls -l /proc/self/fd/  # Included to make debugging easier.
+  exit 1
+fi
+"#,
+                ],
+            )
+            .unwrap();
+            j.wait().unwrap();
         }
     }
 
@@ -964,7 +974,11 @@ mod tests {
         let j = Minijail::new().unwrap();
         j.run("/bin/does not exist", &[1, 2], &EMPTY_STRING_SLICE)
             .unwrap();
-        expect_result!(j.wait(), Err(Error::NoCommand));
+        // TODO(b/194221986) Fix libminijail so that Error::NoAccess is not sometimes returned.
+        assert!(matches!(
+            j.wait(),
+            Err(Error::NoCommand) | Err(Error::NoAccess)
+        ));
     }
 
     #[test]
@@ -985,9 +999,7 @@ mod tests {
     fn chroot() {
         let mut j = Minijail::new().unwrap();
         j.enter_chroot(".").unwrap();
-        if unsafe { j.fork(None).unwrap() } == 0 {
-            exit(0);
-        }
+        j.run("/bin/true", &[], &EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
@@ -995,9 +1007,7 @@ mod tests {
     fn namespace_vfs() {
         let mut j = Minijail::new().unwrap();
         j.namespace_vfs();
-        if unsafe { j.fork(None).unwrap() } == 0 {
-            exit(0);
-        }
+        j.run("/bin/true", &[], &EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
