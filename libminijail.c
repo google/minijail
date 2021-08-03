@@ -2624,7 +2624,7 @@ static_assert(FD_SETSIZE >= MAX_PRESERVED_FDS * 2 - 1,
 	      "If true, ensure_no_fd_conflict will always find an unused fd.");
 
 /* If parent_fd will be used by a child fd, move it to an unused fd. */
-static int ensure_no_fd_conflict(const fd_set* child_fds,
+static int ensure_no_fd_conflict(const fd_set *child_fds,
 				 int child_fd, int *parent_fd)
 {
 	if (!FD_ISSET(*parent_fd, child_fds)) {
@@ -2663,6 +2663,32 @@ static int ensure_no_fd_conflict(const fd_set* child_fds,
 }
 
 /*
+ * Populate child_fds_out with the set of file descriptors that will be replaced
+ * by redirect_fds().
+ *
+ * NOTE: This creates temporaries for parent file descriptors that would
+ * otherwise be overwritten during redirect_fds().
+ */
+static int get_child_fds(struct minijail *j, fd_set *child_fds_out) {
+	/* Relocate parent_fds that would be replaced by a child_fd. */
+	for (size_t i = 0; i < j->preserved_fd_count; i++) {
+		int child_fd = j->preserved_fds[i].child_fd;
+		if (FD_ISSET(child_fd, child_fds_out)) {
+			die("fd %d is mapped more than once", child_fd);
+		}
+
+		int *parent_fd = &j->preserved_fds[i].parent_fd;
+		if (ensure_no_fd_conflict(child_fds_out, child_fd,
+					  parent_fd) == -1) {
+			return -1;
+		}
+
+		FD_SET(child_fd, child_fds_out);
+	}
+	return 0;
+}
+
+/*
  * Structure holding resources and state created when running a minijail.
  */
 struct minijail_run_state {
@@ -2675,28 +2701,11 @@ struct minijail_run_state {
 	char **child_env;
 };
 
-static int redirect_fds(struct minijail *j, struct minijail_run_state *state)
-{
-	fd_set child_fds;
-	FD_ZERO(&child_fds);
-
-	/* Relocate parent_fds that would be replaced by a child_fd. */
-	for (size_t i = 0; i < j->preserved_fd_count; i++) {
-		int child_fd = j->preserved_fds[i].child_fd;
-		if (FD_ISSET(child_fd, &child_fds)) {
-			die("fd %d is mapped more than once", child_fd);
-		}
-
-		int *parent_fd = &j->preserved_fds[i].parent_fd;
-		if (ensure_no_fd_conflict(&child_fds, child_fd,
-					  parent_fd) == -1) {
-			return -1;
-		}
-
-		FD_SET(child_fd, &child_fds);
-	}
-
-	/* Move pipe_fds if they conflict with a child_fd. */
+/*
+ * Move pipe_fds if they conflict with a child_fd.
+ */
+static int avoid_pipe_conflicts(struct minijail_run_state *state,
+				fd_set *child_fds_out) {
 	int *pipe_fds[] = {
 	    state->pipe_fds,   state->child_sync_pipe_fds,
 	    state->stdin_fds,  state->stdout_fds,
@@ -2704,18 +2713,26 @@ static int redirect_fds(struct minijail *j, struct minijail_run_state *state)
 	};
 	for (size_t i = 0; i < ARRAY_SIZE(pipe_fds); ++i) {
 		if (pipe_fds[i][0] != -1 &&
-		    ensure_no_fd_conflict(&child_fds, -1,
+		    ensure_no_fd_conflict(child_fds_out, -1,
 					  &pipe_fds[i][0]) == -1) {
 			return -1;
 		}
 		if (pipe_fds[i][1] != -1 &&
-		    ensure_no_fd_conflict(&child_fds, -1,
+		    ensure_no_fd_conflict(child_fds_out, -1,
 					  &pipe_fds[i][1]) == -1) {
 			return -1;
 		}
 	}
+	return 0;
+}
 
-	/* Perform redirection. */
+/*
+ * Redirect j->preserved_fds from the parent_fd to the child_fd.
+ *
+ * NOTE: This will clear FD_CLOEXEC since otherwise the child_fd would not be
+ * inherited after the exec call.
+ */
+static int redirect_fds(struct minijail *j, fd_set *child_fds) {
 	for (size_t i = 0; i < j->preserved_fd_count; i++) {
 		if (j->preserved_fds[i].parent_fd ==
 		    j->preserved_fds[i].child_fd) {
@@ -2750,7 +2767,7 @@ static int redirect_fds(struct minijail *j, struct minijail_run_state *state)
 	 */
 	for (size_t i = 0; i < j->preserved_fd_count; i++) {
 		int parent_fd = j->preserved_fds[i].parent_fd;
-		if (!FD_ISSET(parent_fd, &child_fds)) {
+		if (!FD_ISSET(parent_fd, child_fds)) {
 			close(parent_fd);
 		}
 	}
@@ -2821,7 +2838,9 @@ static void setup_child_std_fds(struct minijail *j,
 /*
  * Structure that specifies how to start a minijail.
  *
- * filename - The program to exec in the child. Required if |exec_in_child| = 1.
+ * filename - The program to exec in the child. Should be NULL if elf_fd is set.
+ * elf_fd - A fd to be used with fexecve. Should be -1 if filename is set.
+ *   NOTE: either filename or elf_fd is required if |exec_in_child| = 1.
  * argv - Arguments for the child program. Required if |exec_in_child| = 1.
  * envp - Environment for the child program. Available if |exec_in_child| = 1.
  * use_preload - If true use LD_PRELOAD.
@@ -2834,6 +2853,7 @@ static void setup_child_std_fds(struct minijail *j,
  */
 struct minijail_run_config {
 	const char *filename;
+	int elf_fd;
 	char *const *argv;
 	char *const *envp;
 	int use_preload;
@@ -2853,6 +2873,7 @@ int API minijail_run(struct minijail *j, const char *filename,
 {
 	struct minijail_run_config config = {
 	    .filename = filename,
+	    .elf_fd = -1,
 	    .argv = argv,
 	    .envp = NULL,
 	    .use_preload = true,
@@ -2866,6 +2887,7 @@ int API minijail_run_pid(struct minijail *j, const char *filename,
 {
 	struct minijail_run_config config = {
 	    .filename = filename,
+	    .elf_fd = -1,
 	    .argv = argv,
 	    .envp = NULL,
 	    .use_preload = true,
@@ -2880,6 +2902,7 @@ int API minijail_run_pipe(struct minijail *j, const char *filename,
 {
 	struct minijail_run_config config = {
 	    .filename = filename,
+	    .elf_fd = -1,
 	    .argv = argv,
 	    .envp = NULL,
 	    .use_preload = true,
@@ -2895,6 +2918,7 @@ int API minijail_run_pid_pipes(struct minijail *j, const char *filename,
 {
 	struct minijail_run_config config = {
 	    .filename = filename,
+	    .elf_fd = -1,
 	    .argv = argv,
 	    .envp = NULL,
 	    .use_preload = true,
@@ -2914,6 +2938,27 @@ int API minijail_run_env_pid_pipes(struct minijail *j, const char *filename,
 {
 	struct minijail_run_config config = {
 	    .filename = filename,
+	    .elf_fd = -1,
+	    .argv = argv,
+	    .envp = envp,
+	    .use_preload = true,
+	    .exec_in_child = true,
+	    .pstdin_fd = pstdin_fd,
+	    .pstdout_fd = pstdout_fd,
+	    .pstderr_fd = pstderr_fd,
+	    .pchild_pid = pchild_pid,
+	};
+	return minijail_run_config_internal(j, &config);
+}
+
+int API minijail_run_fd_env_pid_pipes(struct minijail *j, int elf_fd,
+				      char *const argv[], char *const envp[],
+				      pid_t *pchild_pid, int *pstdin_fd,
+				      int *pstdout_fd, int *pstderr_fd)
+{
+	struct minijail_run_config config = {
+	    .filename = NULL,
+	    .elf_fd = elf_fd,
 	    .argv = argv,
 	    .envp = envp,
 	    .use_preload = true,
@@ -2931,6 +2976,7 @@ int API minijail_run_no_preload(struct minijail *j, const char *filename,
 {
 	struct minijail_run_config config = {
 	    .filename = filename,
+	    .elf_fd = -1,
 	    .argv = argv,
 	    .envp = NULL,
 	    .use_preload = false,
@@ -2949,6 +2995,7 @@ int API minijail_run_pid_pipes_no_preload(struct minijail *j,
 {
 	struct minijail_run_config config = {
 	    .filename = filename,
+	    .elf_fd = -1,
 	    .argv = argv,
 	    .envp = NULL,
 	    .use_preload = false,
@@ -2970,6 +3017,7 @@ int API minijail_run_env_pid_pipes_no_preload(struct minijail *j,
 {
 	struct minijail_run_config config = {
 	    .filename = filename,
+	    .elf_fd = -1,
 	    .argv = argv,
 	    .envp = envp,
 	    .use_preload = false,
@@ -2984,7 +3032,9 @@ int API minijail_run_env_pid_pipes_no_preload(struct minijail *j,
 
 pid_t API minijail_fork(struct minijail *j)
 {
-	struct minijail_run_config config = {};
+	struct minijail_run_config config = {
+	    .elf_fd = -1,
+	};
 	return minijail_run_config_internal(j, &config);
 }
 
@@ -3002,6 +3052,10 @@ static int minijail_run_internal(struct minijail *j,
 	 */
 	int do_init = j->flags.do_init && !j->flags.run_as_init;
 	int use_preload = config->use_preload;
+
+	if (config->filename != NULL && config->elf_fd != -1) {
+		die("filename and elf_fd cannot be set at the same time");
+	}
 
 	if (use_preload) {
 		if (j->hooks_head != NULL)
@@ -3225,7 +3279,7 @@ static int minijail_run_internal(struct minijail *j,
 	}
 
 	if (j->flags.close_open_fds) {
-		const size_t kMaxInheritableFdsSize = 10 + MAX_PRESERVED_FDS;
+		const size_t kMaxInheritableFdsSize = 11 + MAX_PRESERVED_FDS;
 		int inheritable_fds[kMaxInheritableFdsSize];
 		size_t size = 0;
 
@@ -3262,11 +3316,29 @@ static int minijail_run_internal(struct minijail *j,
 			inheritable_fds[size++] = j->preserved_fds[i].parent_fd;
 		}
 
+		if (config->elf_fd > -1) {
+			inheritable_fds[size++] = config->elf_fd;
+		}
+
 		if (close_open_fds(inheritable_fds, size) < 0)
 			die("failed to close open file descriptors");
 	}
 
-	if (redirect_fds(j, state_out))
+	/* The set of fds will be replaced. */
+	fd_set child_fds;
+	FD_ZERO(&child_fds);
+	if (get_child_fds(j, &child_fds))
+		die("failed to set up fd redirections");
+
+	if (avoid_pipe_conflicts(state_out, &child_fds))
+		die("failed to redirect conflicting pipes");
+
+	/* The elf_fd needs to be mutable so use a stack copy from now on. */
+	int elf_fd = config->elf_fd;
+	if (elf_fd != -1 && ensure_no_fd_conflict(&child_fds, -1, &elf_fd))
+		die("failed to redirect elf_fd");
+
+	if (redirect_fds(j, &child_fds))
 		die("failed to set up fd redirections");
 
 	if (sync_child)
@@ -3356,10 +3428,15 @@ static int minijail_run_internal(struct minijail *j,
 	 */
 	if (!child_env)
 		child_env = config->envp ? config->envp : environ;
-	execve(config->filename, config->argv, child_env);
+	if (elf_fd > -1) {
+		fexecve(elf_fd, config->argv, child_env);
+		pwarn("fexecve(%d) failed", config->elf_fd);
+	} else {
+		execve(config->filename, config->argv, child_env);
+		pwarn("execve(%s) failed", config->filename);
+	}
 
 	ret = (errno == ENOENT ? MINIJAIL_ERR_NO_COMMAND : MINIJAIL_ERR_NO_ACCESS);
-	pwarn("execve(%s) failed", config->filename);
 	_exit(ret);
 }
 
