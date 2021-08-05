@@ -38,14 +38,14 @@ class CheckSeccompPolicyTests(unittest.TestCase):
         path = self._write_file(
             'test.policy', """
             # Comment.\n
-            read: 0\n
-            write: 0\n
+            read: 1\n
+            write: 1\n
         """)
 
         exp_out = seccomp_policy_lint.CheckPolicyReturn(
                     f'seccomp: {path.resolve()} does not contain any dangerous'
                     ' syscalls, so does not require review from'
-                    ' chromeos-security@\n',
+                    ' chromeos-security@',
                     [])
 
         with path.open('r', encoding='utf-8') as check_file:
@@ -58,13 +58,13 @@ class CheckSeccompPolicyTests(unittest.TestCase):
         path = self._write_file(
             'test.policy', """
             # Comment.\n\n\n
-            clone: 0\n
-            write: 0\n
+            clone: 1\n
+            write: 1\n
         """)
 
         exp_out = seccomp_policy_lint.CheckPolicyReturn(
                     f'seccomp: {path.resolve()} contains dangerous syscalls,'
-                    ' so requires review from chromeos-security@\n',
+                    ' so requires review from chromeos-security@',
                     [])
 
         with path.open('r', encoding='utf-8') as check_file:
@@ -73,21 +73,38 @@ class CheckSeccompPolicyTests(unittest.TestCase):
                     exp_out)
 
     def test_check_dangerous_no_comment(self):
-        """Dangerous syscalls without a comment should cause an error.."""
+        """Dangerous syscalls without a comment should cause an error."""
         path = self._write_file(
             'test.policy', """
             # Comment.\n
-            mount: 0\n
-            clone: 0\n
+            mount: 1\n
+            clone: 1\n
         """)
 
         exp_out = seccomp_policy_lint.CheckPolicyReturn(
                     f'seccomp: {path.resolve()} contains dangerous syscalls,'
-                    ' so requires review from chromeos-security@\n'
-                    'Dangerous syscalls must be preceded by a comment'
-                    ' explaining why they are necessary:',
-                   [(f'{path.resolve()}, line 5, clone syscall requires a'
-                   ' comment on the preceding line')])
+                    ' so requires review from chromeos-security@',
+                   [(f'{path.resolve()}, line 5: clone syscall is a dangerous '
+                   'syscall so requires a comment on the preceding line')])
+
+        with path.open('r', encoding='utf-8') as check_file:
+            self.assertEqual(seccomp_policy_lint.check_seccomp_policy(
+                    check_file),
+                    exp_out)
+
+    def test_check_duplicate_syscall(self):
+        """Policy files cannot have duplicate syscalls.."""
+        path = self._write_file(
+            'test.policy', """
+            # Comment.\n
+            clone: 1\n
+            clone: arg0 == 3
+        """)
+
+        exp_out = seccomp_policy_lint.CheckPolicyReturn(
+                    f'seccomp: {path.resolve()} contains dangerous syscalls,'
+                    ' so requires review from chromeos-security@',
+                   [(f'{path.resolve()}, line 5: repeat syscall: clone')])
 
         with path.open('r', encoding='utf-8') as check_file:
             self.assertEqual(seccomp_policy_lint.check_seccomp_policy(
