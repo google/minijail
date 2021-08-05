@@ -33,6 +33,8 @@ DANGEROUS_SYSCALLS = (
     'bpf',
     'socket',
     'ptrace',
+    'swapon',
+    'swapoff',
     # TODO(b/193169195): Add argument granularity for the below syscalls.
     'prctl',
     'ioctl',
