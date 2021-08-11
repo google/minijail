@@ -289,7 +289,8 @@ class PolicyCompiler:
         visitor = bpf.FlatteningVisitor(
             arch=self._arch, kill_action=kill_action)
         if denylist:
-            accept_action = kill_action
+            # Default action for a denylist policy is return EPERM
+            accept_action = bpf.ReturnErrno(self._arch.constants['EPERM'])
             reject_action = bpf.Allow()
         else:
             accept_action = bpf.Allow()
