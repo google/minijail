@@ -42,6 +42,7 @@ _TOKEN_SPECIFICATION = (
     ('DEFAULT', r'@default\b'),
     ('INCLUDE', r'@include\b'),
     ('FREQUENCY', r'@frequency\b'),
+    ('DENYLIST', r'@denylist$'),
     ('PATH', r'(?:\.)?/\S+'),
     ('NUMERIC_CONSTANT', r'-?0[xX][0-9a-fA-F]+|-?0[Oo][0-7]+|-?[0-9]+'),
     ('COLON', r':'),
@@ -59,7 +60,6 @@ _TOKEN_SPECIFICATION = (
     ('BITWISE_OR', r'\|'),
     ('OP', r'&|\bin\b|==|!=|<=|<|>=|>'),
     ('EQUAL', r'='),
-    ('NOT', r'!'),
     ('ARGUMENT', r'\barg[0-9]+\b'),
     ('RETURN', r'\breturn\b'),
     ('ACTION',
@@ -401,7 +401,7 @@ class PolicyParser:
     # action = 'allow' | '1'
     #        | 'kill-process'
     #        | 'kill-thread'
-    #        | 'kill' | '0'
+    #        | 'kill'
     #        | 'trap'
     #        | 'trace'
     #        | 'log'
@@ -412,9 +412,9 @@ class PolicyParser:
         if not tokens:
             self._parser_state.error('missing action')
         action_token = tokens.pop(0)
-        # The only valid denylist action is 0
+        # denylist policies must specify a return for every line.
         if self._denylist:
-            if action_token.type != 'NUMERIC_CONSTANT':
+            if action_token.type != 'RETURN':
                 self._parser_state.error('invalid denylist policy')
 
         if action_token.type == 'ACTION':
@@ -437,13 +437,7 @@ class PolicyParser:
         elif action_token.type == 'NUMERIC_CONSTANT':
             constant = self._parse_single_constant(action_token)
             if constant == 1:
-                if self._denylist:
-                    self._parser_state.error('invalid denylist policy')
                 return bpf.Allow()
-            if constant == 0:
-                if not self._denylist:
-                    self._parser_state.error('invalid allowlist policy')
-                return self._kill_action
         elif action_token.type == 'RETURN':
             if not tokens:
                 self._parser_state.error('missing return value')
@@ -458,23 +452,16 @@ class PolicyParser:
         if not tokens:
             self._parser_state.error('missing filter')
         if tokens[0].type == 'ARGUMENT':
-            if self._denylist:
-                self._parser_state.error('invalid denylist policy')
-            action = bpf.Allow()
-        elif tokens[0].type == 'NOT':
-            if not self._denylist:
-                self._parser_state.error('invalid allowlist policy')
-            tokens.pop(0)
-            action = self._kill_action
+	    # Only argument expressions can start with an ARGUMENT token.
+            argument_expression = self.parse_argument_expression(tokens)
+            if tokens and tokens[0].type == 'SEMICOLON':
+                tokens.pop(0)
+                action = self.parse_action(tokens)
+            else:
+                action = bpf.Allow()
+            return Filter(argument_expression, action)
         else:
             return Filter(None, self.parse_action(tokens))
-        # Parse an argument expression, either allowlist or denylist.
-        # Only argument expressions can start with an ARGUMENT token.
-        argument_expression = self.parse_argument_expression(tokens)
-        if tokens and tokens[0].type == 'SEMICOLON':
-            tokens.pop(0)
-            action = self.parse_action(tokens)
-        return Filter(argument_expression, action)
 
     # filter = '{' , single-filter , [ { ',' , single-filter } ] , '}'
     #        | single-filter
@@ -722,6 +709,7 @@ class PolicyParser:
         self._parser_states.append(ParserState(filename))
         try:
             statements = []
+            denylist_header = False
             with open(filename) as policy_file:
                 for tokens in self._parser_state.tokenize(policy_file):
                     if tokens[0].type == 'INCLUDE':
@@ -735,6 +723,14 @@ class PolicyParser:
                     elif tokens[0].type == 'DEFAULT':
                         self._default_action = self._parse_default_statement(
                             tokens)
+                    elif tokens[0].type == 'DENYLIST':
+                        tokens.pop()
+                        if not self._denylist:
+                            self._parser_state.error('policy is denylist, but '
+                                                     'flag --denylist not '
+                                                     'passed in.')
+                        else:
+                            denylist_header = True
                     else:
                         statement = self.parse_filter_statement(tokens)
                         if statement is None:
@@ -746,6 +742,9 @@ class PolicyParser:
                     if tokens:
                         self._parser_state.error(
                             'extra tokens', token=tokens[0])
+            if self._denylist and not denylist_header:
+                self._parser_state.error('policy must contain @denylist flag to'
+                                         ' be compiled with --denylist flag.')
             return statements
         finally:
             self._parser_states.pop()
