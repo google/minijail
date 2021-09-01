@@ -12,6 +12,23 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 
+/// Returns the target triplet prefix for gcc commands. No prefix is required
+/// for native builds.
+fn get_cross_compile_prefix() -> String {
+    if let Ok(cross_compile) = env::var("CROSS_COMPILE") {
+        return cross_compile;
+    }
+
+    if env::var("HOST").unwrap() == env::var("TARGET").unwrap() {
+        return String::from("");
+    }
+
+    let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let env = env::var("CARGO_CFG_TARGET_ENV").unwrap();
+    return format!("{}-{}-{}-", arch, os, env);
+}
+
 fn set_up_libminijail() -> io::Result<()> {
     // Minijail requires libcap at runtime.
     pkg_config::Config::new().probe("libcap").unwrap();
@@ -29,6 +46,7 @@ fn set_up_libminijail() -> io::Result<()> {
         .current_dir(&out_dir)
         .env("OUT", &out_dir)
         .env("MODE", if profile == "release" { "opt" } else { "debug" })
+        .env("CROSS_COMPILE", get_cross_compile_prefix())
         .arg("-C")
         .arg(&current_dir)
         .arg("CC_STATIC_LIBRARY(libminijail.pic.a)")
