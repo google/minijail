@@ -67,6 +67,11 @@ def parse_args(argv):
         action='store_true',
         help=('Use SECCOMP_RET_KILL_PROCESS instead of '
               'SECCOMP_RET_KILL_THREAD (requires Linux v4.14+).'))
+    arg_parser.add_argument(
+        '--use-ret-log',
+        action='store_true',
+        help=('Change all seccomp failures to return SECCOMP_RET_LOG instead '
+              'of killing (requires SECCOMP_RET_LOG kernel support).'))
     arg_parser.add_argument('policy',
                             help='The seccomp policy.',
                             type=argparse.FileType('r'))
@@ -88,7 +93,12 @@ def main(argv=None):
 
     parsed_arch = arch.Arch.load_from_json(opts.arch_json)
     policy_compiler = compiler.PolicyCompiler(parsed_arch)
-    if opts.use_kill_process:
+    if opts.use_ret_log:
+        kill_action = bpf.Log()
+    elif opts.denylist:
+        # Default action for a denylist policy is return EPERM
+        kill_action = bpf.ReturnErrno(parsed_arch.constants['EPERM'])
+    elif opts.use_kill_process:
         kill_action = bpf.KillProcess()
     else:
         kill_action = bpf.KillThread()
@@ -106,7 +116,8 @@ def main(argv=None):
                 kill_action=kill_action,
                 include_depth_limit=opts.include_depth_limit,
                 override_default_action=override_default_action,
-                denylist=opts.denylist).opcodes)
+                denylist=opts.denylist,
+                ret_log=opts.use_ret_log).opcodes)
     return 0
 
 

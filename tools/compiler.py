@@ -271,14 +271,16 @@ class PolicyCompiler:
                      kill_action,
                      include_depth_limit=10,
                      override_default_action=None,
-                     denylist=False):
+                     denylist=False,
+                     ret_log=False):
         """Return a compiled BPF program from the provided policy file."""
         policy_parser = parser.PolicyParser(
             self._arch,
             kill_action=kill_action,
             include_depth_limit=include_depth_limit,
             override_default_action=override_default_action,
-            denylist=denylist)
+            denylist=denylist,
+            ret_log=ret_log)
         parsed_policy = policy_parser.parse_file(policy_filename)
         entries = [
             self.compile_filter_statement(
@@ -289,8 +291,7 @@ class PolicyCompiler:
         visitor = bpf.FlatteningVisitor(
             arch=self._arch, kill_action=kill_action)
         if denylist:
-            # Default action for a denylist policy is return EPERM
-            accept_action = bpf.ReturnErrno(self._arch.constants['EPERM'])
+            accept_action = kill_action
             reject_action = bpf.Allow()
         else:
             accept_action = bpf.Allow()
