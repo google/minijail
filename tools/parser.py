@@ -221,7 +221,8 @@ class PolicyParser:
                  kill_action,
                  include_depth_limit=10,
                  override_default_action=None,
-                 denylist=False):
+                 denylist=False,
+                 ret_log=False):
         self._parser_states = [ParserState("<memory>")]
         self._kill_action = kill_action
         self._include_depth_limit = include_depth_limit
@@ -233,6 +234,7 @@ class PolicyParser:
         self._frequency_mapping = collections.defaultdict(int)
         self._arch = arch
         self._denylist = denylist
+        self._ret_log = ret_log
 
     @property
     def _parser_state(self):
@@ -441,7 +443,11 @@ class PolicyParser:
         elif action_token.type == 'RETURN':
             if not tokens:
                 self._parser_state.error('missing return value')
-            return bpf.ReturnErrno(self._parse_single_constant(tokens.pop(0)))
+            if self._ret_log:
+                tokens.pop(0)
+                return bpf.Log()
+            else:
+                return bpf.ReturnErrno(self._parse_single_constant(tokens.pop(0)))
         return self._parser_state.error('invalid action', token=action_token)
 
     # single-filter = action
