@@ -526,3 +526,18 @@ TEST_F(CliTest, invalid_remount_mode) {
   argv[1] = "-Kfoo";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
+
+TEST_F(CliTest, invalid_L_combo) {
+  std::vector<std::string> argv = {"", "", "", "/bin/sh"};
+
+  // Cannot call minijail0 with -L and a pre-compiled seccomp policy.
+  argv[0] = "-L";
+  argv[1] = "--seccomp-bpf-binary";
+  argv[2] = "source";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  argv[0] = "--seccomp-bpf-binary";
+  argv[1] = "source";
+  argv[2] = "-L";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+}
