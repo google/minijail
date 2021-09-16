@@ -21,6 +21,7 @@ extern "C" {
 
 static const char *kFdEnvVar = "__MINIJAIL_FD";
 static const char *kLdPreloadEnvVar = "LD_PRELOAD";
+static const char *kSeccompPolicyPathEnvVar = "SECCOMP_POLICY_PATH";
 
 struct minijail;
 
