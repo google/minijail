@@ -2595,6 +2595,16 @@ static int setup_preload(const struct minijail *j attribute_unused,
 #endif
 }
 
+/* For debugging only. This does not have any impact on execution. */
+static int setup_seccomp_policy_path(const struct minijail *j,
+				     char ***child_env)
+{
+	return minijail_setenv(child_env, kSeccompPolicyPathEnvVar,
+			       j->seccomp_policy_path ? j->seccomp_policy_path
+						      : "NO-LABEL",
+			       1 /* overwrite */);
+}
+
 static int setup_pipe(char ***child_env, int fds[2])
 {
 	int r = pipe(fds);
@@ -3087,6 +3097,13 @@ static int minijail_run_internal(struct minijail *j,
 		die("filename and elf_fd cannot be set at the same time");
 	}
 
+	state_out->child_env =
+	    minijail_copy_env(config->envp ? config->envp : environ);
+	if (!state_out->child_env)
+		return ENOMEM;
+	if (setup_seccomp_policy_path(j, &state_out->child_env))
+		return -EFAULT;
+
 	if (use_preload) {
 		if (j->hooks_head != NULL)
 			die("Minijail hooks are not supported with LD_PRELOAD");
@@ -3097,10 +3114,6 @@ static int minijail_run_internal(struct minijail *j,
 		 * Before we fork(2) and execve(2) the child process, we need
 		 * to open a pipe(2) to send the minijail configuration over.
 		 */
-		state_out->child_env =
-		    minijail_copy_env(config->envp ? config->envp : environ);
-		if (!state_out->child_env)
-			return ENOMEM;
 		if (setup_preload(j, &state_out->child_env) ||
 		    setup_pipe(&state_out->child_env, state_out->pipe_fds))
 			return -EFAULT;
@@ -3456,8 +3469,6 @@ static int minijail_run_internal(struct minijail *j,
 	 *   -> init()-ing process
 	 *      -> execve()-ing process
 	 */
-	if (!child_env)
-		child_env = config->envp ? config->envp : environ;
 	if (elf_fd > -1) {
 		fexecve(elf_fd, config->argv, child_env);
 		pwarn("fexecve(%d) failed", config->elf_fd);
