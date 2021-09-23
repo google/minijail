@@ -89,6 +89,7 @@ fn bindings_generation() -> io::Result<()> {
         .args(&["--whitelist-function", "^minijail_.*"])
         .args(&["--whitelist-var", "^MINIJAIL_.*"])
         .arg("--no-layout-tests")
+        .arg("--disable-header-comment")
         .args(&["--output", gen_file.to_str().unwrap()])
         .arg(header_path.to_str().unwrap())
         .args(&[
