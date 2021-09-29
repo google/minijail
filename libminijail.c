@@ -189,7 +189,6 @@ struct minijail {
 	struct hook *hooks_tail;
 	struct preserved_fd preserved_fds[MAX_PRESERVED_FDS];
 	size_t preserved_fd_count;
-	char *seccomp_policy_path;
 };
 
 static void run_hooks_or_die(const struct minijail *j,
@@ -985,10 +984,6 @@ static void clear_seccomp_options(struct minijail *j)
 	j->filter_len = 0;
 	j->filter_prog = NULL;
 	j->flags.no_new_privs = 0;
-	if (j->seccomp_policy_path) {
-		free(j->seccomp_policy_path);
-	}
-	j->seccomp_policy_path = NULL;
 }
 
 static int seccomp_should_use_filters(struct minijail *j)
@@ -1150,10 +1145,6 @@ void API minijail_parse_seccomp_filters(struct minijail *j, const char *path)
 		die("failed to compile seccomp filter BPF program in '%s'",
 		    path);
 	}
-	if (j->seccomp_policy_path) {
-		free(j->seccomp_policy_path);
-	}
-	j->seccomp_policy_path = strdup(path);
 }
 
 void API minijail_parse_seccomp_filters_from_fd(struct minijail *j, int fd)
@@ -1180,10 +1171,7 @@ void API minijail_parse_seccomp_filters_from_fd(struct minijail *j, int fd)
 		die("failed to compile seccomp filter BPF program from fd %d",
 		    fd);
 	}
-	if (j->seccomp_policy_path) {
-		free(j->seccomp_policy_path);
-	}
-	j->seccomp_policy_path = path;
+	free(path);
 }
 
 void API minijail_set_seccomp_filters(struct minijail *j,
@@ -1293,8 +1281,6 @@ static void minijail_marshal_helper(struct marshal_state *state,
 	}
 	for (i = 0; i < j->cgroup_count; ++i)
 		marshal_append_string(state, j->cgroups[i]);
-	if (j->seccomp_policy_path)
-		marshal_append_string(state, j->seccomp_policy_path);
 }
 
 size_t API minijail_size(const struct minijail *j)
@@ -1459,22 +1445,7 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 		++j->cgroup_count;
 	}
 
-	if (j->seccomp_policy_path) { /* stale pointer */
-		char *seccomp_policy_path = consumestr(&serialized, &length);
-		if (!seccomp_policy_path)
-			goto bad_cgroups;
-		j->seccomp_policy_path = strdup(seccomp_policy_path);
-		if (!j->seccomp_policy_path)
-			goto bad_cgroups;
-	}
-
 	return 0;
-
-	/*
-	 * If more is added after j->seccomp_policy_path, then this is needed:
-	 * if (j->seccomp_policy_path)
-	 * 	free(j->seccomp_policy_path);
-	 */
 
 bad_cgroups:
 	free_mounts_list(j);
@@ -1509,7 +1480,6 @@ clear_pointers:
 	j->hostname = NULL;
 	j->alt_syscall_table = NULL;
 	j->cgroup_count = 0;
-	j->seccomp_policy_path = NULL;
 out:
 	return ret;
 }
@@ -2617,16 +2587,6 @@ static int setup_preload(const struct minijail *j attribute_unused,
 #endif
 }
 
-/* For debugging only. This does not have any impact on execution. */
-static int setup_seccomp_policy_path(const struct minijail *j,
-				     char ***child_env)
-{
-	return minijail_setenv(child_env, kSeccompPolicyPathEnvVar,
-			       j->seccomp_policy_path ? j->seccomp_policy_path
-						      : "NO-LABEL",
-			       1 /* overwrite */);
-}
-
 static int setup_pipe(char ***child_env, int fds[2])
 {
 	int r = pipe(fds);
@@ -3119,13 +3079,6 @@ static int minijail_run_internal(struct minijail *j,
 		die("filename and elf_fd cannot be set at the same time");
 	}
 
-	state_out->child_env =
-	    minijail_copy_env(config->envp ? config->envp : environ);
-	if (!state_out->child_env)
-		return ENOMEM;
-	if (setup_seccomp_policy_path(j, &state_out->child_env))
-		return -EFAULT;
-
 	if (use_preload) {
 		if (j->hooks_head != NULL)
 			die("Minijail hooks are not supported with LD_PRELOAD");
@@ -3136,6 +3089,10 @@ static int minijail_run_internal(struct minijail *j,
 		 * Before we fork(2) and execve(2) the child process, we need
 		 * to open a pipe(2) to send the minijail configuration over.
 		 */
+		state_out->child_env =
+		    minijail_copy_env(config->envp ? config->envp : environ);
+		if (!state_out->child_env)
+			return ENOMEM;
 		if (setup_preload(j, &state_out->child_env) ||
 		    setup_pipe(&state_out->child_env, state_out->pipe_fds))
 			return -EFAULT;
@@ -3494,6 +3451,8 @@ static int minijail_run_internal(struct minijail *j,
 	 *   -> init()-ing process
 	 *      -> execve()-ing process
 	 */
+	if (!child_env)
+		child_env = config->envp ? config->envp : environ;
 	if (elf_fd > -1) {
 		fexecve(elf_fd, config->argv, child_env);
 		pwarn("fexecve(%d) failed", config->elf_fd);
@@ -3568,30 +3527,24 @@ static int minijail_wait_internal(struct minijail *j, int expected_signal)
 
 	if (!WIFEXITED(st)) {
 		int error_status = st;
-		if (!WIFSIGNALED(st)) {
-			return error_status;
-		}
-
-		int signum = WTERMSIG(st);
-		/*
-		 * We return MINIJAIL_ERR_JAIL if the process received
-		 * SIGSYS, which happens when a syscall is blocked by
-		 * seccomp filters.
-		 * If not, we do what bash(1) does:
-		 * $? = 128 + signum
-		 */
-		if (signum == SIGSYS) {
-			warn("child process %d had a policy violation (%s)",
-			     j->initpid,
-			     j->seccomp_policy_path ? j->seccomp_policy_path
-						    : "NO-LABEL");
-			error_status = MINIJAIL_ERR_JAIL;
-		} else {
+		if (WIFSIGNALED(st)) {
+			int signum = WTERMSIG(st);
 			if (signum != expected_signal) {
 				warn("child process %d received signal %d",
 				     j->initpid, signum);
 			}
-			error_status = MINIJAIL_ERR_SIG_BASE + signum;
+			/*
+			 * We return MINIJAIL_ERR_JAIL if the process received
+			 * SIGSYS, which happens when a syscall is blocked by
+			 * seccomp filters.
+			 * If not, we do what bash(1) does:
+			 * $? = 128 + signum
+			 */
+			if (signum == SIGSYS) {
+				error_status = MINIJAIL_ERR_JAIL;
+			} else {
+				error_status = MINIJAIL_ERR_SIG_BASE + signum;
+			}
 		}
 		return error_status;
 	}
@@ -3656,8 +3609,6 @@ void API minijail_destroy(struct minijail *j)
 		free(j->alt_syscall_table);
 	for (i = 0; i < j->cgroup_count; ++i)
 		free(j->cgroups[i]);
-	if (j->seccomp_policy_path)
-		free(j->seccomp_policy_path);
 	free(j);
 }
 
