@@ -1,0 +1,28 @@
+# GitHub actions workflow.
+# https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions
+
+# https://scan.coverity.com/projects/google-minijail
+name: Coverity Scan
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  coverity:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        cc: [clang]
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install system packages
+      run: sudo apt-get install -y libcap-dev
+    - uses: vapier/coverity-scan-action@v0
+      with:
+        project: google%2Fminijail
+        email: vapier@google.com
+        token: ${{ secrets.COVERITY_SCAN_TOKEN }}
