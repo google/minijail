@@ -154,7 +154,7 @@ Warning: MINJAIL_DEFAULT_RET_LOG is on, policy will not have any effect
     if opts.output_header_file:
         output_file_base = opts.output
         with open(output_file_base + '.h', 'w') as output_file:
-            program = ', '.join('%#4x' % x for x in compiled_policy.opcodes)
+            program = ', '.join('%i' % x for x in compiled_policy.opcodes)
             output_file.write(HEADER_TEMPLATE % {
                 'upper_name': output_file_base.upper(),
                 'name': output_file_base,
