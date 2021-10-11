@@ -45,7 +45,7 @@ HEADER_TEMPLATE = """/* DO NOT EDIT GENERATED FILE */
 #define MJ_SECCOMP_%(upper_name)s_H
 #include <stdint.h>
 
-static const unsigned char %(name)s_binary_seccomp_policy[] = {
+static const unsigned char %(name)s_binary_seccomp_policy[] __attribute__((__aligned__(4))) = {
     %(program)s
 };
 
