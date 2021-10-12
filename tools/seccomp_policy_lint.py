@@ -64,15 +64,21 @@ def parse_args(argv):
         action='store_true',
         help='Make the linter return nonzero on failure.'
     )
+    parser.add_argument(
+        '--dangerous-syscalls',
+        action='store',
+        default=','.join(DANGEROUS_SYSCALLS),
+        help='Comma-separated list of dangerous sycalls (overrides default).'
+    )
     parser.add_argument('policy',
                             help='The seccomp policy.',
                             type=argparse.FileType('r', encoding='utf-8'))
     return parser.parse_args(argv), parser
 
-def check_seccomp_policy(check_file):
+def check_seccomp_policy(check_file, dangerous_syscalls):
     """Fail if the seccomp policy file has dangerous, undocumented syscalls.
 
-    Takes in a file object as an argument.
+    Takes in a file object and a set of dangerous syscalls as arguments.
     """
 
     found_syscalls = set()
@@ -100,7 +106,7 @@ def check_seccomp_policy(check_file):
                                   f'syscall: {syscall}')
                 else:
                     found_syscalls.add(syscall)
-                    for dangerous in DANGEROUS_SYSCALLS:
+                    for dangerous in dangerous_syscalls:
                         if dangerous == syscall:
                             # Dangerous syscalls must be preceded with a
                             # comment.
@@ -133,7 +139,8 @@ def main(argv=None):
 
     opts, _arg_parser = parse_args(argv)
 
-    check = check_seccomp_policy(opts.policy)
+    check = check_seccomp_policy(opts.policy,
+                                 set(opts.dangerous_syscalls.split(',')))
 
     formatted_items = ''
     if check.errors:
@@ -142,11 +149,7 @@ def main(argv=None):
 
     print('* ' + check.message + formatted_items)
 
-    ret = 0
-    if check.errors and opts.failures_return_nonzero:
-        ret = 1
-
-    return ret
+    return 1 if check.errors and opts.failures_return_nonzero else 0
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
