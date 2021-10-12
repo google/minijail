@@ -50,7 +50,7 @@ class CheckSeccompPolicyTests(unittest.TestCase):
 
         with path.open('r', encoding='utf-8') as check_file:
             self.assertEqual(seccomp_policy_lint.check_seccomp_policy(
-                    check_file),
+                    check_file, seccomp_policy_lint.DANGEROUS_SYSCALLS),
                     exp_out)
 
     def test_check_dangerous_comment(self):
@@ -69,7 +69,7 @@ class CheckSeccompPolicyTests(unittest.TestCase):
 
         with path.open('r', encoding='utf-8') as check_file:
             self.assertEqual(seccomp_policy_lint.check_seccomp_policy(
-                    check_file),
+                    check_file, seccomp_policy_lint.DANGEROUS_SYSCALLS),
                     exp_out)
 
     def test_check_dangerous_no_comment(self):
@@ -89,7 +89,7 @@ class CheckSeccompPolicyTests(unittest.TestCase):
 
         with path.open('r', encoding='utf-8') as check_file:
             self.assertEqual(seccomp_policy_lint.check_seccomp_policy(
-                    check_file),
+                    check_file, seccomp_policy_lint.DANGEROUS_SYSCALLS),
                     exp_out)
 
     def test_check_duplicate_syscall(self):
@@ -108,7 +108,7 @@ class CheckSeccompPolicyTests(unittest.TestCase):
 
         with path.open('r', encoding='utf-8') as check_file:
             self.assertEqual(seccomp_policy_lint.check_seccomp_policy(
-                    check_file),
+                    check_file, seccomp_policy_lint.DANGEROUS_SYSCALLS),
                     exp_out)
 
 
