@@ -15,6 +15,7 @@
 #include "bpf.h"
 #include "syscall_filter.h"
 #include "syscall_filter_unittest_macros.h"
+#include "test_util.h"
 #include "util.h"
 
 namespace {
@@ -1040,44 +1041,6 @@ TEST_F(ArgFilterTest, no_log_bad_ret_error) {
 
 namespace {
 
-FILE* write_policy_to_pipe(std::string policy) {
-  int pipefd[2];
-  if (pipe(pipefd) == -1) {
-    pwarn("pipe(pipefd) failed");
-    return nullptr;
-  }
-
-  size_t len = policy.length();
-  size_t i = 0;
-  unsigned int attempts = 0;
-  ssize_t ret;
-  while (i < len) {
-    ret = write(pipefd[1], policy.c_str() + i, len - i);
-    if (ret == -1) {
-      close(pipefd[0]);
-      close(pipefd[1]);
-      return nullptr;
-    }
-
-    /* If we write 0 bytes three times in a row, fail. */
-    if (ret == 0) {
-      if (++attempts >= 3) {
-        close(pipefd[0]);
-        close(pipefd[1]);
-        warn("write() returned 0 three times in a row");
-        return nullptr;
-      }
-      continue;
-    }
-
-    attempts = 0;
-    i += (size_t)ret;
-  }
-
-  close(pipefd[1]);
-  return fdopen(pipefd[0], "r");
-}
-
 class FileTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
@@ -1101,7 +1064,7 @@ TEST_F(FileTest, malformed_policy) {
   std::string policy =
       "malformed";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_file("policy", policy_file, head_, &arg_blocks_,
                               &labels_);
@@ -1118,7 +1081,7 @@ TEST_F(FileTest, double_free_on_compile_error) {
       "read:arg0 == 0\n"
       "write:0";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_file("policy", policy_file, head_, &arg_blocks_,
                               &labels_);
@@ -1134,7 +1097,7 @@ TEST_F(FileTest, invalid_return) {
   std::string policy =
       "read:arg0 == 0; ;";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_file("policy", policy_file, head_, &arg_blocks_,
                               &labels_);
@@ -1153,7 +1116,7 @@ TEST_F(FileTest, seccomp_mode1) {
       "rt_sigreturn: 1\n"
       "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_file("policy", policy_file, head_, &arg_blocks_,
                               &labels_);
@@ -1188,7 +1151,7 @@ TEST_F(FileTest, seccomp_read) {
 
   const int LABEL_ID = 0;
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_file("policy", policy_file, head_, &arg_blocks_,
                               &labels_);
@@ -1255,7 +1218,7 @@ TEST_F(FileTest, multiline) {
 
   const int LABEL_ID = 0;
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_file("policy", policy_file, head_, &arg_blocks_,
                               &labels_);
@@ -1291,7 +1254,7 @@ TEST(FilterTest, seccomp_mode1) {
       "rt_sigreturn: 1\n"
       "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1328,7 +1291,7 @@ TEST(FilterTest, seccomp_mode1_with_check) {
       "rt_sigreturn: 1\n"
       "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual,
@@ -1373,7 +1336,7 @@ TEST(FilterTest, duplicate_read_with_args) {
       "rt_sigreturn: 1\n"
       "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1393,7 +1356,7 @@ TEST(FilterTest, duplicate_read_with_one_arg) {
       "rt_sigreturn: 1\n"
       "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1412,7 +1375,7 @@ TEST(FilterTest, seccomp_mode1_trap) {
     "rt_sigreturn: 1\n"
     "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res =
@@ -1451,7 +1414,7 @@ TEST(FilterTest, seccomp_mode1_log) {
     "rt_sigreturn: 1\n"
     "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_LOG,
@@ -1490,7 +1453,7 @@ TEST(FilterTest, seccomp_mode1_log_fails) {
     "rt_sigreturn: 1\n"
     "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_LOG,
@@ -1511,7 +1474,7 @@ TEST(FilterTest, seccomp_mode1_ret_kill_process) {
     "rt_sigreturn: 1\n"
     "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_KILL_PROCESS,
@@ -1550,7 +1513,7 @@ TEST(FilterTest, seccomp_read_write) {
       "rt_sigreturn: 1\n"
       "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1591,7 +1554,7 @@ TEST(FilterTest, misplaced_whitespace) {
   struct sock_fprog actual;
   std::string policy = "read :1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1609,7 +1572,7 @@ TEST(FilterTest, missing_atom) {
   struct sock_fprog actual;
   std::string policy = "open:\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1621,7 +1584,7 @@ TEST(FilterTest, whitespace_atom) {
   struct sock_fprog actual;
   std::string policy = "open:\t    \n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1633,7 +1596,7 @@ TEST(FilterTest, invalid_name) {
   struct sock_fprog actual;
   std::string policy = "notasyscall: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1645,7 +1608,7 @@ TEST(FilterTest, invalid_arg) {
   struct sock_fprog actual;
   std::string policy = "open: argnn ==\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1657,7 +1620,7 @@ TEST(FilterTest, invalid_tokens) {
   struct sock_fprog actual;
   std::string policy = "read: arg0 == 1 |||| arg0 == 2\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1679,7 +1642,7 @@ TEST(FilterTest, log) {
       "rt_sigreturn: 1\n"
       "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_TRAP,
@@ -1726,7 +1689,7 @@ TEST(FilterTest, allow_log_but_kill) {
     "rt_sigreturn: 1\n"
     "exit: 1\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_KILL,
@@ -1769,7 +1732,7 @@ TEST(FilterTest, frequency) {
   struct sock_fprog actual;
   std::string frequency = "@frequency ./path/is/ignored.frequency\n";
 
-  FILE* policy_file = write_policy_to_pipe(frequency);
+  FILE* policy_file = write_to_pipe(frequency);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1782,7 +1745,7 @@ TEST(FilterTest, include_invalid_token) {
   struct sock_fprog actual;
   std::string invalid_token = "@unclude ./test/seccomp.policy\n";
 
-  FILE* policy_file = write_policy_to_pipe(invalid_token);
+  FILE* policy_file = write_to_pipe(invalid_token);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1793,7 +1756,7 @@ TEST(FilterTest, include_no_space) {
   struct sock_fprog actual;
   std::string no_space = "@includetest/seccomp.policy\n";
 
-  FILE* policy_file = write_policy_to_pipe(no_space);
+  FILE* policy_file = write_to_pipe(no_space);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1804,7 +1767,7 @@ TEST(FilterTest, include_double_token) {
   struct sock_fprog actual;
   std::string double_token = "@includeinclude ./test/seccomp.policy\n";
 
-  FILE* policy_file = write_policy_to_pipe(double_token);
+  FILE* policy_file = write_to_pipe(double_token);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1815,7 +1778,7 @@ TEST(FilterTest, include_no_file) {
   struct sock_fprog actual;
   std::string no_file = "@include\n";
 
-  FILE* policy_file = write_policy_to_pipe(no_file);
+  FILE* policy_file = write_to_pipe(no_file);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1826,7 +1789,7 @@ TEST(FilterTest, include_space_no_file) {
   struct sock_fprog actual;
   std::string space_no_file = "@include \n";
 
-  FILE* policy_file = write_policy_to_pipe(space_no_file);
+  FILE* policy_file = write_to_pipe(space_no_file);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1837,7 +1800,7 @@ TEST(FilterTest, include_implicit_relative_path) {
   struct sock_fprog actual;
   std::string implicit_relative_path = "@include test/seccomp.policy\n";
 
-  FILE* policy_file = write_policy_to_pipe(implicit_relative_path);
+  FILE* policy_file = write_to_pipe(implicit_relative_path);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1848,7 +1811,7 @@ TEST(FilterTest, include_extra_text) {
   struct sock_fprog actual;
   std::string extra_text = "@include /some/file: sneaky comment\n";
 
-  FILE* policy_file = write_policy_to_pipe(extra_text);
+  FILE* policy_file = write_to_pipe(extra_text);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1859,7 +1822,7 @@ TEST(FilterTest, include_split_filename) {
   struct sock_fprog actual;
   std::string split_filename = "@include /some/file:colon.policy\n";
 
-  FILE* policy_file = write_policy_to_pipe(split_filename);
+  FILE* policy_file = write_to_pipe(split_filename);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
@@ -1870,7 +1833,7 @@ TEST(FilterTest, include_nonexistent_file) {
   struct sock_fprog actual;
   std::string include_policy = "@include ./nonexistent.policy\n";
 
-  FILE* policy_file = write_policy_to_pipe(include_policy);
+  FILE* policy_file = write_to_pipe(include_policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1893,7 +1856,7 @@ TEST(FilterTest, include) {
       "rt_sigreturn: 1\n"
       "exit: 1\n";
 
-  FILE* file_plain = write_policy_to_pipe(policy_plain);
+  FILE* file_plain = write_to_pipe(policy_plain);
   ASSERT_NE(file_plain, nullptr);
   int res_plain = test_compile_filter("policy", file_plain, &compiled_plain,
                                       ACTION_RET_KILL);
@@ -1902,7 +1865,7 @@ TEST(FilterTest, include) {
   std::string policy_with_include =
       "@include " + source_path("test/seccomp.policy") + "\n";
 
-  FILE* file_with_include = write_policy_to_pipe(policy_with_include);
+  FILE* file_with_include = write_to_pipe(policy_with_include);
   ASSERT_NE(file_with_include, nullptr);
   int res_with_include = test_compile_filter(
       "policy", file_with_include, &compiled_with_include, ACTION_RET_KILL);
@@ -1949,7 +1912,7 @@ TEST(FilterTest, include_same_syscalls) {
       "exit: 1\n"
       "@include " + source_path("test/seccomp.policy") + "\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -1971,7 +1934,7 @@ TEST(FilterTest, include_same_syscalls_with_check) {
       "exit: 1\n"
       "@include " + source_path("test/seccomp.policy") + "\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual,
@@ -1988,7 +1951,7 @@ TEST(FilterTest, include_two) {
       "@include " + source_path("test/seccomp.policy") + "\n" +
       "@include " + source_path("test/seccomp.policy") + "\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   int res = test_compile_filter("policy", policy_file, &actual);
@@ -2010,7 +1973,7 @@ TEST(FilterTest, include_invalid_policy) {
       "exit: 1\n"
       "@include ./test/invalid_syscall_name.policy\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   /* Ensure the included (invalid) policy file exists. */
@@ -2029,7 +1992,7 @@ TEST(FilterTest, include_nested) {
   struct sock_fprog actual;
   std::string policy = "@include ./test/nested.policy\n";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
 
   /* Ensure the policy file exists. */
@@ -2051,7 +2014,7 @@ TEST(FilterTest, error_cleanup_leak) {
       "read:&&\n"
       "read:&&";
 
-  FILE* policy_file = write_policy_to_pipe(policy);
+  FILE* policy_file = write_to_pipe(policy);
   ASSERT_NE(policy_file, nullptr);
   int res = test_compile_filter("policy", policy_file, &actual);
   fclose(policy_file);
