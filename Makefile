@@ -126,7 +126,7 @@ ifeq ($(USE_SYSTEM_GTEST),no)
 CXX_BINARY(syscall_filter_unittest): $(GTEST_LIBS)
 endif
 CXX_BINARY(syscall_filter_unittest): syscall_filter_unittest.o \
-		$(CORE_OBJECT_FILES) testrunner.o
+		$(CORE_OBJECT_FILES) test_util.o testrunner.o
 clean: CLEAN(syscall_filter_unittest)
 
 
@@ -146,7 +146,7 @@ ifeq ($(USE_SYSTEM_GTEST),no)
 CXX_BINARY(util_unittest): $(GTEST_LIBS)
 endif
 CXX_BINARY(util_unittest): util_unittest.o \
-		$(CORE_OBJECT_FILES) testrunner.o
+		$(CORE_OBJECT_FILES) test_util.o testrunner.o
 clean: CLEAN(util_unittest)
 
 
