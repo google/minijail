@@ -187,7 +187,8 @@ static inline bool running_with_asan(void)
 	return compiled_with_asan() || &__asan_init != 0 || &__hwasan_init != 0;
 }
 
-static inline bool debug_logging_allowed(void) {
+static inline bool debug_logging_allowed(void)
+{
 #if defined(ALLOW_DEBUG_LOGGING)
 	return true;
 #else
@@ -195,7 +196,8 @@ static inline bool debug_logging_allowed(void) {
 #endif
 }
 
-static inline bool seccomp_default_ret_log(void) {
+static inline bool seccomp_default_ret_log(void)
+{
 #if defined(SECCOMP_DEFAULT_RET_LOG)
 	return true;
 #else
@@ -257,7 +259,7 @@ char *consumestr(char **buf, size_t *buflength);
  * @fd           The file descriptor to log into. Ignored unless
  *               @logger = LOG_TO_FD.
  * @min_priority The minimum priority to display. Corresponds to syslog's
-                 priority parameter. Ignored unless @logger = LOG_TO_FD.
+ *               priority parameter. Ignored unless @logger = LOG_TO_FD.
  */
 void init_logging(enum logging_system_t logger, int fd, int min_priority);
 
@@ -300,6 +302,17 @@ char **minijail_copy_env(char *const *env);
  */
 int minijail_setenv(char ***env, const char *name, const char *value,
 		    int overwrite);
+
+/*
+ * getmultiline: This is like getline() but supports line wrapping with \.
+ *
+ * @lineptr    Address of a buffer that a mutli-line is stored.
+ * @n          Number of bytes stored in *lineptr.
+ * @stream     Input stream to read from.
+ *
+ * Returns number of bytes read or -1 on failure to read (including EOF).
+ */
+ssize_t getmultiline(char **lineptr, size_t *n, FILE *stream);
 
 #ifdef __cplusplus
 }; /* extern "C" */
