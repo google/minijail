@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "bpf.h"
+#include "test_util.h"
 #include "util.h"
 
 namespace {
@@ -357,4 +358,31 @@ TEST(parse_size, complete) {
   ASSERT_EQ(-EINVAL, parse_size(&size, "14.2G"));
   ASSERT_EQ(-EINVAL, parse_size(&size, "-1G"));
   ASSERT_EQ(-EINVAL, parse_size(&size, "; /bin/rm -- "));
+}
+
+TEST(getmultiline, basic) {
+  std::string config =
+           "\n"
+           "mount = none\n"
+           "mount =\\\n"
+           "none\n"
+           "binding = none,/tmp\n"
+           "binding = none,\\\n"
+           "/tmp";
+  FILE *config_file = write_to_pipe(config);
+  ASSERT_NE(config_file, nullptr);
+
+  char *line = NULL;
+  size_t len = 0;
+  ASSERT_EQ(0, getmultiline(&line, &len, config_file));
+  EXPECT_EQ(std::string(line), "");
+  ASSERT_EQ(12, getmultiline(&line, &len, config_file));
+  EXPECT_EQ(std::string(line), "mount = none");
+  ASSERT_EQ(12, getmultiline(&line, &len, config_file));
+  EXPECT_EQ(std::string(line), "mount = none");
+  ASSERT_EQ(19, getmultiline(&line, &len, config_file));
+  EXPECT_EQ(std::string(line), "binding = none,/tmp");
+  ASSERT_EQ(20, getmultiline(&line, &len, config_file));
+  EXPECT_EQ(std::string(line), "binding = none, /tmp");
+  free(line);
 }
