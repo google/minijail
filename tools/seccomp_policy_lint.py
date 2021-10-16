@@ -60,11 +60,6 @@ def parse_args(argv):
         action='store_true',
         help='Check as a denylist policy rather than the default allowlist.')
     parser.add_argument(
-        '--failures-return-nonzero',
-        action='store_true',
-        help='Make the linter return nonzero on failure.'
-    )
-    parser.add_argument(
         '--dangerous-syscalls',
         action='store',
         default=','.join(DANGEROUS_SYSCALLS),
@@ -91,15 +86,11 @@ def check_seccomp_policy(check_file, dangerous_syscalls):
         if re.match(r'^\s*#', line):
             prev_line_comment = True
         elif re.match(r'^\s*$', line):
-            # Empty lines shouldn't reset prev_line_comment
+            # Empty lines shouldn't reset prev_line_comment.
             continue
         else:
             match = re.match(fr'^\s*(\w*)\s*:', line)
-            if not match:
-                errors.append(f'{check_file.name}, {line_num}: syscall not '
-                              'found in beginning of line. '
-                              'Line must begin in the form "<syscall>:".')
-            else:
+            if match:
                 syscall = match.group(1)
                 if syscall in found_syscalls:
                     errors.append(f'{check_file.name}, line {line_num}: repeat '
@@ -118,6 +109,11 @@ def check_seccomp_policy(check_file, dangerous_syscalls):
                                               'requires a comment on the '
                                               'preceding line')
                 prev_line_comment = False
+            else:
+                # This line is probably a continuation from the previous line.
+                # TODO(b/203216289): Support line breaks.
+                pass
+
     if contains_dangerous_syscall:
         msg = (f'seccomp: {check_file.name} contains dangerous syscalls, so'
                ' requires review from chromeos-security@')
@@ -149,7 +145,7 @@ def main(argv=None):
 
     print('* ' + check.message + formatted_items)
 
-    return 1 if check.errors and opts.failures_return_nonzero else 0
+    return 1 if check.errors else 0
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
