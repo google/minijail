@@ -49,20 +49,27 @@ MJ_COMMON_FLAGS = -Wunused-parameter -Wextra -Wno-missing-field-initializers
 CFLAGS += $(MJ_COMMON_FLAGS)
 CXXFLAGS += $(MJ_COMMON_FLAGS)
 
+# Dependencies that all gtest based unittests should have.
+UNITTEST_LIBS := -lcap
+UNITTEST_DEPS := testrunner.o test_util.o
+
 USE_SYSTEM_GTEST ?= no
 ifeq ($(USE_SYSTEM_GTEST),no)
 GTEST_CXXFLAGS := -std=gnu++14
 GTEST_LIBS := gtest.a
+UNITTEST_DEPS += $(GTEST_LIBS)
 else
 GTEST_CXXFLAGS := $(shell gtest-config --cxxflags 2>/dev/null || \
   echo "-pthread")
 GTEST_LIBS := $(shell gtest-config --libs 2>/dev/null || \
   echo "-lgtest -pthread -lpthread")
 endif
+UNITTEST_LIBS += $(GTEST_LIBS)
 
 CORE_OBJECT_FILES := libminijail.o syscall_filter.o signal_handler.o \
 		bpf.o util.o system.o syscall_wrapper.o \
 		libconstants.gen.o libsyscalls.gen.o
+UNITTEST_DEPS += $(CORE_OBJECT_FILES)
 
 all: CC_BINARY(minijail0) CC_LIBRARY(libminijail.so) \
 	CC_LIBRARY(libminijailpreload.so)
@@ -93,12 +100,8 @@ clean: CLEAN(libminijail.*.a)
 
 CXX_BINARY(libminijail_unittest): CXXFLAGS += -Wno-write-strings \
 						$(GTEST_CXXFLAGS)
-CXX_BINARY(libminijail_unittest): LDLIBS += -lcap $(GTEST_LIBS)
-ifeq ($(USE_SYSTEM_GTEST),no)
-CXX_BINARY(libminijail_unittest): $(GTEST_LIBS)
-endif
-CXX_BINARY(libminijail_unittest): libminijail_unittest.o $(CORE_OBJECT_FILES) \
-		testrunner.o
+CXX_BINARY(libminijail_unittest): LDLIBS += $(UNITTEST_LIBS)
+CXX_BINARY(libminijail_unittest): $(UNITTEST_DEPS) libminijail_unittest.o
 clean: CLEAN(libminijail_unittest)
 
 TEST(CXX_BINARY(libminijail_unittest)): CC_LIBRARY(libminijailpreload.so)
@@ -110,43 +113,28 @@ clean: CLEAN(libminijailpreload.so)
 
 
 CXX_BINARY(minijail0_cli_unittest): CXXFLAGS += $(GTEST_CXXFLAGS)
-CXX_BINARY(minijail0_cli_unittest): LDLIBS += -lcap $(GTEST_LIBS)
-ifeq ($(USE_SYSTEM_GTEST),no)
-CXX_BINARY(minijail0_cli_unittest): $(GTEST_LIBS)
-endif
-CXX_BINARY(minijail0_cli_unittest): minijail0_cli_unittest.o \
-		$(CORE_OBJECT_FILES) minijail0_cli.o elfparse.o testrunner.o
+CXX_BINARY(minijail0_cli_unittest): LDLIBS += $(UNITTEST_LIBS)
+CXX_BINARY(minijail0_cli_unittest): $(UNITTEST_DEPS) minijail0_cli_unittest.o \
+		minijail0_cli.o elfparse.o
 clean: CLEAN(minijail0_cli_unittest)
 
 
 CXX_BINARY(syscall_filter_unittest): CXXFLAGS += -Wno-write-strings \
 						$(GTEST_CXXFLAGS)
-CXX_BINARY(syscall_filter_unittest): LDLIBS += -lcap $(GTEST_LIBS)
-ifeq ($(USE_SYSTEM_GTEST),no)
-CXX_BINARY(syscall_filter_unittest): $(GTEST_LIBS)
-endif
-CXX_BINARY(syscall_filter_unittest): syscall_filter_unittest.o \
-		$(CORE_OBJECT_FILES) test_util.o testrunner.o
+CXX_BINARY(syscall_filter_unittest): LDLIBS += $(UNITTEST_LIBS)
+CXX_BINARY(syscall_filter_unittest): $(UNITTEST_DEPS) syscall_filter_unittest.o
 clean: CLEAN(syscall_filter_unittest)
 
 
 CXX_BINARY(system_unittest): CXXFLAGS += $(GTEST_CXXFLAGS)
-CXX_BINARY(system_unittest): LDLIBS += -lcap $(GTEST_LIBS)
-ifeq ($(USE_SYSTEM_GTEST),no)
-CXX_BINARY(system_unittest): $(GTEST_LIBS)
-endif
-CXX_BINARY(system_unittest): system_unittest.o \
-		$(CORE_OBJECT_FILES) testrunner.o
+CXX_BINARY(system_unittest): LDLIBS += $(UNITTEST_LIBS)
+CXX_BINARY(system_unittest): $(UNITTEST_DEPS) system_unittest.o
 clean: CLEAN(system_unittest)
 
 
 CXX_BINARY(util_unittest): CXXFLAGS += $(GTEST_CXXFLAGS)
-CXX_BINARY(util_unittest): LDLIBS += -lcap $(GTEST_LIBS)
-ifeq ($(USE_SYSTEM_GTEST),no)
-CXX_BINARY(util_unittest): $(GTEST_LIBS)
-endif
-CXX_BINARY(util_unittest): util_unittest.o \
-		$(CORE_OBJECT_FILES) test_util.o testrunner.o
+CXX_BINARY(util_unittest): LDLIBS += $(UNITTEST_LIBS)
+CXX_BINARY(util_unittest): $(UNITTEST_DEPS) util_unittest.o
 clean: CLEAN(util_unittest)
 
 
