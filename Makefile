@@ -161,10 +161,9 @@ libsyscalls.gen.o.depends: libsyscalls.gen.c
 
 # Only regenerate libsyscalls.gen.c if the Makefile or header changes.
 # NOTE! This will not detect if the file is not appropriate for the target.
-libsyscalls.gen.c: $(SRC)/Makefile $(SRC)/libsyscalls.h
-	@printf "Generating target-arch specific $@...\n"
+libsyscalls.gen.c: $(SRC)/libsyscalls.h $(SRC)/Makefile
+	@$(ECHO) "GEN		$(subst $(SRC)/,,$<) ->  $@"
 	$(QUIET)CC="$(CC)" $(SRC)/gen_syscalls.sh "$@"
-	@printf "$@ done.\n"
 clean: CLEAN(libsyscalls.gen.c)
 
 $(eval $(call add_object_rules,libsyscalls.gen.o,CC,c,CFLAGS))
@@ -175,10 +174,9 @@ libconstants.gen.o.depends: libconstants.gen.c
 
 # Only regenerate libconstants.gen.c if the Makefile or header changes.
 # NOTE! This will not detect if the file is not appropriate for the target.
-libconstants.gen.c: $(SRC)/Makefile $(SRC)/libconstants.h
-	@printf "Generating target-arch specific $@...\n"
+libconstants.gen.c: $(SRC)/libconstants.h $(SRC)/Makefile
+	@$(ECHO) "GEN		$(subst $(SRC)/,,$<) ->  $@"
 	$(QUIET)CC="$(CC)" $(SRC)/gen_constants.sh "$@"
-	@printf "$@ done.\n"
 clean: CLEAN(libconstants.gen.c)
 
 $(eval $(call add_object_rules,libconstants.gen.o,CC,c,CFLAGS))
@@ -209,7 +207,7 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 clean: clean_gtest
 
 clean_gtest:
-	rm -f gtest.a gtest_main.a *.o
+	$(QUIET)rm -f gtest.a gtest_main.a *.o
 
 # Builds gtest.a and gtest_main.a.
 
