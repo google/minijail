@@ -440,16 +440,10 @@ char *tokenize(char **stringp, const char *delim)
 
 char *path_join(const char *external_path, const char *internal_path)
 {
-	char *path;
-	size_t pathlen;
-
-	/* One extra char for '/' and one for '\0', hence + 2. */
-	pathlen = strlen(external_path) + strlen(internal_path) + 2;
-	path = malloc(pathlen);
-	if (path)
-		snprintf(path, pathlen, "%s/%s", external_path, internal_path);
-
-	return path;
+	char *path = NULL;
+	return asprintf(&path, "%s/%s", external_path, internal_path) < 0
+		   ? NULL
+		   : path;
 }
 
 void *consumebytes(size_t length, char **buf, size_t *buflength)
