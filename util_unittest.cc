@@ -360,6 +360,12 @@ TEST(parse_size, complete) {
   ASSERT_EQ(-EINVAL, parse_size(&size, "; /bin/rm -- "));
 }
 
+TEST(path_join, basic) {
+  char *path = path_join("a", "b");
+  ASSERT_EQ(std::string("a/b"), path);
+  free(path);
+}
+
 TEST(getmultiline, basic) {
   std::string config =
            "\n"
