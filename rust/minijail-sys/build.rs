@@ -47,9 +47,9 @@ fn set_up_libminijail() -> io::Result<()> {
         .env("OUT", &out_dir)
         .env("MODE", if profile == "release" { "opt" } else { "debug" })
         .env("CROSS_COMPILE", get_cross_compile_prefix())
+        .env("BUILD_STATIC_LIBS", "yes")
         .arg("-C")
         .arg(&current_dir)
-        .arg("CC_STATIC_LIBRARY(libminijail.pic.a)")
         .status()?;
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
