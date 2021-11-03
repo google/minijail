@@ -10,6 +10,9 @@ PRELOADNAME = libminijailpreload.so
 PRELOADPATH = "$(LIBDIR)/$(PRELOADNAME)"
 CPPFLAGS += -DPRELOADPATH='$(PRELOADPATH)'
 
+# We don't build static libs by default.
+BUILD_STATIC_LIBS ?= no
+
 # Defines the pivot root path used by the minimalistic-mountns profile.
 DEFAULT_PIVOT_ROOT ?= /var/empty
 CPPFLAGS += -DDEFAULT_PIVOT_ROOT='"$(DEFAULT_PIVOT_ROOT)"'
@@ -97,6 +100,10 @@ clean: CLEAN(libminijail.so)
 CC_STATIC_LIBRARY(libminijail.pic.a): $(CORE_OBJECT_FILES)
 CC_STATIC_LIBRARY(libminijail.pie.a): $(CORE_OBJECT_FILES)
 clean: CLEAN(libminijail.*.a)
+
+ifeq ($(BUILD_STATIC_LIBS),yes)
+all: CC_STATIC_LIBRARY(libminijail.pic.a) CC_STATIC_LIBRARY(libminijail.pie.a)
+endif
 
 CXX_BINARY(libminijail_unittest): CXXFLAGS += -Wno-write-strings \
 						$(GTEST_CXXFLAGS)
