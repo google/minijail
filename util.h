@@ -104,6 +104,21 @@ static inline void _cleanup_fd(int *fd)
 		close(*fd);
 }
 
+/*
+ * Automatically free a heap allocation when exiting its scope.
+ * Make sure the pointer is always initialized.
+ * Some examples:
+ *   attribute_cleanup_str char *s = strdup(...);
+ *   attribute_cleanup_str char *s = NULL;
+ *   ...
+ *   s = strdup(...);
+ */
+#define attribute_cleanup_str attribute_cleanup(_cleanup_str)
+static inline void _cleanup_str(char **ptr)
+{
+	free(*ptr);
+}
+
 #endif /* __cplusplus */
 
 /* clang-format off */
