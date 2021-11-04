@@ -500,11 +500,10 @@ static bool seccomp_action_is_available(const char *wanted)
 		return false;
 	}
 
-	char *actions_avail = NULL;
+	attribute_cleanup_str char *actions_avail = NULL;
 	size_t buf_size = 0;
 	if (getline(&actions_avail, &buf_size, f) < 0) {
 		pwarn("getline() failed");
-		free(actions_avail);
 		return false;
 	}
 
@@ -514,9 +513,7 @@ static bool seccomp_action_is_available(const char *wanted)
 	 * seccomp actions which include other actions though, so we're good for
 	 * now. Eventually we might want to split the string by spaces.
 	 */
-	bool available = strstr(actions_avail, wanted) != NULL;
-	free(actions_avail);
-	return available;
+	return strstr(actions_avail, wanted) != NULL;
 }
 
 int seccomp_ret_log_available(void)
