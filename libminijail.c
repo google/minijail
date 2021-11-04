@@ -2525,7 +2525,7 @@ int API minijail_from_fd(int fd, struct minijail *j)
 {
 	size_t sz = 0;
 	size_t bytes = read(fd, &sz, sizeof(sz));
-	char *buf;
+	attribute_cleanup_str char *buf = NULL;
 	int r;
 	if (sizeof(sz) != bytes)
 		return -EINVAL;
@@ -2535,12 +2535,9 @@ int API minijail_from_fd(int fd, struct minijail *j)
 	if (!buf)
 		return -ENOMEM;
 	bytes = read(fd, buf, sz);
-	if (bytes != sz) {
-		free(buf);
+	if (bytes != sz)
 		return -EINVAL;
-	}
 	r = minijail_unmarshal(j, buf, sz);
-	free(buf);
 	return r;
 }
 
@@ -2550,24 +2547,20 @@ int API minijail_to_fd(struct minijail *j, int fd)
 	if (!sz)
 		return -EINVAL;
 
-	char *buf = malloc(sz);
+	attribute_cleanup_str char *buf = malloc(sz);
 	if (!buf)
 		return -ENOMEM;
 
 	int err = minijail_marshal(j, buf, sz);
 	if (err)
-		goto error;
+		return err;
 
 	/* Sends [size][minijail]. */
 	err = write_exactly(fd, &sz, sizeof(sz));
 	if (err)
-		goto error;
+		return err;
 
-	err = write_exactly(fd, buf, sz);
-
-error:
-	free(buf);
-	return err;
+	return write_exactly(fd, buf, sz);
 }
 
 int API minijail_copy_jail(const struct minijail *from, struct minijail *out)
@@ -2576,18 +2569,15 @@ int API minijail_copy_jail(const struct minijail *from, struct minijail *out)
 	if (!sz)
 		return -EINVAL;
 
-	char *buf = malloc(sz);
+	attribute_cleanup_str char *buf = malloc(sz);
 	if (!buf)
 		return -ENOMEM;
 
 	int err = minijail_marshal(from, buf, sz);
 	if (err)
-		goto error;
+		return err;
 
-	err = minijail_unmarshal(out, buf, sz);
-error:
-	free(buf);
-	return err;
+	return minijail_unmarshal(out, buf, sz);
 }
 
 static int setup_preload(const struct minijail *j attribute_unused,
