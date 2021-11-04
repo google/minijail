@@ -589,7 +589,7 @@ int compile_file(const char *filename, FILE *policy_file,
 	 * Chain the filter sections together and dump them into
 	 * the final buffer at the end.
 	 */
-	char *line = NULL;
+	attribute_cleanup_str char *line = NULL;
 	size_t len = 0;
 	int ret = 0;
 
@@ -624,7 +624,7 @@ int compile_file(const char *filename, FILE *policy_file,
 				    &state,
 				    "failed to parse include statement");
 				ret = -1;
-				goto free_line;
+				goto out;
 			}
 
 			attribute_cleanup_fp FILE *included_file =
@@ -633,7 +633,7 @@ int compile_file(const char *filename, FILE *policy_file,
 				compiler_pwarn(&state, "fopen('%s') failed",
 					       filename);
 				ret = -1;
-				goto free_line;
+				goto out;
 			}
 			if (compile_file(filename, included_file, head,
 					 arg_blocks, labels, filteropts,
@@ -642,7 +642,7 @@ int compile_file(const char *filename, FILE *policy_file,
 				compiler_warn(&state, "'@include %s' failed",
 					      filename);
 				ret = -1;
-				goto free_line;
+				goto out;
 			}
 			continue;
 		}
@@ -656,14 +656,14 @@ int compile_file(const char *filename, FILE *policy_file,
 			warn("compile_file: malformed policy line, missing "
 			     "':'");
 			ret = -1;
-			goto free_line;
+			goto out;
 		}
 
 		policy_line = strip(policy_line);
 		if (*policy_line == '\0') {
 			compiler_warn(&state, "empty policy line");
 			ret = -1;
-			goto free_line;
+			goto out;
 		}
 
 		syscall_name = strip(syscall_name);
@@ -688,7 +688,7 @@ int compile_file(const char *filename, FILE *policy_file,
 				continue;
 			}
 			ret = -1;
-			goto free_line;
+			goto out;
 		}
 
 		if (!insert_and_check_duplicate_syscall(previous_syscalls,
@@ -731,7 +731,7 @@ int compile_file(const char *filename, FILE *policy_file,
 				}
 				warn("could not allocate filter block");
 				ret = -1;
-				goto free_line;
+				goto out;
 			}
 
 			if (*arg_blocks) {
@@ -752,8 +752,7 @@ int compile_file(const char *filename, FILE *policy_file,
 		ret = -1;
 	}
 
-free_line:
-	free(line);
+out:
 	return ret;
 }
 
