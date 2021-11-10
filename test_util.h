@@ -9,7 +9,42 @@
 #ifndef _TEST_UTIL_H_
 #define _TEST_UTIL_H_
 
+#include <stdio.h>
+
+#include <memory>
 #include <string>
+
+#include "config_parser.h"
+
+namespace mj {
+
+namespace internal {
+
+// Functor for |ScopedFILE| (below).
+struct ScopedFILECloser {
+  inline void operator()(FILE *x) const {
+    if (x) {
+      fclose(x);
+    }
+  }
+};
+
+// Functor for |ScopedConfigEntry| (below).
+struct ScopedConfigEntryDeleter {
+  inline void operator()(config_entry *entry) const {
+    if (entry) {
+      free(entry);
+    }
+  }
+};
+
+} // namespace internal
+
+} // namespace mj
+
+using ScopedFILE = std::unique_ptr<FILE, mj::internal::ScopedFILECloser>;
+using ScopedConfigEntry =
+    std::unique_ptr<config_entry, mj::internal::ScopedConfigEntryDeleter>;
 
 /*
  * write_to_pipe: write a string as the file content into a pipe based
