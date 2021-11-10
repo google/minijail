@@ -1038,6 +1038,27 @@ const struct syscall_entry syscall_table[] = {
 #ifdef __NR_fspick
 { "fspick", __NR_fspick },
 #endif
+#ifdef __NR_pidfd_open
+{ "pidfd_open", __NR_pidfd_open },
+#endif
+#ifdef __NR_clone3
+{ "clone3", __NR_clone3 },
+#endif
+#ifdef __NR_close_range
+{ "close_range", __NR_close_range },
+#endif
+#ifdef __NR_openat2
+{ "openat2", __NR_openat2 },
+#endif
+#ifdef __NR_pidfd_getfd
+{ "pidfd_getfd", __NR_pidfd_getfd },
+#endif
+#ifdef __NR_faccessat2
+{ "faccessat2", __NR_faccessat2 },
+#endif
+#ifdef __NR_process_madvise
+{ "process_madvise", __NR_process_madvise },
+#endif
   { NULL, -1 },
 };
 
