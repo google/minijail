@@ -24,13 +24,9 @@
 
 # Executables when compiling in-tree.
 /dump_constants
-/libminijail_unittest
 /minijail0
-/minijail0_cli_unittest
-/syscall_filter_unittest
-/system_unittest
-/util_unittest
 /parse_seccomp_policy
+/*_unittest
 
 # common.mk TEST().
 *.test
