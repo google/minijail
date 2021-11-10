@@ -157,6 +157,24 @@ functions and determining if any of them issue system calls.  There is
 no active implementation for this, but something like
 code.google.com/p/seccompsandbox is one possible runtime variant.
 
+.SH CONFIGURATION FILE
+A configuration file can be used to specify command line options and other settings.
+
+It supports the following syntax:
+  \fB% minijail-config-file v0\fR
+  \fB<key>\fR=\fB<value>\fR
+  \fB<empty line>\fR
+  \fB# any single line comment\fR
+
+Long lines may be broken up using \\ at the end.
+
+The special directive "% minijail-config-file v0" must occupy the first line.
+"v0" also declares the version of the config file format.
+
+Keys contain only alphabetic characters and '-'. Values can be any string. Leading
+and trailing whitespaces around keys and values are permitted but will be stripped
+before processing.
+
 .SH AUTHOR
 The Chromium OS Authors <chromiumos-dev@chromium.org>
 .SH COPYRIGHT

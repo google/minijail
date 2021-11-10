@@ -459,6 +459,40 @@ cc_test {
     },
 }
 
+
+// Configuration file parser functionality unit tests using gtest.
+//
+// For a device, run with:
+// adb shell /data/nativetest/config_parser_unittest_gtest/config_parser_unittest_gtest
+//
+// For host, run with:
+// out/host/linux-x86/nativetest(64)/config_parser_unittest_gtest/config_parser_unittest_gtest
+// =========================================================
+cc_test {
+    name: "config_parser_unittest_gtest",
+    defaults: ["libminijail_flags"],
+    host_supported: true,
+
+    srcs: [
+        "config_parser.c",
+        "util.c",
+        "config_parser_unittest.cc",
+    ] + unittestSrcFiles,
+
+    static_libs: ["libminijail_generated"],
+    shared_libs: minijailCommonLibraries,
+
+    target: {
+        android: {
+            test_suites: ["device-tests"],
+        },
+    },
+    test_options: {
+        unit_test: true,
+    },
+    data: ["test/*"],
+}
+
 // libminijail_test executable for brillo_Minijail test.
 // =========================================================
 cc_test {
