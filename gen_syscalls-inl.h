@@ -73,3 +73,7 @@
 #ifndef __NR_io_uring_setup
 #define __NR_io_uring_setup 425
 #endif
+
+#ifndef __NR_faccessat2
+#define __NR_faccessat2 439
+#endif
