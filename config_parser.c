@@ -64,21 +64,21 @@ bool parse_config_line(const char *config_line, struct config_entry *entry)
 	char *value = line;
 
 	/* After tokenize call, |value| will point to a substring after '='.
-	 * If there is no '=' in the string, |key| will contain the entire string
-	 * while |value| will be NULL.
+	 * If there is no '=' in the string, |key| will contain the entire
+	 * string while |value| will be NULL.
 	 */
 	char *key = tokenize(&value, "=");
 	if (key)
 		key = strip(key);
 	if (value)
 		value = strip(value);
-	if (!key || !value || key[0] == '\0' || value[0] == '\0') {
+	if (!key || key[0] == '\0' || (value && value[0] == '\0')) {
 		warn("unable to parse %s", config_line);
 		return false;
 	}
 	entry->key = strdup(key);
-	entry->value = strdup(value);
-	if (!entry->key || !entry->value) {
+	entry->value = value ? strdup(value) : NULL;
+	if (!entry->key || (value && !entry->value)) {
 		clear_config_entry(entry);
 		return false;
 	}
