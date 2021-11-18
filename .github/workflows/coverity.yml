@@ -8,6 +8,14 @@ on:
   push:
     branches: [master]
 
+  schedule:
+    # The GH mirroring from Google GoB does not trigger push actions.
+    # Fire it once a week to provide some coverage.
+    - cron: '39 2 * * WED'
+
+  # Allow for manual triggers from the web.
+  workflow_dispatch:
+
 jobs:
   coverity:
     strategy:
