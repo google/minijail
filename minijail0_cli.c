@@ -661,10 +661,10 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	const char *filter_path = NULL;
 	int log_to_stderr = -1;
 
-	const char *optstring =
+	static const char optstring[] =
 	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUK::wyYzd";
 	/* clang-format off */
-	const struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
 		{"mount-dev", no_argument, 0, 'd'},
 		{"ambient", no_argument, 0, 128},
