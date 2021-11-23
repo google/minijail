@@ -140,7 +140,7 @@ static inline void _cleanup_str(char **ptr)
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 /* clang-format on */
 
-extern const char *log_syscalls[];
+extern const char *const log_syscalls[];
 extern const size_t log_syscalls_len;
 
 enum logging_system_t {
