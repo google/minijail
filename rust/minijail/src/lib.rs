@@ -139,6 +139,8 @@ pub enum Error {
     Killed(u8),
     /// Process finished returning a non-zero code.
     ReturnCode(u8),
+    /// Failed to wait the process.
+    Wait(i32),
 }
 
 impl Display for Error {
@@ -227,6 +229,7 @@ impl Display for Error {
             SeccompViolation(s) => write!(f, "seccomp violation syscall #{}", s),
             Killed(s) => write!(f, "killed with signal number {}", s),
             ReturnCode(e) => write!(f, "exited with code {}", e),
+            Wait(errno) => write!(f, "failed to wait: {}", io::Error::from_raw_os_error(*errno)),
         }
     }
 }
@@ -289,6 +292,9 @@ fn translate_wait_error(ret: libc::c_int) -> Result<()> {
     if ret == 0 {
         return Ok(());
     }
+    if ret < 0 {
+        return Err(Error::Wait(ret));
+    }
     if ret == MINIJAIL_ERR_NO_COMMAND as libc::c_int {
         return Err(Error::NoCommand);
     }
@@ -305,7 +311,7 @@ fn translate_wait_error(ret: libc::c_int) -> Result<()> {
     if ret > 0 && ret <= 0xff {
         return Err(Error::ReturnCode(ret as u8));
     }
-    unreachable!();
+    unreachable!(format!("Unexpected returned value from wait: {}", ret));
 }
 
 impl Minijail {
