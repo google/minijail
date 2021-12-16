@@ -15,25 +15,76 @@ use std::result::Result as StdResult;
 use libc::pid_t;
 use minijail_sys::*;
 
+enum Program {
+    Filename(PathBuf),
+    FileDescriptor(RawFd),
+}
+
+/// Configuration of a command to be run in a jail.
+struct Command {
+    program: Program,
+    preserve_fds: Vec<(RawFd, RawFd)>,
+
+    // Ownership of the backing data of args_cptr is provided by args_cstr.
+    args_cstr: Vec<CString>,
+    args_cptr: Vec<*const c_char>,
+}
+
+impl Command {
+    fn new(program: Program) -> Command {
+        Command {
+            program,
+            preserve_fds: Vec::new(),
+            args_cstr: Vec::new(),
+            args_cptr: Vec::new(),
+        }
+    }
+
+    fn keep_fds(mut self, keep_fds: &[RawFd]) -> Command {
+        self.preserve_fds = keep_fds
+            .iter()
+            .map(|&a| (a, a))
+            .collect::<Vec<(RawFd, RawFd)>>();
+        self
+    }
+
+    fn remap_fds(mut self, remap_fds: &[(RawFd, RawFd)]) -> Command {
+        self.preserve_fds = remap_fds.to_vec();
+        self
+    }
+
+    fn args<S: AsRef<str>>(mut self, args: &[S]) -> Result<Command> {
+        let (args_cstr, args_cptr) = to_execve_cstring_array(args)?;
+        self.args_cstr = args_cstr;
+        self.args_cptr = args_cptr;
+        Ok(self)
+    }
+
+    fn argv(&self) -> *const *mut c_char {
+        self.args_cptr.as_ptr() as *const *mut c_char
+    }
+}
+
 /// Abstracts paths and executable file descriptors in a way that the run implementation can cover
 /// both.
 trait Runnable {
-    fn run_pid_pipes(&self, jail: &Minijail, argv: &[*const c_char]) -> Result<pid_t>;
+    fn run_command(&self, jail: &Minijail, cmd: &Command) -> Result<pid_t>;
 }
 
 impl Runnable for &Path {
-    fn run_pid_pipes(&self, jail: &Minijail, argv: &[*const c_char]) -> Result<pid_t> {
-        let cmd_os = self
+    fn run_command(&self, jail: &Minijail, cmd: &Command) -> Result<pid_t> {
+        let path_str = self
             .to_str()
             .ok_or_else(|| Error::PathToCString(self.to_path_buf()))?;
-        let cmd_cstr = CString::new(cmd_os).map_err(|_| Error::StrToCString(cmd_os.to_owned()))?;
+        let path_cstr =
+            CString::new(path_str).map_err(|_| Error::StrToCString(path_str.to_owned()))?;
 
         let mut pid: pid_t = 0;
         let ret = unsafe {
             minijail_run_pid_pipes(
                 jail.jail,
-                cmd_cstr.as_ptr(),
-                argv.as_ptr() as *const *mut c_char,
+                path_cstr.as_ptr(),
+                cmd.argv(),
                 &mut pid,
                 null_mut(),
                 null_mut(),
@@ -48,13 +99,13 @@ impl Runnable for &Path {
 }
 
 impl Runnable for RawFd {
-    fn run_pid_pipes(&self, jail: &Minijail, argv: &[*const c_char]) -> Result<pid_t> {
+    fn run_command(&self, jail: &Minijail, cmd: &Command) -> Result<pid_t> {
         let mut pid: pid_t = 0;
         let ret = unsafe {
             minijail_run_fd_env_pid_pipes(
                 jail.jail,
                 *self,
-                argv.as_ptr() as *const *mut c_char,
+                cmd.argv(),
                 null_mut(),
                 &mut pid,
                 null_mut(),
@@ -725,12 +776,9 @@ impl Minijail {
         args: &[S],
     ) -> Result<pid_t> {
         self.run_internal(
-            cmd.as_ref(),
-            &inheritable_fds
-                .iter()
-                .map(|&a| (a, a))
-                .collect::<Vec<(RawFd, RawFd)>>(),
-            args,
+            Command::new(Program::Filename(cmd.as_ref().to_path_buf()))
+                .keep_fds(inheritable_fds)
+                .args(args)?,
         )
     }
 
@@ -742,7 +790,11 @@ impl Minijail {
         inheritable_fds: &[(RawFd, RawFd)],
         args: &[S],
     ) -> Result<pid_t> {
-        self.run_internal(cmd.as_ref(), &inheritable_fds, args)
+        self.run_internal(
+            Command::new(Program::Filename(cmd.as_ref().to_path_buf()))
+                .remap_fds(inheritable_fds)
+                .args(args)?,
+        )
     }
 
     /// Behaves the same as `run()` except cmd is a file descriptor to the executable.
@@ -753,12 +805,9 @@ impl Minijail {
         args: &[S],
     ) -> Result<pid_t> {
         self.run_internal(
-            cmd.as_raw_fd(),
-            &inheritable_fds
-                .iter()
-                .map(|&a| (a, a))
-                .collect::<Vec<(RawFd, RawFd)>>(),
-            args,
+            Command::new(Program::FileDescriptor(cmd.as_raw_fd()))
+                .keep_fds(inheritable_fds)
+                .args(args)?,
         )
     }
 
@@ -770,28 +819,15 @@ impl Minijail {
         inheritable_fds: &[(RawFd, RawFd)],
         args: &[S],
     ) -> Result<pid_t> {
-        self.run_internal(cmd.as_raw_fd(), &inheritable_fds, args)
+        self.run_internal(
+            Command::new(Program::FileDescriptor(cmd.as_raw_fd()))
+                .remap_fds(inheritable_fds)
+                .args(args)?,
+        )
     }
 
-    fn run_internal<R: Runnable, S: AsRef<str>>(
-        &self,
-        cmd: R,
-        inheritable_fds: &[(RawFd, RawFd)],
-        args: &[S],
-    ) -> Result<pid_t> {
-        // Converts each incoming `args` string to a `CString`, and then puts each `CString` pointer
-        // into a null terminated array, suitable for use as an argv parameter to `execve`.
-        let mut args_cstr = Vec::with_capacity(args.len());
-        let mut args_array = Vec::with_capacity(args.len());
-        for arg in args {
-            let arg_cstr = CString::new(arg.as_ref())
-                .map_err(|_| Error::StrToCString(arg.as_ref().to_owned()))?;
-            args_array.push(arg_cstr.as_ptr());
-            args_cstr.push(arg_cstr);
-        }
-        args_array.push(null());
-
-        for (src_fd, dst_fd) in inheritable_fds {
+    fn run_internal(&self, cmd: Command) -> Result<pid_t> {
+        for (src_fd, dst_fd) in cmd.preserve_fds.iter() {
             let ret = unsafe { minijail_preserve_fd(self.jail, *src_fd, *dst_fd) };
             if ret < 0 {
                 return Err(Error::PreservingFd(ret));
@@ -806,7 +842,7 @@ impl Minijail {
         // Set stdin, stdout, and stderr to /dev/null unless they are in the inherit list.
         // These will only be closed when this process exits.
         for io_fd in &[libc::STDIN_FILENO, libc::STDOUT_FILENO, libc::STDERR_FILENO] {
-            if !inheritable_fds.iter().any(|(_, fd)| *fd == *io_fd) {
+            if !cmd.preserve_fds.iter().any(|(_, fd)| *fd == *io_fd) {
                 let ret = unsafe { minijail_preserve_fd(self.jail, dev_null.as_raw_fd(), *io_fd) };
                 if ret < 0 {
                     return Err(Error::PreservingFd(ret));
@@ -818,7 +854,10 @@ impl Minijail {
             minijail_close_open_fds(self.jail);
         }
 
-        cmd.run_pid_pipes(&self, &args_array)
+        match cmd.program {
+            Program::Filename(ref path) => path.as_path().run_command(&self, &cmd),
+            Program::FileDescriptor(fd) => fd.run_command(&self, &cmd),
+        }
     }
 
     /// Forks a child and puts it in the previously configured minijail.
@@ -936,6 +975,26 @@ fn is_single_threaded() -> io::Result<bool> {
         Ok(_) => Ok(false),
         Err(e) => Err(e),
     }
+}
+
+fn to_execve_cstring_array<S: AsRef<str>>(
+    slice: &[S],
+) -> Result<(Vec<CString>, Vec<*const c_char>)> {
+    // Converts each incoming `str` to a `CString`, and then puts each `CString` pointer into a
+    // null terminated array, suitable for use as an argv or envp parameter to `execve`.
+    let mut vec_cstr = Vec::with_capacity(slice.len());
+    let mut vec_cptr = Vec::with_capacity(slice.len() + 1);
+    for s in slice {
+        let cstr =
+            CString::new(s.as_ref()).map_err(|_| Error::StrToCString(s.as_ref().to_owned()))?;
+
+        vec_cstr.push(cstr);
+        vec_cptr.push(vec_cstr.last().unwrap().as_ptr());
+    }
+
+    vec_cptr.push(null());
+
+    Ok((vec_cstr, vec_cptr))
 }
 
 #[cfg(test)]
