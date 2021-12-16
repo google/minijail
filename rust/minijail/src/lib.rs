@@ -21,7 +21,7 @@ enum Program {
 }
 
 /// Configuration of a command to be run in a jail.
-struct Command {
+pub struct Command {
     program: Program,
     preserve_fds: Vec<(RawFd, RawFd)>,
 
@@ -35,6 +35,24 @@ struct Command {
 }
 
 impl Command {
+    /// This exposes a subset of what Command can do, before we are ready to commit to a stable
+    /// API.
+    pub fn new_for_path<P: AsRef<Path>, S: AsRef<str>, A: AsRef<str>>(
+        path: P,
+        keep_fds: &[RawFd],
+        args: &[S],
+        env_vars: Option<&[A]>,
+    ) -> Result<Command> {
+        let mut cmd = Command::new(Program::Filename(path.as_ref().to_path_buf()))
+            .keep_fds(keep_fds)
+            .args(args)?;
+        if let Some(env_vars) = env_vars {
+            cmd = cmd.envs(env_vars)?;
+        }
+
+        Ok(cmd)
+    }
+
     fn new(program: Program) -> Command {
         Command {
             program,
@@ -845,6 +863,11 @@ impl Minijail {
                 .remap_fds(inheritable_fds)
                 .args(args)?,
         )
+    }
+
+    /// A generic version of `run()` that is a super set of all variants.
+    pub fn run_command(&self, cmd: Command) -> Result<pid_t> {
+        self.run_internal(cmd)
     }
 
     fn run_internal(&self, cmd: Command) -> Result<pid_t> {
