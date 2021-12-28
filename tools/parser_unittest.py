@@ -60,7 +60,7 @@ class TokenizerTests(unittest.TestCase):
         ])
         self.assertEqual(
             [(token.type, token.value) for token in TokenizerTests._tokenize(
-                'read: arg0 in ~0xffff || arg0 & (1|2) && arg0 == 0o755; '
+                'read: arg0 in ~0xffff || arg0 & (1|2) && arg0 == 0755; '
                 'return ENOSYS # ignored')], [
                     ('IDENTIFIER', 'read'),
                     ('COLON', ':'),
@@ -79,7 +79,7 @@ class TokenizerTests(unittest.TestCase):
                     ('AND', '&&'),
                     ('ARGUMENT', 'arg0'),
                     ('OP', '=='),
-                    ('NUMERIC_CONSTANT', '0o755'),
+                    ('NUMERIC_CONSTANT', '0755'),
                     ('SEMICOLON', ';'),
                     ('RETURN', 'return'),
                     ('IDENTIFIER', 'ENOSYS'),
@@ -275,6 +275,27 @@ class ParseFilterExpressionTests(unittest.TestCase):
                     [parser.Atom(0, '==', 4),
                      parser.Atom(1, '==', 2)],
                 ])
+
+    def test_parse_number_argument_expression(self):
+        """Accept valid argument expressions with any octal/decimal/hex number."""
+        # 4607 == 010777 == 0x11ff
+        self.assertEqual(
+            self.parser.parse_argument_expression(
+                self._tokenize('arg0 in 4607')), [
+                    [parser.Atom(0, 'in', 4607)],
+            ])
+
+        self.assertEqual(
+            self.parser.parse_argument_expression(
+                self._tokenize('arg0 in 010777')), [
+                    [parser.Atom(0, 'in', 4607)],
+            ])
+
+        self.assertEqual(
+            self.parser.parse_argument_expression(
+                self._tokenize('arg0 in 0x11ff')), [
+                    [parser.Atom(0, 'in', 4607)],
+            ])
 
     def test_parse_empty_argument_expression(self):
         """Reject empty argument expressions."""
