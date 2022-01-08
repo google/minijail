@@ -158,11 +158,13 @@ no active implementation for this, but something like
 code.google.com/p/seccompsandbox is one possible runtime variant.
 
 .SH CONFIGURATION FILE
-A configuration file can be used to specify command line options and other settings.
+A configuration file can be used to specify command line options and other
+settings.
 
 It supports the following syntax:
   \fB% minijail-config-file v0\fR
-  \fB<key>\fR=\fB<value>\fR
+  \fB<option>\fR=\fB<argument>\fR
+  \fB<no-argument-option>\fR
   \fB<empty line>\fR
   \fB# any single line comment\fR
 
@@ -171,9 +173,14 @@ Long lines may be broken up using \\ at the end.
 The special directive "% minijail-config-file v0" must occupy the first line.
 "v0" also declares the version of the config file format.
 
-Keys contain only alphabetic characters and '-'. Values can be any string. Leading
-and trailing whitespaces around keys and values are permitted but will be stripped
-before processing.
+Keys contain only alphabetic characters and '-'. Values can be any non-empty
+string. Leading and trailing whitespaces around keys and
+values are permitted but will be stripped before processing.
+
+Currently all long options are supported such as
+\fBmount\fR, \fBbind-mount\fR. For a option that has no argument, the option
+will occupy a single line, without '=' and value. Otherwise, any string that
+is given after the '=' is interpreted as the argument.
 
 .SH AUTHOR
 The Chromium OS Authors <chromiumos-dev@chromium.org>
