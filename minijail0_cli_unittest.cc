@@ -14,8 +14,10 @@
 
 #include <gtest/gtest.h>
 
+#include "config_parser.h"
 #include "libminijail.h"
 #include "minijail0_cli.h"
+#include "test_util.h"
 
 namespace {
 
@@ -541,3 +543,28 @@ TEST_F(CliTest, invalid_L_combo) {
   argv[2] = "-L";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
+
+// Android unit tests do not support data file yet.
+#if !defined(__ANDROID__)
+
+std::string source_path(std::string file) {
+  std::string srcdir = getenv("SRC") ? : ".";
+  return srcdir + "/" + file;
+}
+
+TEST_F(CliTest, conf_parsing_invalid_key) {
+  std::vector<std::string> argv = {"--config", source_path("test/invalid.conf"),
+                                   "/bin/sh"};
+
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+}
+
+TEST_F(CliTest, conf_parsing) {
+  std::vector<std::string> argv = {"-v", "--config",
+                                   source_path("test/valid.conf"),
+                                   "/bin/sh"};
+
+  ASSERT_TRUE(parse_args_(argv));
+}
+
+#endif  // !__ANDROID__
