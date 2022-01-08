@@ -21,6 +21,7 @@
 #include "libminijail.h"
 #include "libsyscalls.h"
 
+#include "config_parser.h"
 #include "elfparse.h"
 #include "minijail0_cli.h"
 #include "system.h"
@@ -450,7 +451,8 @@ static void use_profile(struct minijail *j, const char *profile,
 		}
 		if (!strcmp(profile, "minimalistic-mountns")) {
 			if (minijail_bind(j, "/dev/log", "/dev/log", 0)) {
-				fprintf(stderr, "minijail_bind(/dev/log) failed.\n");
+				fprintf(stderr,
+					"minijail_bind(/dev/log) failed.\n");
 				exit(1);
 			}
 			minijail_mount_dev(j);
@@ -529,14 +531,14 @@ static void usage(const char *progn)
 	       "  [-R <type,cur,max>] [-S <file>] [-t[size]] [-T <type>] [-u <user>] [-V <file>]\n"
 	       "  <program> [args...]\n"
 	       "  -a <table>:   Use alternate syscall table <table>.\n"
-	       "  -b <...>:     Bind <src> to <dest> in chroot.\n"
-	       "                Multiple instances allowed.\n"
+	       "  --bind-mount <...>,  Bind <src> to <dest> in chroot.\n"
+	       "            -b <...>:  Multiple instances allowed.\n"
 	       "  -B <mask>:    Skip setting securebits in <mask> when restricting capabilities (-c).\n"
 	       "                By default, SECURE_NOROOT, SECURE_NO_SETUID_FIXUP, and \n"
 	       "                SECURE_KEEP_CAPS (together with their respective locks) are set.\n"
 	       "                There are eight securebits in total.\n"
-	       "  -k <...>:     Mount <src> at <dest> in chroot.\n"
-	       "                <flags> and <data> can be specified as in mount(2).\n"
+	       "  --mount <...>,Mount <src> at <dest> in chroot.\n"
+	       "       -k <...>:<flags> and <data> can be specified as in mount(2).\n"
 	       "                Multiple instances allowed.\n"
 	       "  -c <caps>:    Restrict caps to <caps>.\n"
 	       "  -C <dir>:     chroot(2) to <dir>.\n"
@@ -618,7 +620,9 @@ static void usage(const char *progn)
 	       "                The user is responsible for ensuring that the binary\n"
 	       "                was compiled for the correct architecture / kernel version.\n"
 	       "  --allow-speculative-execution:Allow speculative execution and disable\n"
-	       "                mitigations for speculative execution attacks.\n");
+	       "                mitigations for speculative execution attacks.\n"
+	       "  --config <file>:Load the Minijail configuration file <file>.\n"
+	       "                If used, must be specified ahead of other options.\n");
 	/* clang-format on */
 }
 
@@ -633,11 +637,91 @@ static void seccomp_filter_usage(const char *progn)
 	printf("\nSee minijail0(5) for example policies.\n");
 }
 
+/*
+ * Return the next unconsumed option char/value parsed from
+ * |*conf_entry_list|. |optarg| is updated to point to an argument from
+ * the entry value. If all options have been consumed, |*conf_entry_list|
+ * will be freed and -1 will be returned.
+ */
+static int getopt_from_conf(const struct option *longopts,
+			    struct config_entry_list **conf_entry_list,
+			    size_t *conf_index)
+{
+	int opt = -1;
+	/* If we've consumed all the options in the this config, reset it. */
+	if (*conf_index >= (*conf_entry_list)->num_entries) {
+		free_config_entry_list(*conf_entry_list);
+		*conf_entry_list = NULL;
+		*conf_index = 0;
+		return opt;
+	}
+
+	struct config_entry *entry = &(*conf_entry_list)->entries[*conf_index];
+	/* Look up a matching long option. */
+	size_t i = 0;
+	const struct option *curr_opt;
+	for (curr_opt = &longopts[0]; curr_opt->name != NULL;
+	     curr_opt = &longopts[++i])
+		if (strcmp(entry->key, curr_opt->name) == 0)
+			break;
+	if (curr_opt->name == NULL) {
+		fprintf(
+		    stderr,
+		    "Unable to recognize '%s' as Minijail conf entry key, "
+		    "please refer to minijail0(5) for syntax and examples.\n",
+		    entry->key);
+		exit(1);
+	}
+	opt = curr_opt->val;
+	optarg = (char *)entry->value;
+	(*conf_index)++;
+	return opt;
+}
+
+/*
+ * Similar to getopt(3), return the next option char/value as it
+ * parses through the CLI argument list. Config entries in
+ * |*conf_entry_list| will be parsed with precendences over cli options.
+ * Same as getopt(3), |optarg| is pointing to the option argument.
+ */
+static int getopt_conf_or_cli(int argc, char *const argv[],
+			      struct config_entry_list **conf_entry_list,
+			      size_t *conf_index)
+{
+	int opt = -1;
+	static const char optstring[] =
+	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUK::wyYzd";
+	/* clang-format off */
+	static const struct option long_options[] = {
+		{"help", no_argument, 0, 'h'},
+		{"mount-dev", no_argument, 0, 'd'},
+		{"ambient", no_argument, 0, 128},
+		{"uts", optional_argument, 0, 129},
+		{"logging", required_argument, 0, 130},
+		{"profile", required_argument, 0, 131},
+		{"preload-library", required_argument, 0, 132},
+		{"seccomp-bpf-binary", required_argument, 0, 133},
+		{"add-suppl-group", required_argument, 0, 134},
+		{"allow-speculative-execution", no_argument, 0, 135},
+		{"config", required_argument, 0, 136},
+		{"mount", required_argument, 0, 'k'},
+		{"bind-mount", required_argument, 0, 'b'},
+		{0, 0, 0, 0},
+	};
+	/* clang-format on */
+	if (*conf_entry_list != NULL)
+		opt =
+		    getopt_from_conf(long_options, conf_entry_list, conf_index);
+	if (opt == -1)
+		opt = getopt_long(argc, argv, optstring, long_options, NULL);
+	return opt;
+}
+
 int parse_args(struct minijail *j, int argc, char *const argv[],
 	       int *exit_immediately, ElfType *elftype,
 	       const char **preload_path)
 {
-	enum seccomp_type{None, Strict, Filter, BpfBinaryFilter};
+	enum seccomp_type { None, Strict, Filter, BpfBinaryFilter };
 	enum seccomp_type seccomp = None;
 	int opt;
 	int use_seccomp_filter = 0;
@@ -660,27 +744,11 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	size_t tmp_size = 0;
 	const char *filter_path = NULL;
 	int log_to_stderr = -1;
+	struct config_entry_list *conf_entry_list = NULL;
+	size_t conf_index = 0;
 
-	static const char optstring[] =
-	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUK::wyYzd";
-	/* clang-format off */
-	static const struct option long_options[] = {
-		{"help", no_argument, 0, 'h'},
-		{"mount-dev", no_argument, 0, 'd'},
-		{"ambient", no_argument, 0, 128},
-		{"uts", optional_argument, 0, 129},
-		{"logging", required_argument, 0, 130},
-		{"profile", required_argument, 0, 131},
-		{"preload-library", required_argument, 0, 132},
-		{"seccomp-bpf-binary", required_argument, 0, 133},
-		{"add-suppl-group", required_argument, 0, 134},
-		{"allow-speculative-execution", no_argument, 0, 135},
-		{0, 0, 0, 0},
-	};
-	/* clang-format on */
-
-	while ((opt = getopt_long(argc, argv, optstring, long_options, NULL)) !=
-	       -1) {
+	while ((opt = getopt_conf_or_cli(argc, argv, &conf_entry_list,
+					 &conf_index)) != -1) {
 		switch (opt) {
 		case 'u':
 			if (use_uid) {
@@ -730,9 +798,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case 'L':
 			if (seccomp == BpfBinaryFilter) {
-				fprintf(stderr,
-					"-L does not work with "
-					"--seccomp-bpf-binary.\n");
+				fprintf(stderr, "-L does not work with "
+						"--seccomp-bpf-binary.\n");
 				exit(1);
 			}
 			use_seccomp_log = 1;
@@ -974,6 +1041,33 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		case 135:
 			minijail_set_seccomp_filter_allow_speculation(j);
 			break;
+		case 136: {
+			if (conf_entry_list != NULL) {
+				fprintf(stderr,
+					"Nested config file specification is "
+					"not allowed.\n");
+				exit(1);
+			}
+			conf_entry_list = new_config_entry_list();
+			conf_index = 0;
+			attribute_cleanup_fp FILE *config_file =
+			    fopen(optarg, "re");
+			if (!config_file) {
+				fprintf(stderr, "failed to open %s: %m",
+					optarg);
+				exit(1);
+			}
+			if (!parse_config_file(config_file, conf_entry_list)) {
+				fprintf(
+				    stderr,
+				    "Unable to parse %s as Minijail conf file, "
+				    "please refer to minijail0(5) for syntax "
+				    "and examples.\n",
+				    optarg);
+				exit(1);
+			}
+			break;
+		}
 		default:
 			usage(argv[0]);
 			exit(opt == 'h' ? 0 : 1);
