@@ -11,6 +11,7 @@
 
 #include "libminijail.h"
 #include "libminijail-private.h"
+#include "util.h"
 
 #include <dlfcn.h>
 #include <stdio.h>
@@ -23,18 +24,24 @@
 static int (*real_main) (int, char **, char **);
 static void *libc_handle;
 
-static void die(const char *failed)
+static void truncate_preload_env(char **envp, const char *name)
 {
-	syslog(LOG_ERR, "libminijail: %s", failed);
-	abort();
-}
-
-static void unset_in_env(char **envp, const char *name)
-{
-	int i;
-	for (i = 0; envp[i]; i++)
-		if (!strncmp(envp[i], name, strlen(name)))
-			envp[i][0] = '\0';
+	char *env_value = minijail_getenv(envp, name);
+	if (env_value) {
+		/*
+		 * if we have more than just libminijailpreload.so in
+		 * LD_PRELOAD, cut out libminijailpreload.so from it,
+		 * as it is guaranteed to always be last in the
+		 * LD_PRELOAD list.
+		 */
+		char *last_space = strrchr(env_value, ' ');
+		if (last_space) {
+			*last_space = '\0';
+		} else {
+			/* Only our lib was in LD_PRELOAD, just unset it. */
+			minijail_unsetenv(envp, name);
+		}
+	}
 }
 
 /** @brief Fake main(), spliced in before the real call to main() by
@@ -71,12 +78,10 @@ static int fake_main(int argc, char **argv, char **envp)
 		die("preload: failed to parse minijail from parent");
 	close(fd);
 
-	unset_in_env(envp, kFdEnvVar);
-	/* TODO(ellyjones): this trashes existing preloads, so one can't do:
-	 * LD_PRELOAD="/tmp/test.so libminijailpreload.so" prog; the
-	 * descendants of prog will have no LD_PRELOAD set at all.
-	 */
-	unset_in_env(envp, kLdPreloadEnvVar);
+	minijail_unsetenv(envp, kFdEnvVar);
+
+	truncate_preload_env(envp, kLdPreloadEnvVar);
+
 	/* Strip out flags meant for the parent. */
 	minijail_preenter(j);
 	minijail_enter(j);
