@@ -1491,12 +1491,12 @@ bad_filters:
 	if (j->alt_syscall_table)
 		free(j->alt_syscall_table);
 bad_syscall_table:
-	if (j->chrootdir)
-		free(j->chrootdir);
-bad_chrootdir:
 	if (j->hostname)
 		free(j->hostname);
 bad_hostname:
+	if (j->chrootdir)
+		free(j->chrootdir);
+bad_chrootdir:
 	if (j->suppl_gid_list)
 		free(j->suppl_gid_list);
 bad_gid_list:
