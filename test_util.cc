@@ -14,7 +14,7 @@
 
 #define MAX_PIPE_CAPACITY (4096)
 
-FILE *write_to_pipe(std::string content)
+FILE *write_to_pipe(const std::string& content)
 {
 	int pipefd[2];
 	if (pipe(pipefd) == -1) {

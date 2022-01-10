@@ -547,7 +547,7 @@ TEST_F(CliTest, invalid_L_combo) {
 // Android unit tests do not support data file yet.
 #if !defined(__ANDROID__)
 
-std::string source_path(std::string file) {
+std::string source_path(const std::string& file) {
   std::string srcdir = getenv("SRC") ? : ".";
   return srcdir + "/" + file;
 }
