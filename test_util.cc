@@ -53,3 +53,8 @@ FILE *write_to_pipe(const std::string& content)
 	close(pipefd[1]);
 	return fdopen(pipefd[0], "r");
 }
+
+std::string source_path(const std::string& file) {
+	std::string srcdir = getenv("SRC") ? : ".";
+	return srcdir + "/" + file;
+}
