@@ -509,24 +509,46 @@ char **minijail_copy_env(char *const *env)
 	return copy;
 }
 
+/*
+ * Utility function used by minijail_setenv, minijail_unsetenv and
+ * minijail_getenv, returns true if |name| is found, false if not.
+ * If found, |*i| is |name|'s index. If not, |*i| is the length of |envp|.
+ */
+static bool getenv_index(char **envp, const char *name, int *i) {
+	if (!envp || !name || !i)
+		return false;
+
+	size_t name_len = strlen(name);
+	for (*i = 0; envp[*i]; ++(*i)) {
+		/*
+		 * If we find a match the size of |name|, we must check
+		 * that the next character is a '=', indicating that
+		 * the full varname of envp[i] is exactly |name| and
+		 * not just happening to start with |name|.
+		 */
+		if (!strncmp(envp[*i], name, name_len) &&
+		    (envp[*i][name_len] == '=')) {
+			return true;
+		}
+	}
+	/* No match found, |*i| contains the number of elements in |envp|. */
+	return false;
+}
+
 int minijail_setenv(char ***env, const char *name, const char *value,
 		    int overwrite)
 {
 	if (!env || !*env || !name || !*name || !value)
 		return EINVAL;
 
-	size_t name_len = strlen(name);
-
 	char **dest = NULL;
-	size_t env_len = 0;
-	for (char **entry = *env; *entry; ++entry, ++env_len) {
-		if (!dest && strncmp(name, *entry, name_len) == 0 &&
-		    (*entry)[name_len] == '=') {
-			if (!overwrite)
-				return 0;
+	int i;
 
-			dest = entry;
-		}
+	/* Look in env to check if this var name already exists. */
+	if (getenv_index(*env, name, &i)) {
+		if (!overwrite)
+			return 0;
+		dest = &(*env)[i];
 	}
 
 	char *new_entry = NULL;
@@ -539,15 +561,16 @@ int minijail_setenv(char ***env, const char *name, const char *value,
 		return 0;
 	}
 
-	env_len++;
-	char **new_env = realloc(*env, (env_len + 1) * sizeof(char *));
+	/* getenv_index has set |i| to the length of |env|. */
+	++i;
+	char **new_env = realloc(*env, (i + 1) * sizeof(char *));
 	if (!new_env) {
 		free(new_entry);
 		return ENOMEM;
 	}
 
-	new_env[env_len - 1] = new_entry;
-	new_env[env_len] = NULL;
+	new_env[i - 1] = new_entry;
+	new_env[i] = NULL;
 	*env = new_env;
 	return 0;
 }
@@ -589,4 +612,36 @@ ssize_t getmultiline(char **lineptr, size_t *n, FILE *stream)
 	memcpy(&line[ret + 1], next_line, next_ret + 1);
 	*lineptr = line;
 	return *n - 1;
+}
+
+char *minijail_getenv(char **envp, const char *name) {
+	if (!envp || !name)
+		return NULL;
+
+	int i;
+	if (!getenv_index(envp, name, &i))
+		return NULL;
+
+	/* Return a ptr to the value after the '='. */
+	return envp[i] + strlen(name) + 1;
+}
+
+bool minijail_unsetenv(char **envp, const char *name)
+{
+	if (!envp || !name)
+		return false;
+
+	int i;
+	if (!getenv_index(envp, name, &i))
+		return false;
+
+	/* We found a match, replace it by the last entry of the array. */
+	int last;
+	for (last = i; envp[last]; ++last)
+		continue;
+	--last;
+	envp[i] = envp[last];
+	envp[last] = NULL;
+
+	return true;
 }

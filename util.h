@@ -329,6 +329,34 @@ int minijail_setenv(char ***env, const char *name, const char *value,
  */
 ssize_t getmultiline(char **lineptr, size_t *n, FILE *stream);
 
+/*
+ * minjail_getenv: Get an environment variable from @envp. Semantics match the
+ * standard getenv() function, but this operates on @envp, not the global
+ * environment (usually referred to as `extern char **environ`).
+ *
+ * @env       Address of the environment to read from.
+ * @name      Name of the key to get.
+ *
+ * Returns a pointer to the corresponding environment value. The caller must
+ * take care not to modify the pointed value, as this points directly to memory
+ * pointed to by @envp.
+ * If the environment variable name is not found, returns NULL.
+ */
+char *minijail_getenv(char **env, const char *name);
+
+/*
+ * minjail_unsetenv: Clear the environment variable @name from the @envp array
+ * of pointers to strings that have the KEY=VALUE format. If the operation is
+ * successful, the array will contain one item less than before the call.
+ * Only the first occurence is removed.
+ *
+ * @envp      Address of the environment to clear the variable from.
+ * @name      Name of the variable to clear.
+ *
+ * Returns false and modifies *@envp on success, returns true otherwise.
+ */
+bool minijail_unsetenv(char **envp, const char *name);
+
 #ifdef __cplusplus
 }; /* extern "C" */
 #endif

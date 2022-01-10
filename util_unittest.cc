@@ -158,6 +158,42 @@ TEST(environment, copy_and_modify) {
   EXPECT_EQ("val1=3\nval2=4\ndup=5\ndup=2\nempty=\nnew1=7\nnew2=8\n",
             dump_env(env));
 
+  EXPECT_EQ(nullptr, minijail_getenv(nullptr, "dup"));
+  EXPECT_EQ(nullptr, minijail_getenv(nullptr, nullptr));
+  EXPECT_EQ(nullptr, minijail_getenv(env, nullptr));
+  EXPECT_EQ(nullptr, minijail_getenv(env, "dup="));
+  EXPECT_EQ(nullptr, minijail_getenv(env, "du"));
+  EXPECT_EQ(std::string("8"), minijail_getenv(env, "new2"));
+  EXPECT_EQ(std::string("3"), minijail_getenv(env, "val1"));
+  EXPECT_EQ(std::string("5"), minijail_getenv(env, "dup"));
+
+  EXPECT_EQ(false, minijail_unsetenv(env, "nonexisting"));
+  EXPECT_EQ("val1=3\nval2=4\ndup=5\ndup=2\nempty=\nnew1=7\nnew2=8\n",
+            dump_env(env));
+  EXPECT_EQ(false, minijail_unsetenv(env, ""));
+  EXPECT_EQ("val1=3\nval2=4\ndup=5\ndup=2\nempty=\nnew1=7\nnew2=8\n",
+            dump_env(env));
+  EXPECT_EQ(false, minijail_unsetenv(env, nullptr));
+  EXPECT_EQ("val1=3\nval2=4\ndup=5\ndup=2\nempty=\nnew1=7\nnew2=8\n",
+            dump_env(env));
+  EXPECT_EQ(false, minijail_unsetenv(nullptr, nullptr));
+  EXPECT_EQ("val1=3\nval2=4\ndup=5\ndup=2\nempty=\nnew1=7\nnew2=8\n",
+            dump_env(env));
+  EXPECT_EQ(false, minijail_unsetenv(nullptr, "nonexisting"));
+  EXPECT_EQ("val1=3\nval2=4\ndup=5\ndup=2\nempty=\nnew1=7\nnew2=8\n",
+            dump_env(env));
+  EXPECT_EQ(false, minijail_unsetenv(env, "val1="));
+  EXPECT_EQ("val1=3\nval2=4\ndup=5\ndup=2\nempty=\nnew1=7\nnew2=8\n",
+            dump_env(env));
+  EXPECT_EQ(true, minijail_unsetenv(env, "val1"));
+  EXPECT_EQ("new2=8\nval2=4\ndup=5\ndup=2\nempty=\nnew1=7\n", dump_env(env));
+  EXPECT_EQ(true, minijail_unsetenv(env, "empty"));
+  EXPECT_EQ("new2=8\nval2=4\ndup=5\ndup=2\nnew1=7\n", dump_env(env));
+  EXPECT_EQ(true, minijail_unsetenv(env, "new2"));
+  EXPECT_EQ("new1=7\nval2=4\ndup=5\ndup=2\n", dump_env(env));
+  EXPECT_EQ(true, minijail_unsetenv(env, "new1"));
+  EXPECT_EQ("dup=2\nval2=4\ndup=5\n", dump_env(env));
+
   minijail_free_env(env);
 }
 
