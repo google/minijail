@@ -36,7 +36,7 @@ TEST(ParsingConfigTest, valid_config_line) {
       "  xyz = abc  ",
   };
 
-  for (const auto conf_line : valid_conf_lines) {
+  for (const auto& conf_line : valid_conf_lines) {
     ASSERT_TRUE(parse_config_line(conf_line.c_str(), entry.get()));
     clear_config_entry(entry.get());
   }
@@ -52,7 +52,7 @@ TEST(ParsingConfigTest, invalid_config_line) {
       "empty_arg=   ",
   };
 
-  for (const auto conf_line : invalid_conf_lines) {
+  for (const auto& conf_line : invalid_conf_lines) {
     ASSERT_FALSE(parse_config_line(conf_line.c_str(), entry.get()));
   }
 }

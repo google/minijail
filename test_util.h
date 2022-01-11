@@ -57,6 +57,6 @@ using ScopedConfigEntry =
  * Returns a FILE* that contains @content.
  */
 
-FILE *write_to_pipe(std::string content);
+FILE *write_to_pipe(const std::string& content);
 
 #endif /* _TEST_UTIL_H_ */
