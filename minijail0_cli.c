@@ -58,7 +58,7 @@ static void set_user(struct minijail *j, const char *arg, uid_t *out_uid,
 		     gid_t *out_gid)
 {
 	char *end = NULL;
-	int uid = strtod(arg, &end);
+	uid_t uid = strtoul(arg, &end, 10);
 	if (!*end && *arg) {
 		*out_uid = uid;
 		minijail_change_uid(j, uid);
@@ -82,7 +82,7 @@ static void set_user(struct minijail *j, const char *arg, uid_t *out_uid,
 static void set_group(struct minijail *j, const char *arg, gid_t *out_gid)
 {
 	char *end = NULL;
-	int gid = strtod(arg, &end);
+	gid_t gid = strtoul(arg, &end, 10);
 	if (!*end && *arg) {
 		*out_gid = gid;
 		minijail_change_gid(j, gid);
@@ -105,12 +105,10 @@ static void set_group(struct minijail *j, const char *arg, gid_t *out_gid)
 static void suppl_group_add(size_t *suppl_gids_count, gid_t **suppl_gids,
                             char *arg) {
 	char *end = NULL;
-	int groupid = strtod(arg, &end);
-	gid_t gid;
+	gid_t gid = strtoul(arg, &end, 10);
 	int ret;
 	if (!*end && *arg) {
 		/* A gid number has been specified, proceed. */
-		gid = groupid;
 	} else if ((ret = lookup_group(arg, &gid))) {
 		/*
 		 * A group name has been specified,
