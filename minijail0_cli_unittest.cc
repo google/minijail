@@ -547,11 +547,6 @@ TEST_F(CliTest, invalid_L_combo) {
 // Android unit tests do not support data file yet.
 #if !defined(__ANDROID__)
 
-std::string source_path(const std::string& file) {
-  std::string srcdir = getenv("SRC") ? : ".";
-  return srcdir + "/" + file;
-}
-
 TEST_F(CliTest, conf_parsing_invalid_key) {
   std::vector<std::string> argv = {"--config", source_path("test/invalid.conf"),
                                    "/bin/sh"};
