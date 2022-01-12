@@ -20,17 +20,6 @@
 
 namespace {
 
-// TODO(jorgelo): Android unit tests don't currently support data files.
-// Re-enable by creating a temporary policy file at runtime.
-#if !defined(__ANDROID__)
-
-std::string source_path(const std::string& file) {
-  std::string srcdir = getenv("SRC") ? : ".";
-  return srcdir + "/" + file;
-}
-
-#endif
-
 // Simple C++ -> C wrappers to simplify test code.
 
 enum ret_trap {
