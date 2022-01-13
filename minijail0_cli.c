@@ -4,6 +4,7 @@
  */
 
 #include <dlfcn.h>
+#include <err.h>
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
@@ -37,20 +38,16 @@
 static void *xmalloc(size_t size)
 {
 	void *ret = malloc(size);
-	if (!ret) {
-		perror("malloc() failed");
-		exit(1);
-	}
+	if (!ret)
+		err(1, "malloc() failed");
 	return ret;
 }
 
 static char *xstrdup(const char *s)
 {
 	char *ret = strdup(s);
-	if (!ret) {
-		perror("strdup() failed");
-		exit(1);
-	}
+	if (!ret)
+		err(1, "strdup() failed");
 	return ret;
 }
 
@@ -67,15 +64,14 @@ static void set_user(struct minijail *j, const char *arg, uid_t *out_uid,
 
 	int ret = lookup_user(arg, out_uid, out_gid);
 	if (ret) {
-		fprintf(stderr, "Bad user '%s': %s\n", arg, strerror(-ret));
-		exit(1);
+		errno = -ret;
+		err(1, "Bad user '%s'", arg);
 	}
 
 	ret = minijail_change_user(j, arg);
 	if (ret) {
-		fprintf(stderr, "minijail_change_user('%s') failed: %s\n", arg,
-			strerror(-ret));
-		exit(1);
+		errno = -ret;
+		err(1, "minijail_change_user('%s') failed", arg);
 	}
 }
 
@@ -91,8 +87,8 @@ static void set_group(struct minijail *j, const char *arg, gid_t *out_gid)
 
 	int ret = lookup_group(arg, out_gid);
 	if (ret) {
-		fprintf(stderr, "Bad group '%s': %s\n", arg, strerror(-ret));
-		exit(1);
+		errno = -ret;
+		err(1, "Bad group '%s'", arg);
 	}
 
 	minijail_change_gid(j, *out_gid);
@@ -114,8 +110,8 @@ static void suppl_group_add(size_t *suppl_gids_count, gid_t **suppl_gids,
 		 * A group name has been specified,
 		 * but doesn't exist: we bail out.
 		 */
-		fprintf(stderr, "Bad group '%s': %s\n", arg, strerror(-ret));
-		exit(1);
+		errno = -ret;
+		err(1, "Bad group '%s'", arg);
 	}
 
 	/*
@@ -124,10 +120,8 @@ static void suppl_group_add(size_t *suppl_gids_count, gid_t **suppl_gids,
 	 */
 	*suppl_gids = realloc(*suppl_gids,
 			      sizeof(gid_t) * ++(*suppl_gids_count));
-	if (!suppl_gids) {
-		fprintf(stderr, "failed to allocate memory.\n");
-		exit(1);
-	}
+	if (!suppl_gids)
+		err(1, "failed to allocate memory");
 
 	(*suppl_gids)[*suppl_gids_count - 1] = gid;
 }
@@ -137,10 +131,8 @@ static void skip_securebits(struct minijail *j, const char *arg)
 	uint64_t securebits_skip_mask;
 	char *end = NULL;
 	securebits_skip_mask = strtoull(arg, &end, 16);
-	if (*end) {
-		fprintf(stderr, "Invalid securebit mask: '%s'\n", arg);
-		exit(1);
-	}
+	if (*end)
+		errx(1, "Invalid securebit mask: '%s'", arg);
 	minijail_skip_setting_securebits(j, securebits_skip_mask);
 }
 
@@ -166,11 +158,8 @@ static void use_caps(struct minijail *j, const char *arg)
 					 */
 					continue;
 				}
-				fprintf(stderr,
-					"Could not get the value of "
-					"the %d-th capability: %m\n",
-					i);
-				exit(1);
+				err(1, "Could not get the value of the %d-th "
+				       "capability", i);
 			}
 			if (cap_value == CAP_SET)
 				caps |= (one << i);
@@ -179,10 +168,8 @@ static void use_caps(struct minijail *j, const char *arg)
 	} else {
 		char *end = NULL;
 		caps = strtoull(arg, &end, 16);
-		if (*end) {
-			fprintf(stderr, "Invalid cap set: '%s'\n", arg);
-			exit(1);
-		}
+		if (*end)
+			errx(1, "Invalid cap set: '%s'", arg);
 	}
 
 	minijail_use_caps(j, caps);
@@ -193,10 +180,8 @@ static void add_binding(struct minijail *j, char *arg)
 	char *src = tokenize(&arg, ",");
 	char *dest = tokenize(&arg, ",");
 	char *flags = tokenize(&arg, ",");
-	if (!src || src[0] == '\0' || arg != NULL) {
-		fprintf(stderr, "Bad binding: %s %s\n", src, dest);
-		exit(1);
-	}
+	if (!src || src[0] == '\0' || arg != NULL)
+		errx(1, "Bad binding: %s %s", src, dest);
 	if (dest == NULL || dest[0] == '\0')
 		dest = src;
 	int writable;
@@ -204,14 +189,10 @@ static void add_binding(struct minijail *j, char *arg)
 		writable = 0;
 	else if (!strcmp(flags, "1"))
 		writable = 1;
-	else {
-		fprintf(stderr, "Bad value for <writable>: %s\n", flags);
-		exit(1);
-	}
-	if (minijail_bind(j, src, dest, writable)) {
-		fprintf(stderr, "minijail_bind failed.\n");
-		exit(1);
-	}
+	else
+		errx(1, "Bad value for <writable>: %s", flags);
+	if (minijail_bind(j, src, dest, writable))
+		errx(1, "minijail_bind failed");
 }
 
 static void add_rlimit(struct minijail *j, char *arg)
@@ -222,8 +203,7 @@ static void add_rlimit(struct minijail *j, char *arg)
 	char *end;
 	if (!type || type[0] == '\0' || !cur || cur[0] == '\0' ||
 	    !max || max[0] == '\0' || arg != NULL) {
-		fprintf(stderr, "Bad rlimit '%s'.\n", arg);
-		exit(1);
+		errx(1, "Bad rlimit '%s'", arg);
 	}
 	rlim_t cur_rlim;
 	rlim_t max_rlim;
@@ -232,34 +212,25 @@ static void add_rlimit(struct minijail *j, char *arg)
 	} else {
 		end = NULL;
 		cur_rlim = strtoul(cur, &end, 0);
-		if (*end) {
-			fprintf(stderr, "Bad soft limit: '%s'.\n", cur);
-			exit(1);
-		}
+		if (*end)
+			errx(1, "Bad soft limit: '%s'", cur);
 	}
 	if (!strcmp(max, "unlimited")) {
 		max_rlim = RLIM_INFINITY;
 	} else {
 		end = NULL;
 		max_rlim = strtoul(max, &end, 0);
-		if (*end) {
-			fprintf(stderr, "Bad hard limit: '%s'.\n", max);
-			exit(1);
-		}
+		if (*end)
+			errx(1, "Bad hard limit: '%s'", max);
 	}
 
 	end = NULL;
 	int resource = parse_single_constant(type, &end);
-	if (type == end) {
-		fprintf(stderr, "Bad rlimit: '%s'.\n", type);
-		exit(1);
-	}
+	if (type == end)
+		errx(1, "Bad rlimit: '%s'", type);
 
-	if (minijail_rlimit(j, resource, cur_rlim, max_rlim)) {
-		fprintf(stderr, "minijail_rlimit '%s,%s,%s' failed.\n", type,
-			cur, max);
-		exit(1);
-	}
+	if (minijail_rlimit(j, resource, cur_rlim, max_rlim))
+		errx(1, "minijail_rlimit '%s,%s,%s' failed", type, cur, max);
 }
 
 static void add_mount(struct minijail *j, char *arg)
@@ -272,8 +243,7 @@ static void add_mount(struct minijail *j, char *arg)
 	char *end;
 	if (!src || src[0] == '\0' || !dest || dest[0] == '\0' ||
 	    !type || type[0] == '\0') {
-		fprintf(stderr, "Bad mount: %s %s %s\n", src, dest, type);
-		exit(1);
+		errx(1, "Bad mount: %s %s %s", src, dest, type);
 	}
 
 	/*
@@ -296,17 +266,12 @@ static void add_mount(struct minijail *j, char *arg)
 	} else {
 		end = NULL;
 		mountflags = parse_constant(flags, &end);
-		if (flags == end) {
-			fprintf(stderr, "Bad mount flags: %s\n", flags);
-			exit(1);
-		}
+		if (flags == end)
+			errx(1, "Bad mount flags: %s", flags);
 	}
 
-	if (minijail_mount_with_data(j, src, dest, type,
-				     mountflags, data)) {
-		fprintf(stderr, "minijail_mount failed.\n");
-		exit(1);
-	}
+	if (minijail_mount_with_data(j, src, dest, type, mountflags, data))
+		errx(1, "minijail_mount failed");
 }
 
 static char *build_idmap(id_t id, id_t lowerid)
@@ -316,8 +281,7 @@ static char *build_idmap(id_t id, id_t lowerid)
 	ret = snprintf(idmap, IDMAP_LEN, "%d %d 1", id, lowerid);
 	if (ret < 0 || (size_t)ret >= IDMAP_LEN) {
 		free(idmap);
-		fprintf(stderr, "Could not build id map.\n");
-		exit(1);
+		errx(1, "Could not build id map");
 	}
 	return idmap;
 }
@@ -331,20 +295,14 @@ static int has_cap_setgid(void)
 		return 0;
 
 	caps = cap_get_proc();
-	if (!caps) {
-		fprintf(stderr, "Could not get process' capabilities: %m\n");
-		exit(1);
-	}
+	if (!caps)
+		err(1, "Could not get process' capabilities");
 
-	if (cap_get_flag(caps, CAP_SETGID, CAP_EFFECTIVE, &cap_value)) {
-		fprintf(stderr, "Could not get the value of CAP_SETGID: %m\n");
-		exit(1);
-	}
+	if (cap_get_flag(caps, CAP_SETGID, CAP_EFFECTIVE, &cap_value))
+		err(1, "Could not get the value of CAP_SETGID");
 
-	if (cap_free(caps)) {
-		fprintf(stderr, "Could not free capabilities: %m\n");
-		exit(1);
-	}
+	if (cap_free(caps))
+		err(1, "Could not free capabilities");
 
 	return cap_value == CAP_SET;
 }
@@ -365,10 +323,8 @@ static void set_ugid_mapping(struct minijail *j, int set_uidmap, uid_t uid,
 			 */
 			uidmap = build_idmap(uid, getuid());
 		}
-		if (0 != minijail_uidmap(j, uidmap)) {
-			fprintf(stderr, "Could not set uid map.\n");
-			exit(1);
-		}
+		if (0 != minijail_uidmap(j, uidmap))
+			errx(1, "Could not set uid map");
 		free(uidmap);
 	}
 	if (set_gidmap) {
@@ -392,10 +348,8 @@ static void set_ugid_mapping(struct minijail *j, int set_uidmap, uid_t uid,
 			 */
 			minijail_namespace_user_disable_setgroups(j);
 		}
-		if (0 != minijail_gidmap(j, gidmap)) {
-			fprintf(stderr, "Could not set gid map.\n");
-			exit(1);
-		}
+		if (0 != minijail_gidmap(j, gidmap))
+			errx(1, "Could not set gid map");
 		free(gidmap);
 	}
 }
@@ -403,30 +357,20 @@ static void set_ugid_mapping(struct minijail *j, int set_uidmap, uid_t uid,
 static void use_chroot(struct minijail *j, const char *path, int *chroot,
 		       int pivot_root)
 {
-	if (pivot_root) {
-		fprintf(stderr, "Could not set chroot because "
-				"'-P' was specified.\n");
-		exit(1);
-	}
-	if (minijail_enter_chroot(j, path)) {
-		fprintf(stderr, "Could not set chroot.\n");
-		exit(1);
-	}
+	if (pivot_root)
+		errx(1, "Could not set chroot because -P was specified");
+	if (minijail_enter_chroot(j, path))
+		errx(1, "Could not set chroot");
 	*chroot = 1;
 }
 
 static void use_pivot_root(struct minijail *j, const char *path,
 			   int *pivot_root, int chroot)
 {
-	if (chroot) {
-		fprintf(stderr, "Could not set pivot_root because "
-				"'-C' was specified.\n");
-		exit(1);
-	}
-	if (minijail_enter_pivot_root(j, path)) {
-		fprintf(stderr, "Could not set pivot_root.\n");
-		exit(1);
-	}
+	if (chroot)
+		errx(1, "Could not set pivot_root because -C was specified");
+	if (minijail_enter_pivot_root(j, path))
+		errx(1, "Could not set pivot_root");
 	minijail_namespace_vfs(j);
 	*pivot_root = 1;
 }
@@ -439,20 +383,13 @@ static void use_profile(struct minijail *j, const char *profile,
 	if (!strcmp(profile, "minimalistic-mountns") ||
 	    !strcmp(profile, "minimalistic-mountns-nodev")) {
 		minijail_namespace_vfs(j);
-		if (minijail_bind(j, "/", "/", 0)) {
-			fprintf(stderr, "minijail_bind(/) failed.\n");
-			exit(1);
-		}
-		if (minijail_bind(j, "/proc", "/proc", 0)) {
-			fprintf(stderr, "minijail_bind(/proc) failed.\n");
-			exit(1);
-		}
+		if (minijail_bind(j, "/", "/", 0))
+			errx(1, "minijail_bind(/) failed");
+		if (minijail_bind(j, "/proc", "/proc", 0))
+			errx(1, "minijail_bind(/proc) failed");
 		if (!strcmp(profile, "minimalistic-mountns")) {
-			if (minijail_bind(j, "/dev/log", "/dev/log", 0)) {
-				fprintf(stderr,
-					"minijail_bind(/dev/log) failed.\n");
-				exit(1);
-			}
+			if (minijail_bind(j, "/dev/log", "/dev/log", 0))
+				errx(1, "minijail_bind(/dev/log) failed");
 			minijail_mount_dev(j);
 		}
 		if (!*tmp_size) {
@@ -461,10 +398,8 @@ static void use_profile(struct minijail *j, const char *profile,
 		}
 		minijail_remount_proc_readonly(j);
 		use_pivot_root(j, DEFAULT_PIVOT_ROOT, pivot_root, chroot);
-	} else {
-		fprintf(stderr, "Unrecognized profile name '%s'\n", profile);
-		exit(1);
-	}
+	} else
+		errx(1, "Unrecognized profile name '%s'", profile);
 }
 
 static void set_remount_mode(struct minijail *j, const char *mode)
@@ -478,10 +413,8 @@ static void set_remount_mode(struct minijail *j, const char *mode)
 		msmode = MS_SLAVE;
 	else if (!strcmp(mode, "unbindable"))
 		msmode = MS_UNBINDABLE;
-	else {
-		fprintf(stderr, "Unknown remount mode: '%s'\n", mode);
-		exit(1);
-	}
+	else
+		errx(1, "Unknown remount mode: '%s'", mode);
 	minijail_remount_mode(j, msmode);
 }
 
@@ -489,22 +422,15 @@ static void read_seccomp_filter(const char *filter_path,
 				struct sock_fprog *filter)
 {
 	attribute_cleanup_fp FILE *f = fopen(filter_path, "re");
-	if (!f) {
-		fprintf(stderr, "failed to open %s: %m", filter_path);
-		exit(1);
-	}
+	if (!f)
+		err(1, "failed to open %s", filter_path);
 	off_t filter_size = 0;
-	if (fseeko(f, 0, SEEK_END) == -1 || (filter_size = ftello(f)) == -1) {
-		fprintf(stderr, "failed to get file size of %s: %m",
-			filter_path);
-		exit(1);
-	}
+	if (fseeko(f, 0, SEEK_END) == -1 || (filter_size = ftello(f)) == -1)
+		err(1, "failed to get file size of %s", filter_path);
 	if (filter_size % sizeof(struct sock_filter) != 0) {
-		fprintf(stderr,
-			"filter size (%" PRId64
-			") of %s is not a multiple of %zu: %m",
-			filter_size, filter_path, sizeof(struct sock_filter));
-		exit(1);
+		errx(1, "filter size (%" PRId64 ") of %s is not a multiple of"
+			" %zu", filter_size, filter_path,
+			sizeof(struct sock_filter));
 	}
 	rewind(f);
 
@@ -512,8 +438,7 @@ static void read_seccomp_filter(const char *filter_path,
 	filter->filter = xmalloc(filter_size);
 	if (fread(filter->filter, sizeof(struct sock_filter), filter->len, f) !=
 	    filter->len) {
-		fprintf(stderr, "failed read %s: %m", filter_path);
-		exit(1);
+		err(1, "failed read %s", filter_path);
 	}
 }
 
@@ -663,12 +588,10 @@ static int getopt_from_conf(const struct option *longopts,
 		if (strcmp(entry->key, curr_opt->name) == 0)
 			break;
 	if (curr_opt->name == NULL) {
-		fprintf(
-		    stderr,
-		    "Unable to recognize '%s' as Minijail conf entry key, "
-		    "please refer to minijail0(5) for syntax and examples.\n",
-		    entry->key);
-		exit(1);
+		errx(1,
+		     "Unable to recognize '%s' as Minijail conf entry key, "
+		     "please refer to minijail0(5) for syntax and examples.\n",
+		     entry->key);
 	}
 	opt = curr_opt->val;
 	optarg = (char *)entry->value;
@@ -749,20 +672,14 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 					 &conf_index)) != -1) {
 		switch (opt) {
 		case 'u':
-			if (use_uid) {
-				fprintf(stderr,
-					"-u provided multiple times.\n");
-				exit(1);
-			}
+			if (use_uid)
+				errx(1, "-u provided multiple times.");
 			use_uid = true;
 			set_user(j, optarg, &uid, &gid);
 			break;
 		case 'g':
-			if (use_gid) {
-				fprintf(stderr,
-					"-g provided multiple times.\n");
-				exit(1);
-			}
+			if (use_gid)
+				errx(1, "-g provided multiple times.");
 			use_gid = true;
 			set_group(j, optarg, &gid);
 			break;
@@ -771,20 +688,16 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case 's':
 			if (seccomp != None && seccomp != Strict) {
-				fprintf(stderr,
-					"Do not use -s, -S, or "
-					"--seccomp-bpf-binary together.\n");
-				exit(1);
+				errx(1, "Do not use -s, -S, or "
+					"--seccomp-bpf-binary together");
 			}
 			seccomp = Strict;
 			minijail_use_seccomp(j);
 			break;
 		case 'S':
 			if (seccomp != None && seccomp != Filter) {
-				fprintf(stderr,
-					"Do not use -s, -S, or "
-					"--seccomp-bpf-binary together.\n");
-				exit(1);
+				errx(1, "Do not use -s, -S, or "
+					"--seccomp-bpf-binary together");
 			}
 			seccomp = Filter;
 			minijail_use_seccomp_filter(j);
@@ -796,9 +709,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case 'L':
 			if (seccomp == BpfBinaryFilter) {
-				fprintf(stderr, "-L does not work with "
-						"--seccomp-bpf-binary.\n");
-				exit(1);
+				errx(1, "-L does not work with "
+					"--seccomp-bpf-binary");
 			}
 			use_seccomp_log = 1;
 			minijail_log_seccomp_filter_failures(j);
@@ -828,11 +740,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			use_pivot_root(j, optarg, &pivot_root, chroot);
 			break;
 		case 'f':
-			if (0 != minijail_write_pid_file(j, optarg)) {
-				fprintf(stderr,
-					"Could not prepare pid file path.\n");
-				exit(1);
-			}
+			if (0 != minijail_write_pid_file(j, optarg))
+				errx(1, "Could not prepare pid file path");
 			break;
 		case 't':
 			minijail_namespace_vfs(j);
@@ -845,8 +754,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			}
 			if (optarg != NULL &&
 			    0 != parse_size(&tmp_size, optarg)) {
-				fprintf(stderr, "Invalid /tmp tmpfs size.\n");
-				exit(1);
+				errx(1, "Invalid /tmp tmpfs size");
 			}
 			break;
 		case 'v':
@@ -891,20 +799,14 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			minijail_remount_proc_readonly(j);
 			break;
 		case 'G':
-			if (keep_suppl_gids) {
-				fprintf(stderr,
-					"-y and -G are not compatible.\n");
-				exit(1);
-			}
+			if (keep_suppl_gids)
+				errx(1, "-y and -G are not compatible");
 			minijail_inherit_usergroups(j);
 			inherit_suppl_gids = 1;
 			break;
 		case 'y':
-			if (inherit_suppl_gids) {
-				fprintf(stderr,
-					"-y and -G are not compatible.\n");
-				exit(1);
-			}
+			if (inherit_suppl_gids)
+				errx(1, "-y and -G are not compatible");
 			minijail_keep_supplementary_gids(j);
 			keep_suppl_gids = 1;
 			break;
@@ -953,11 +855,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				gidmap = xstrdup(optarg);
 			break;
 		case 'a':
-			if (0 != minijail_use_alt_syscall(j, optarg)) {
-				fprintf(stderr,
-					"Could not set alt-syscall table.\n");
-				exit(1);
-			}
+			if (0 != minijail_use_alt_syscall(j, optarg))
+				errx(1, "Could not set alt-syscall table");
 			break;
 		case 'R':
 			add_rlimit(j, optarg);
@@ -968,9 +867,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			else if (!strcmp(optarg, "dynamic"))
 				*elftype = ELFDYNAMIC;
 			else {
-				fprintf(stderr, "ELF type must be 'static' or "
-						"'dynamic'.\n");
-				exit(1);
+				errx(1, "ELF type must be 'static' or "
+					"'dynamic'");
 			}
 			break;
 		case 'w':
@@ -997,17 +895,14 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				minijail_namespace_set_hostname(j, optarg);
 			break;
 		case 130: /* Logging. */
-			if (!strcmp(optarg, "auto")) {
+			if (!strcmp(optarg, "auto"))
 				log_to_stderr = -1;
-			} else if (!strcmp(optarg, "syslog")) {
+			else if (!strcmp(optarg, "syslog"))
 				log_to_stderr = 0;
-			} else if (!strcmp(optarg, "stderr")) {
+			else if (!strcmp(optarg, "stderr"))
 				log_to_stderr = 1;
-			} else {
-				fprintf(stderr, "--logger must be 'syslog' or "
-						"'stderr'.\n");
-				exit(1);
-			}
+			else
+				errx(1, "--logger must be 'syslog' or 'stderr'");
 			break;
 		case 131: /* Profile */
 			use_profile(j, optarg, &pivot_root, chroot, &tmp_size);
@@ -1017,16 +912,11 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case 133: /* seccomp-bpf binary. */
 			if (seccomp != None && seccomp != BpfBinaryFilter) {
-				fprintf(stderr,
-					"Do not use -s, -S, or "
-					"--seccomp-bpf-binary together.\n");
-				exit(1);
+				errx(1, "Do not use -s, -S, or "
+					"--seccomp-bpf-binary together");
 			}
-			if (use_seccomp_log == 1) {
-				fprintf(stderr,
-					"-L does not work with --seccomp-bpf-binary.\n");
-				exit(1);
-			}
+			if (use_seccomp_log == 1)
+				errx(1, "-L does not work with --seccomp-bpf-binary");
 			seccomp = BpfBinaryFilter;
 			minijail_use_seccomp_filter(j);
 			filter_path = optarg;
@@ -1041,28 +931,22 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case 136: {
 			if (conf_entry_list != NULL) {
-				fprintf(stderr,
-					"Nested config file specification is "
-					"not allowed.\n");
-				exit(1);
+				errx(1,
+					 "Nested config file specification is "
+					 "not allowed.\n");
 			}
 			conf_entry_list = new_config_entry_list();
 			conf_index = 0;
 			attribute_cleanup_fp FILE *config_file =
 			    fopen(optarg, "re");
-			if (!config_file) {
-				fprintf(stderr, "failed to open %s: %m",
-					optarg);
-				exit(1);
-			}
+			if (!config_file)
+				err(1, "failed to open %s", optarg);
 			if (!parse_config_file(config_file, conf_entry_list)) {
-				fprintf(
-				    stderr,
-				    "Unable to parse %s as Minijail conf file, "
-				    "please refer to minijail0(5) for syntax "
-				    "and examples.\n",
-				    optarg);
-				exit(1);
+				errx(1,
+				     "Unable to parse %s as Minijail conf file, "
+				     "please refer to minijail0(5) for syntax "
+				     "and examples.\n",
+				     optarg);
 			}
 			break;
 		}
@@ -1083,8 +967,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		 */
 		if (0 !=
 		    minijail_preserve_fd(j, STDERR_FILENO, STDERR_FILENO)) {
-			fprintf(stderr, "Could not preserve stderr.\n");
-			exit(1);
+			errx(1, "Could not preserve stderr");
 		}
 	}
 
@@ -1096,9 +979,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 
 	/* Can only set ambient caps when using regular caps. */
 	if (ambient_caps && !caps) {
-		fprintf(stderr, "Can't set ambient capabilities (--ambient) "
-				"without actually using capabilities (-c).\n");
-		exit(1);
+		errx(1, "Can't set ambient capabilities (--ambient) "
+			"without actually using capabilities (-c)");
 	}
 
 	/* Set up signal handlers in minijail unless asked not to. */
@@ -1110,9 +992,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	 * a new mount namespace.
 	 */
 	if (binding && !(chroot || pivot_root || mount_ns)) {
-		fprintf(stderr, "Bind mounts require a chroot, pivot_root, or "
-				" new mount namespace.\n");
-		exit(1);
+		errx(1, "Bind mounts require a chroot, pivot_root, or "
+			" new mount namespace");
 	}
 
 	/*
@@ -1120,11 +1001,10 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	 * that's set there is no need for the -K/-K<mode> flags.
 	 */
 	if (change_remount && !mount_ns) {
-		fprintf(stderr, "No need to use -K (skip remounting '/') or "
-				"-K<mode> (remount '/' as <mode>)\n"
-				"without -v (new mount namespace).\n"
-				"Do you need to add '-v' explicitly?\n");
-		exit(1);
+		errx(1, "No need to use -K (skip remounting '/') or "
+			"-K<mode> (remount '/' as <mode>)\n"
+			"without -v (new mount namespace).\n"
+			"Do you need to add '-v' explicitly?\n");
 	}
 
 	/* Configure the remount flag here to avoid having -v override it. */
@@ -1182,10 +1062,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 
 		/* Check that we can access the target program. */
 		if (access(program_path, X_OK)) {
-			fprintf(stderr,
-				"Target program '%s' is not accessible.\n",
+			errx(1, "Target program '%s' is not accessible",
 				argv[optind]);
-			exit(1);
 		}
 
 		/* Check if target is statically or dynamically linked. */
@@ -1199,11 +1077,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	 * execve(2).
 	 */
 	if (caps && *elftype == ELFSTATIC && !ambient_caps) {
-		fprintf(stderr, "Can't run statically-linked binaries with "
-				"capabilities (-c) without also setting "
-				"ambient capabilities. Try passing "
-				"--ambient.\n");
-		exit(1);
+		errx(1, "Can't run statically-linked binaries with capabilities"
+			" (-c) without also setting ambient capabilities. "
+			"Try passing --ambient.");
 	}
 
 	return optind;
