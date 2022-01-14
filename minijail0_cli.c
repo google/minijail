@@ -590,7 +590,7 @@ static int getopt_from_conf(const struct option *longopts,
 	if (curr_opt->name == NULL) {
 		errx(1,
 		     "Unable to recognize '%s' as Minijail conf entry key, "
-		     "please refer to minijail0(5) for syntax and examples.\n",
+		     "please refer to minijail0(5) for syntax and examples.",
 		     entry->key);
 	}
 	opt = curr_opt->val;
@@ -933,7 +933,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			if (conf_entry_list != NULL) {
 				errx(1,
 					 "Nested config file specification is "
-					 "not allowed.\n");
+					 "not allowed.");
 			}
 			conf_entry_list = new_config_entry_list();
 			conf_index = 0;
@@ -945,7 +945,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				errx(1,
 				     "Unable to parse %s as Minijail conf file, "
 				     "please refer to minijail0(5) for syntax "
-				     "and examples.\n",
+				     "and examples.",
 				     optarg);
 			}
 			break;
@@ -1002,9 +1002,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	 */
 	if (change_remount && !mount_ns) {
 		errx(1, "No need to use -K (skip remounting '/') or "
-			"-K<mode> (remount '/' as <mode>)\n"
+			"-K<mode> (remount '/' as <mode>) "
 			"without -v (new mount namespace).\n"
-			"Do you need to add '-v' explicitly?\n");
+			"Do you need to add '-v' explicitly?");
 	}
 
 	/* Configure the remount flag here to avoid having -v override it. */
