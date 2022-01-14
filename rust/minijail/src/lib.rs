@@ -28,6 +28,10 @@ struct Command {
     // Ownership of the backing data of args_cptr is provided by args_cstr.
     args_cstr: Vec<CString>,
     args_cptr: Vec<*const c_char>,
+
+    // Ownership of the backing data of env_cptr is provided by env_cstr.
+    env_cstr: Option<Vec<CString>>,
+    env_cptr: Option<Vec<*const c_char>>,
 }
 
 impl Command {
@@ -37,6 +41,8 @@ impl Command {
             preserve_fds: Vec::new(),
             args_cstr: Vec::new(),
             args_cptr: Vec::new(),
+            env_cstr: None,
+            env_cptr: None,
         }
     }
 
@@ -60,8 +66,22 @@ impl Command {
         Ok(self)
     }
 
+    fn envs<S: AsRef<str>>(mut self, vars: &[S]) -> Result<Command> {
+        let (env_cstr, env_cptr) = to_execve_cstring_array(vars)?;
+        self.env_cstr = Some(env_cstr);
+        self.env_cptr = Some(env_cptr);
+        Ok(self)
+    }
+
     fn argv(&self) -> *const *mut c_char {
         self.args_cptr.as_ptr() as *const *mut c_char
+    }
+
+    fn envp(&self) -> *const *mut c_char {
+        (match self.env_cptr {
+            Some(ref env_cptr) => env_cptr.as_ptr(),
+            None => null_mut(),
+        }) as *const *mut c_char
     }
 }
 
@@ -81,10 +101,11 @@ impl Runnable for &Path {
 
         let mut pid: pid_t = 0;
         let ret = unsafe {
-            minijail_run_pid_pipes(
+            minijail_run_env_pid_pipes(
                 jail.jail,
                 path_cstr.as_ptr(),
                 cmd.argv(),
+                cmd.envp(),
                 &mut pid,
                 null_mut(),
                 null_mut(),
@@ -106,7 +127,7 @@ impl Runnable for RawFd {
                 jail.jail,
                 *self,
                 cmd.argv(),
-                null_mut(),
+                cmd.envp(),
                 &mut pid,
                 null_mut(),
                 null_mut(),
