@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -14,7 +15,9 @@
 #include <string.h>
 #include <sys/capability.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/vfs.h>
 #include <unistd.h>
 
 #include <linux/filter.h>
@@ -99,7 +102,8 @@ static void set_group(struct minijail *j, const char *arg, gid_t *out_gid)
  * to build the supplementary gids array.
  */
 static void suppl_group_add(size_t *suppl_gids_count, gid_t **suppl_gids,
-                            char *arg) {
+			    char *arg)
+{
 	char *end = NULL;
 	gid_t gid = strtoul(arg, &end, 10);
 	int ret;
@@ -159,7 +163,8 @@ static void use_caps(struct minijail *j, const char *arg)
 					continue;
 				}
 				err(1, "Could not get the value of the %d-th "
-				       "capability", i);
+				    "capability",
+				    i);
 			}
 			if (cap_value == CAP_SET)
 				caps |= (one << i);
@@ -428,9 +433,10 @@ static void read_seccomp_filter(const char *filter_path,
 	if (fseeko(f, 0, SEEK_END) == -1 || (filter_size = ftello(f)) == -1)
 		err(1, "failed to get file size of %s", filter_path);
 	if (filter_size % sizeof(struct sock_filter) != 0) {
-		errx(1, "filter size (%" PRId64 ") of %s is not a multiple of"
-			" %zu", filter_size, filter_path,
-			sizeof(struct sock_filter));
+		errx(1,
+		     "filter size (%" PRId64 ") of %s is not a multiple of"
+		     " %zu",
+		     filter_size, filter_path, sizeof(struct sock_filter));
 	}
 	rewind(f);
 
@@ -902,7 +908,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			else if (!strcmp(optarg, "stderr"))
 				log_to_stderr = 1;
 			else
-				errx(1, "--logger must be 'syslog' or 'stderr'");
+				errx(1,
+				     "--logger must be 'syslog' or 'stderr'");
 			break;
 		case 131: /* Profile */
 			use_profile(j, optarg, &pivot_root, chroot, &tmp_size);
@@ -937,10 +944,36 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			}
 			conf_entry_list = new_config_entry_list();
 			conf_index = 0;
+#if defined(BLOCK_NOEXEC_CONF)
+			/*
+			* Check the conf file is in a exec mount.
+			* With a W^X invariant, it excludes writable
+			* mounts.
+			*/
+			struct statfs conf_statfs;
+			if (statfs(optarg, &conf_statfs) != 0)
+				err(1, "statfs(%s) failed.", optarg);
+			if ((conf_statfs.f_flags & MS_NOEXEC) != 0)
+				errx(1,
+				     "Conf file must be in a exec "
+				     "mount: %s",
+				     optarg);
+#endif
+#if defined(ENFORCE_ROOTFS_CONF)
+			/* Make sure the conf file is in the same device as the rootfs. */
+			struct stat root_stat;
+			struct stat conf_stat;
+			if (stat("/", &root_stat) != 0)
+				err(1, "stat(/) failed.");
+			if (stat(optarg, &conf_stat) != 0)
+				err(1, "stat(%s) failed.", optarg);
+			if (root_stat.st_dev != conf_stat.st_dev)
+				errx(1, "Conf file must be in the rootfs.");
+#endif
 			attribute_cleanup_fp FILE *config_file =
 			    fopen(optarg, "re");
 			if (!config_file)
-				err(1, "failed to open %s", optarg);
+				err(1, "Failed to open %s", optarg);
 			if (!parse_config_file(config_file, conf_entry_list)) {
 				errx(1,
 				     "Unable to parse %s as Minijail conf file, "
@@ -1063,7 +1096,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		/* Check that we can access the target program. */
 		if (access(program_path, X_OK)) {
 			errx(1, "Target program '%s' is not accessible",
-				argv[optind]);
+			     argv[optind]);
 		}
 
 		/* Check if target is statically or dynamically linked. */
