@@ -122,8 +122,8 @@ static void suppl_group_add(size_t *suppl_gids_count, gid_t **suppl_gids,
 	 * From here, gid is guaranteed to be set and valid,
 	 * we add it to our supplementary gids array.
 	 */
-	*suppl_gids = realloc(*suppl_gids,
-			      sizeof(gid_t) * ++(*suppl_gids_count));
+	*suppl_gids =
+	    realloc(*suppl_gids, sizeof(gid_t) * ++(*suppl_gids_count));
 	if (!suppl_gids)
 		err(1, "failed to allocate memory");
 
@@ -162,7 +162,8 @@ static void use_caps(struct minijail *j, const char *arg)
 					 */
 					continue;
 				}
-				err(1, "Could not get the value of the %d-th "
+				err(1,
+				    "Could not get the value of the %d-th "
 				    "capability",
 				    i);
 			}
@@ -206,8 +207,8 @@ static void add_rlimit(struct minijail *j, char *arg)
 	char *cur = tokenize(&arg, ",");
 	char *max = tokenize(&arg, ",");
 	char *end;
-	if (!type || type[0] == '\0' || !cur || cur[0] == '\0' ||
-	    !max || max[0] == '\0' || arg != NULL) {
+	if (!type || type[0] == '\0' || !cur || cur[0] == '\0' || !max ||
+	    max[0] == '\0' || arg != NULL) {
 		errx(1, "Bad rlimit '%s'", arg);
 	}
 	rlim_t cur_rlim;
@@ -246,8 +247,8 @@ static void add_mount(struct minijail *j, char *arg)
 	char *flags = tokenize(&arg, ",");
 	char *data = tokenize(&arg, ",");
 	char *end;
-	if (!src || src[0] == '\0' || !dest || dest[0] == '\0' ||
-	    !type || type[0] == '\0') {
+	if (!src || src[0] == '\0' || !dest || dest[0] == '\0' || !type ||
+	    type[0] == '\0') {
 		errx(1, "Bad mount: %s %s %s", src, dest, type);
 	}
 
@@ -923,33 +924,32 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 					"--seccomp-bpf-binary together");
 			}
 			if (use_seccomp_log == 1)
-				errx(1, "-L does not work with --seccomp-bpf-binary");
+				errx(1, "-L does not work with "
+					"--seccomp-bpf-binary");
 			seccomp = BpfBinaryFilter;
 			minijail_use_seccomp_filter(j);
 			filter_path = optarg;
 			use_seccomp_filter_binary = 1;
 			break;
 		case 134:
-			suppl_group_add(&suppl_gids_count, &suppl_gids,
-			                optarg);
+			suppl_group_add(&suppl_gids_count, &suppl_gids, optarg);
 			break;
 		case 135:
 			minijail_set_seccomp_filter_allow_speculation(j);
 			break;
 		case 136: {
 			if (conf_entry_list != NULL) {
-				errx(1,
-					 "Nested config file specification is "
-					 "not allowed.");
+				errx(1, "Nested config file specification is "
+					"not allowed.");
 			}
 			conf_entry_list = new_config_entry_list();
 			conf_index = 0;
 #if defined(BLOCK_NOEXEC_CONF)
 			/*
-			* Check the conf file is in a exec mount.
-			* With a W^X invariant, it excludes writable
-			* mounts.
-			*/
+			 * Check the conf file is in a exec mount.
+			 * With a W^X invariant, it excludes writable
+			 * mounts.
+			 */
 			struct statfs conf_statfs;
 			if (statfs(optarg, &conf_statfs) != 0)
 				err(1, "statfs(%s) failed.", optarg);
@@ -960,7 +960,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				     optarg);
 #endif
 #if defined(ENFORCE_ROOTFS_CONF)
-			/* Make sure the conf file is in the same device as the rootfs. */
+			/* Make sure the conf file is in the same device as the
+			 * rootfs. */
 			struct stat root_stat;
 			struct stat conf_stat;
 			if (stat("/", &root_stat) != 0)
@@ -975,11 +976,12 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			if (!config_file)
 				err(1, "Failed to open %s", optarg);
 			if (!parse_config_file(config_file, conf_entry_list)) {
-				errx(1,
-				     "Unable to parse %s as Minijail conf file, "
-				     "please refer to minijail0(5) for syntax "
-				     "and examples.",
-				     optarg);
+				errx(
+				    1,
+				    "Unable to parse %s as Minijail conf file, "
+				    "please refer to minijail0(5) for syntax "
+				    "and examples.",
+				    optarg);
 			}
 			break;
 		}
@@ -1055,7 +1057,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	 */
 	if (suppl_gids_count) {
 		minijail_set_supplementary_gids(j, suppl_gids_count,
-		                                suppl_gids);
+						suppl_gids);
 		free(suppl_gids);
 	}
 
