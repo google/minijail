@@ -472,111 +472,156 @@ enum {
 	OPT_UTS,
 };
 
+/*
+ * NB: When adding new options, prefer long-option only.  Add a short option
+ * only if its meaning is intuitive/obvious at a glance.
+ *
+ * Keep this sorted.
+ */
+static const char optstring[] =
+    "+a:b:c:de::f:g:hik:lm::nprst::u:vwyzB:C:GHIK::LM::NP:R:S:T:UV:Y";
+
+static const struct option long_options[] = {
+    {"help", no_argument, 0, 'h'},
+    {"mount-dev", no_argument, 0, 'd'},
+    {"ambient", no_argument, 0, OPT_AMBIENT},
+    {"uts", optional_argument, 0, OPT_UTS},
+    {"logging", required_argument, 0, OPT_LOGGING},
+    {"profile", required_argument, 0, OPT_PROFILE},
+    {"preload-library", required_argument, 0, OPT_PRELOAD_LIBRARY},
+    {"seccomp-bpf-binary", required_argument, 0, OPT_SECCOMP_BPF_BINARY},
+    {"add-suppl-group", required_argument, 0, OPT_ADD_SUPPL_GROUP},
+    {"allow-speculative-execution", no_argument, 0,
+     OPT_ALLOW_SPECULATIVE_EXECUTION},
+    {"config", required_argument, 0, OPT_CONFIG},
+    {"mount", required_argument, 0, 'k'},
+    {"bind-mount", required_argument, 0, 'b'},
+    {0, 0, 0, 0},
+};
+
+/*
+ * Pull the usage string out into the top-level to help with long-lines.  We
+ * want the output to be wrapped at 80 cols when it's shown to the user in the
+ * terminal, but we don't want the source wrapped to 80 cols because that will
+ * effectively make terminal output wrap to much lower levels (like <70).
+ */
+/* clang-format off */
+static const char help_text[] =
+"Account (user/group) options:\n"
+"  -u <user>    Change uid to <user>.\n"
+"  -g <group>   Change gid to <group>.\n"
+"  -G           Inherit supplementary groups from new uid.\n"
+"               Incompatible with -y or --add-suppl-group.\n"
+"  -y           Keep original uid's supplementary groups.\n"
+"               Incompatible with -G or --add-suppl-group.\n"
+"  --add-suppl-group <group>\n"
+"               Add <group> to the proccess' supplementary groups.\n"
+"               Can be specified multiple times to add several groups.\n"
+"               Incompatible with -y or -G.\n"
+"\n"
+"Mount/path options:\n"
+"  -b <src[,dst[,writable]]>, --bind-mount <...>\n"
+"               Bind <src> to <dst>.\n"
+"  -k <src,dst,fstype[,flags[,data]]>, --mount <...>\n"
+"               Mount <src> at <dst>. <flags> and <data> can be specified as\n"
+"               in mount(2). Multiple instances allowed.\n"
+"  -K           Do not change share mode of any existing mounts.\n"
+"  -K<mode>     Mark all existing mounts as <mode> instead of MS_PRIVATE.\n"
+"  -r           Remount /proc read-only (implies -v).\n"
+"  -d, --mount-dev\n"
+"               Create a new /dev with a minimal set of device nodes\n"
+"               (implies -v). See minijail0(1) for exact list.\n"
+"  -t[size]     Mount tmpfs at /tmp (implies -v).\n"
+"               Optional argument specifies size (default \"64M\").\n"
+"  -C <dir>     chroot(2) to <dir>. Incompatible with -P.\n"
+"  -P <dir>     pivot_root(2) to <dir> (implies -v). Incompatible with -C.\n"
+"\n"
+"Namespace options:\n"
+"  -N           Enter a new cgroup namespace.\n"
+"  -l           Enter new IPC namespace.\n"
+"  -v           Enter new mount namespace.\n"
+"  -V <file>    Enter specified mount namespace.\n"
+"  -e[file]     Enter new network namespace, or existing |file| if provided.\n"
+"  -p           Enter new pid namespace (implies -vr).\n"
+"  -I           Run as init (pid 1) inside a new pid namespace (implies -p).\n"
+"  -U           Enter new user namespace (implies -p).\n"
+"  -m[<uid> <loweruid> <count>]\n"
+"               Set the uid map of a user namespace (implies -pU).\n"
+"               Same arguments as newuidmap(1); mappings are comma separated.\n"
+"               With no mapping, map the current uid to root.\n"
+"               Incompatible with -b without the 'writable' option.\n"
+"  -M[<gid> <lowergid> <count>]\n"
+"               Set the gid map of a user namespace (implies -pU).\n"
+"               Same arguments as newgidmap(1); mappings are comma separated.\n"
+"               With no mapping, map the current gid to root.\n"
+"               Incompatible with -b without the 'writable' option.\n"
+"  --uts[=name] Enter a new UTS namespace (and set hostname).\n"
+"\n"
+"Seccomp options:\n"
+"  -S <file>    Set seccomp filter using <file>.\n"
+"               E.g., '-S /usr/share/filters/<prog>.$(uname -m)'.\n"
+"               Requires -n when not running as root.\n"
+"  --seccomp-bpf-binary=<f>\n"
+"               Set a pre-compiled seccomp filter using <f>.\n"
+"               E.g., '-S /usr/share/filters/<prog>.$(uname -m).bpf'.\n"
+"               Requires -n when not running as root.\n"
+"               The user is responsible for ensuring that the binary\n"
+"               was compiled for the correct architecture / kernel version.\n"
+"  -L           Report blocked syscalls when using seccomp filter.\n"
+"               If the kernel does not support SECCOMP_RET_LOG, some syscalls\n"
+"               will automatically be allowed (see below).\n"
+"  -Y           Synchronize seccomp filters across thread group.\n"
+"  -a <table>   Use alternate syscall table <table>.\n"
+"  -s           Use seccomp mode 1 (not the same as -S).\n"
+"\n"
+"Other options:\n"
+"  --config <file>\n"
+"               Load the Minijail configuration file <file>.\n"
+"               If used, must be specified ahead of other options.\n"
+"  --profile <p>\n"
+"               Configure minijail0 to run with the <p> sandboxing profile,\n"
+"               which is a convenient way to express multiple flags\n"
+"               that are typically used together.\n"
+"               See the minijail0(1) man page for the full list.\n"
+"  -n           Set no_new_privs. See prctl(2) for details.\n"
+"  -c <caps>    Restrict caps to <caps>.\n"
+"  --ambient    Raise ambient capabilities. Requires -c.\n"
+"  -B <mask>    Skip setting <mask> securebits when restricting caps (-c).\n"
+"               By default, SECURE_NOROOT, SECURE_NO_SETUID_FIXUP, and \n"
+"               SECURE_KEEP_CAPS (with their respective locks) are set.\n"
+"  -f <file>    Write the pid of the jailed process to <file>.\n"
+"  -i           Exit immediately after fork(2); i.e. background the program.\n"
+"  -z           Don't forward signals to jailed process.\n"
+"  -R <type,cur,max>\n"
+"               Call setrlimit(3); can be specified multiple times.\n"
+"  -T <type>    Assume <program> is a <type> ELF binary;\n"
+"               <type> may be 'static' or 'dynamic'.\n"
+"               This will avoid accessing <program> binary before execve(2).\n"
+"               Type 'static' will avoid preload hooking.\n"
+"  -w           Create and join a new anonymous session keyring.\n"
+"\n"
+"Uncommon options:\n"
+"  --allow-speculative-execution\n"
+"               Allow speculative execution by disabling mitigations.\n"
+"  --preload-library=<file>\n"
+"               Overrides the path to \"" PRELOADPATH "\".\n"
+"               This is only really useful for local testing.\n"
+"  --logging=<output>\n"
+"               Set the logging system output: 'auto' (default),\n"
+"               'syslog', or 'stderr'.\n"
+"  -h           Help (this message).\n"
+"  -H           Seccomp filter help message.\n";
+/* clang-format on */
+
 static void usage(const char *progn)
 {
-	size_t i;
-	/* clang-format off */
-	printf("Usage: %s [-dGhHiIKlLnNprRstUvyYz]\n"
-	       "  [-a <table>]\n"
-	       "  [-b <src>[,[dest][,<writeable>]]] [-k <src>,<dest>,<type>[,<flags>[,<data>]]]\n"
-	       "  [-c <caps>] [-C <dir>] [-P <dir>] [-e[file]] [-f <file>] [-g <group>]\n"
-	       "  [-m[<uid> <loweruid> <count>]*] [-M[<gid> <lowergid> <count>]*] [--profile <name>]\n"
-	       "  [-R <type,cur,max>] [-S <file>] [-t[size]] [-T <type>] [-u <user>] [-V <file>]\n"
-	       "  <program> [args...]\n"
-	       "  -a <table>:   Use alternate syscall table <table>.\n"
-	       "  --bind-mount <...>,  Bind <src> to <dest> in chroot.\n"
-	       "            -b <...>:  Multiple instances allowed.\n"
-	       "  -B <mask>:    Skip setting securebits in <mask> when restricting capabilities (-c).\n"
-	       "                By default, SECURE_NOROOT, SECURE_NO_SETUID_FIXUP, and \n"
-	       "                SECURE_KEEP_CAPS (together with their respective locks) are set.\n"
-	       "                There are eight securebits in total.\n"
-	       "  --mount <...>,Mount <src> at <dest> in chroot.\n"
-	       "       -k <...>:<flags> and <data> can be specified as in mount(2).\n"
-	       "                Multiple instances allowed.\n"
-	       "  -c <caps>:    Restrict caps to <caps>.\n"
-	       "  -C <dir>:     chroot(2) to <dir>.\n"
-	       "                Not compatible with -P.\n"
-	       "  -P <dir>:     pivot_root(2) to <dir> (implies -v).\n"
-	       "                Not compatible with -C.\n"
-	       "  --mount-dev,  Create a new /dev with a minimal set of device nodes (implies -v).\n"
-	       "           -d:  See the minijail0(1) man page for the exact set.\n"
-	       "  -e[file]:     Enter new network namespace, or existing one if |file| is provided.\n"
-	       "  -f <file>:    Write the pid of the jailed process to <file>.\n"
-	       "  -g <group>:   Change gid to <group>.\n"
-	       "  -G:           Inherit supplementary groups from new uid.\n"
-	       "                Not compatible with -y or --add-suppl-group.\n"
-	       "  -y:           Keep original uid's supplementary groups.\n"
-	       "                Not compatible with -G or --add-suppl-group.\n"
-	       "  --add-suppl-group <g>:Add <g> to the proccess' supplementary groups,\n"
-	       "                can be specified multiple times to add several groups.\n"
-	       "                Not compatible with -y or -G.\n"
-	       "  -h:           Help (this message).\n"
-	       "  -H:           Seccomp filter help message.\n"
-	       "  -i:           Exit immediately after fork(2). The jailed process will run\n"
-	       "                in the background.\n"
-	       "  -I:           Run <program> as init (pid 1) inside a new pid namespace (implies -p).\n"
-	       "  -K:           Do not change share mode of any existing mounts.\n"
-	       "  -K<mode>:     Mark all existing mounts as <mode> instead of MS_PRIVATE.\n"
-	       "  -l:           Enter new IPC namespace.\n"
-	       "  -L:           Report blocked syscalls when using seccomp filter.\n"
-	       "                If the kernel does not support SECCOMP_RET_LOG,\n"
-	       "                forces the following syscalls to be allowed:\n"
-	       "                  ", progn);
-	/* clang-format on */
-	for (i = 0; i < log_syscalls_len; i++)
-		printf("%s ", log_syscalls[i]);
+	printf("Usage: %s [options] [--] <program> [args...]\n\n%s", progn,
+	       help_text);
 
-	/* clang-format off */
-	printf("\n"
-	       "  -m[map]:      Set the uid map of a user namespace (implies -pU).\n"
-	       "                Same arguments as newuidmap(1), multiple mappings should be separated by ',' (comma).\n"
-	       "                With no mapping, map the current uid to root inside the user namespace.\n"
-	       "                Not compatible with -b without the 'writable' option.\n"
-	       "  -M[map]:      Set the gid map of a user namespace (implies -pU).\n"
-	       "                Same arguments as newgidmap(1), multiple mappings should be separated by ',' (comma).\n"
-	       "                With no mapping, map the current gid to root inside the user namespace.\n"
-	       "                Not compatible with -b without the 'writable' option.\n"
-	       "  -n:           Set no_new_privs.\n"
-	       "  -N:           Enter a new cgroup namespace.\n"
-	       "  -p:           Enter new pid namespace (implies -vr).\n"
-	       "  -r:           Remount /proc read-only (implies -v).\n"
-	       "  -R:           Set rlimits, can be specified multiple times.\n"
-	       "  -s:           Use seccomp mode 1 (not the same as -S).\n"
-	       "  -S <file>:    Set seccomp filter using <file>.\n"
-	       "                E.g., '-S /usr/share/filters/<prog>.$(uname -m)'.\n"
-	       "                Requires -n when not running as root.\n"
-	       "  -t[size]:     Mount tmpfs at /tmp (implies -v).\n"
-	       "                Optional argument specifies size (default \"64M\").\n"
-	       "  -T <type>:    Assume <program> is a <type> ELF binary; <type> can be 'static' or 'dynamic'.\n"
-	       "                This will avoid accessing <program> binary before execve(2).\n"
-	       "                Type 'static' will avoid preload hooking.\n"
-	       "  -u <user>:    Change uid to <user>.\n"
-	       "  -U:           Enter new user namespace (implies -p).\n"
-	       "  -v:           Enter new mount namespace.\n"
-	       "  -V <file>:    Enter specified mount namespace.\n"
-	       "  -w:           Create and join a new anonymous session keyring.\n"
-	       "  -Y:           Synchronize seccomp filters across thread group.\n"
-	       "  -z:           Don't forward signals to jailed process.\n"
-	       "  --ambient:    Raise ambient capabilities. Requires -c.\n"
-	       "  --uts[=name]: Enter a new UTS namespace (and set hostname).\n"
-	       "  --logging=<s>:Use <s> as the logging system.\n"
-	       "                <s> must be 'auto' (default), 'syslog', or 'stderr'.\n"
-	       "  --profile <p>:Configure minijail0 to run with the <p> sandboxing profile,\n"
-	       "                which is a convenient way to express multiple flags\n"
-	       "                that are typically used together.\n"
-	       "                See the minijail0(1) man page for the full list.\n"
-	       "  --preload-library=<f>:Overrides the path to \"" PRELOADPATH "\".\n"
-	       "                This is only really useful for local testing.\n"
-	       "  --seccomp-bpf-binary=<f>:Set a pre-compiled seccomp filter using <f>.\n"
-	       "                E.g., '-S /usr/share/filters/<prog>.$(uname -m).bpf'.\n"
-	       "                Requires -n when not running as root.\n"
-	       "                The user is responsible for ensuring that the binary\n"
-	       "                was compiled for the correct architecture / kernel version.\n"
-	       "  --allow-speculative-execution:Allow speculative execution and disable\n"
-	       "                mitigations for speculative execution attacks.\n"
-	       "  --config <file>:Load the Minijail configuration file <file>.\n"
-	       "                If used, must be specified ahead of other options.\n");
-	/* clang-format on */
+	printf("\nsyscalls allowed when logging (-L):\n ");
+	for (size_t i = 0; i < log_syscalls_len; ++i)
+		printf(" %s", log_syscalls[i]);
+	printf("\n");
 }
 
 static void seccomp_filter_usage(const char *progn)
@@ -640,28 +685,6 @@ static int getopt_conf_or_cli(int argc, char *const argv[],
 			      size_t *conf_index)
 {
 	int opt = -1;
-	/* NB: Keep short list sorted. */
-	static const char optstring[] =
-	    "+a:b:c:de::f:g:hik:lm::nprst::u:vwyzB:C:GHIK::LM::NP:R:S:T:UV:Y";
-	/* clang-format off */
-	static const struct option long_options[] = {
-		{"help", no_argument, 0, 'h'},
-		{"mount-dev", no_argument, 0, 'd'},
-		{"ambient", no_argument, 0, OPT_AMBIENT},
-		{"uts", optional_argument, 0, OPT_UTS},
-		{"logging", required_argument, 0, OPT_LOGGING},
-		{"profile", required_argument, 0, OPT_PROFILE},
-		{"preload-library", required_argument, 0, OPT_PRELOAD_LIBRARY},
-		{"seccomp-bpf-binary", required_argument, 0, OPT_SECCOMP_BPF_BINARY},
-		{"add-suppl-group", required_argument, 0, OPT_ADD_SUPPL_GROUP},
-		{"allow-speculative-execution", no_argument, 0,
-		 OPT_ALLOW_SPECULATIVE_EXECUTION},
-		{"config", required_argument, 0, OPT_CONFIG},
-		{"mount", required_argument, 0, 'k'},
-		{"bind-mount", required_argument, 0, 'b'},
-		{0, 0, 0, 0},
-	};
-	/* clang-format on */
 	if (*conf_entry_list != NULL)
 		opt =
 		    getopt_from_conf(long_options, conf_entry_list, conf_index);
