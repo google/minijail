@@ -640,8 +640,9 @@ static int getopt_conf_or_cli(int argc, char *const argv[],
 			      size_t *conf_index)
 {
 	int opt = -1;
+	/* NB: Keep short list sorted. */
 	static const char optstring[] =
-	    "+u:g:sS:c:C:P:b:B:V:f:m::M::k:a:e::R:T:vrGhHinNplLt::IUK::wyYzd";
+	    "+a:b:c:de::f:g:hik:lm::nprst::u:vwyzB:C:GHIK::LM::NP:R:S:T:UV:Y";
 	/* clang-format off */
 	static const struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
