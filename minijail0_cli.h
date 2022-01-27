@@ -17,8 +17,9 @@ extern "C" {
 struct minijail;
 
 int parse_args(struct minijail *j, int argc, char *const argv[],
-	       int *exit_immediately, ElfType *elftype,
-	       const char **preload_path);
+	       char *const environ[], int *exit_immediately,
+	       ElfType *elftype, const char **preload_path,
+	       char ***envp);
 
 #ifdef __cplusplus
 }; /* extern "C" */
