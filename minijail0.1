@@ -289,6 +289,16 @@ capability-dumb binaries.  See \fBcapabilities\fR(7).
 Create a new UTS/hostname namespace, and optionally set the hostname in the new
 namespace to \fIhostname\fR.
 .TP
+\fB--env-reset\fR
+Clear the current environment instead of having the program inherit the active
+environment. This is often used to start the program with a minimal
+sanitized environment.
+.TP
+\fB--env-add <NAME=value>\fR
+Adds or replace the specified environment variable \fINAME\fR in the program's
+environment before starting it, and set it to the specified \fIvalue\fR.
+This option can be used several times to set any number of environment variables.
+.TP
 \fB--logging=<system>\fR
 Use \fIsystem\fR as the logging system. \fIsystem\fR must be one of
 \fBauto\fR (the default), \fBsyslog\fR, or \fBstderr\fR.

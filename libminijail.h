@@ -344,6 +344,13 @@ void minijail_enter(const struct minijail *j);
 
 /*
  * Run the specified command in the given minijail, execve(2)-style.
+ * Pass |envp| as the full environment for the child.
+ */
+int minijail_run_env(struct minijail *j, const char *filename,
+		     char *const argv[], char *const envp[]);
+
+/*
+ * Run the specified command in the given minijail, execve(2)-style.
  * If minijail_namespace_pids() or minijail_namespace_user() are used,
  * this or minijail_fork() is required instead of minijail_enter().
  */
