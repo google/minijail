@@ -2590,7 +2590,7 @@ static int setup_preload(const struct minijail *j attribute_unused,
 	const char *preload_path = j->preload_path ?: PRELOADPATH;
 	char *newenv = NULL;
 	int ret = 0;
-	const char *oldenv = getenv(kLdPreloadEnvVar);
+	const char *oldenv = minijail_getenv(*child_env, kLdPreloadEnvVar);
 
 	if (!oldenv)
 		oldenv = "";
@@ -2935,6 +2935,20 @@ int API minijail_run(struct minijail *j, const char *filename,
 	    .envp = NULL,
 	    .use_preload = true,
 	    .exec_in_child = true,
+	};
+	return minijail_run_config_internal(j, &config);
+}
+
+int API minijail_run_env(struct minijail *j, const char *filename,
+			 char *const argv[], char *const envp[])
+{
+	struct minijail_run_config config = {
+	   .filename = filename,
+	   .elf_fd = -1,
+	   .argv = argv,
+	   .envp = envp,
+	   .use_preload = true,
+	   .exec_in_child = true,
 	};
 	return minijail_run_config_internal(j, &config);
 }
