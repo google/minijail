@@ -598,7 +598,7 @@ TEST_F(CliTest, conf_parsing_invalid_key) {
 }
 
 TEST_F(CliTest, conf_parsing) {
-  std::vector<std::string> argv = {"-v", "--config",
+  std::vector<std::string> argv = {"--config",
                                    source_path("test/valid.conf"),
                                    "/bin/sh"};
 
