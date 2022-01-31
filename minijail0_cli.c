@@ -500,6 +500,7 @@ static const struct option long_options[] = {
     {"env-reset", no_argument, 0, OPT_ENV_RESET},
     {"mount", required_argument, 0, 'k'},
     {"bind-mount", required_argument, 0, 'b'},
+    {"ns-mount", no_argument, 0, 'v'},
     {0, 0, 0, 0},
 };
 
@@ -543,7 +544,8 @@ static const char help_text[] =
 "Namespace options:\n"
 "  -N           Enter a new cgroup namespace.\n"
 "  -l           Enter new IPC namespace.\n"
-"  -v           Enter new mount namespace.\n"
+"  -v, --ns-mount\n"
+"               Enter new mount namespace.\n"
 "  -V <file>    Enter specified mount namespace.\n"
 "  -e[file]     Enter new network namespace, or existing |file| if provided.\n"
 "  -p           Enter new pid namespace (implies -vr).\n"
