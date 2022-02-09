@@ -95,8 +95,7 @@ tests: TEST(CXX_BINARY(libminijail_unittest)) \
 	TEST(CXX_BINARY(syscall_filter_unittest)) \
 	TEST(CXX_BINARY(system_unittest)) \
 	TEST(CXX_BINARY(util_unittest)) \
-	TEST(CXX_BINARY(config_parser_unittest)) \
-
+	TEST(CXX_BINARY(config_parser_unittest))
 
 CC_BINARY(minijail0): LDLIBS += -lcap -ldl
 CC_BINARY(minijail0): $(CORE_OBJECT_FILES) \
@@ -185,7 +184,7 @@ libsyscalls.gen.o.depends: libsyscalls.gen.c
 # Only regenerate libsyscalls.gen.c if the Makefile or header changes.
 # NOTE! This will not detect if the file is not appropriate for the target.
 libsyscalls.gen.c: $(SRC)/libsyscalls.h $(SRC)/Makefile
-	@$(ECHO) "GEN		$(subst $(SRC)/,,$<) ->  $@"
+	@/bin/echo -e "GEN		$(subst $(SRC)/,,$<) ->  $@"
 	$(QUIET)CC="$(CC)" $(SRC)/gen_syscalls.sh "$@"
 clean: CLEAN(libsyscalls.gen.c)
 
@@ -198,7 +197,7 @@ libconstants.gen.o.depends: libconstants.gen.c
 # Only regenerate libconstants.gen.c if the Makefile or header changes.
 # NOTE! This will not detect if the file is not appropriate for the target.
 libconstants.gen.c: $(SRC)/libconstants.h $(SRC)/Makefile
-	@$(ECHO) "GEN		$(subst $(SRC)/,,$<) ->  $@"
+	@/bin/echo -e "GEN		$(subst $(SRC)/,,$<) ->  $@"
 	$(QUIET)CC="$(CC)" $(SRC)/gen_constants.sh "$@"
 clean: CLEAN(libconstants.gen.c)
 
