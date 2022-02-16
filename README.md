@@ -154,7 +154,7 @@ FEATURES=test emerge-${BOARD} chromeos-base/minijail dev-rust/minijail-sys \
 
 # Check integration tests.
 cros deploy <DUT> chromeos-base/minijail
-tast run <DUT> security.Minijail security.MinijailSeccomp
+tast run <DUT> security.Minijail.* security.MinijailSeccomp
 ```
 
 Finally, when uploading the CL make sure to include the list of changes
