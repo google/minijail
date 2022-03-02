@@ -510,6 +510,9 @@ impl Minijail {
         }
 
         let buffer = fs::read(path).map_err(Error::ReadProgram)?;
+        self.parse_seccomp_bytes(&buffer)
+    }
+    pub fn parse_seccomp_bytes(&mut self, buffer: &[u8]) -> Result<()> {
         if buffer.len() % std::mem::size_of::<sock_filter>() != 0 {
             return Err(Error::WrongProgramSize);
         }
