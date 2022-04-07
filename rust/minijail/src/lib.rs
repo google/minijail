@@ -401,7 +401,7 @@ fn translate_wait_error(ret: libc::c_int) -> Result<()> {
     if ret > 0 && ret <= 0xff {
         return Err(Error::ReturnCode(ret as u8));
     }
-    unreachable!(format!("Unexpected returned value from wait: {}", ret));
+    unreachable!("Unexpected returned value from wait: {}", ret);
 }
 
 impl Minijail {
