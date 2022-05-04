@@ -605,4 +605,13 @@ TEST_F(CliTest, conf_parsing) {
   ASSERT_TRUE(parse_args_(argv));
 }
 
+TEST_F(CliTest, conf_parsing_with_dac_override) {
+  std::vector<std::string> argv = {"-c 2", "--config",
+                                   source_path("test/valid.conf"),
+                                   "/bin/sh"};
+
+  ASSERT_TRUE(parse_args_(argv));
+}
+
+
 #endif  // !__ANDROID__
