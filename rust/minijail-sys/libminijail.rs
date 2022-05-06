@@ -320,6 +320,14 @@ extern "C" {
     pub fn minijail_enter(j: *const minijail);
 }
 extern "C" {
+    pub fn minijail_run_env(
+        j: *mut minijail,
+        filename: *const ::std::os::raw::c_char,
+        argv: *const *mut ::std::os::raw::c_char,
+        envp: *const *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn minijail_run(
         j: *mut minijail,
         filename: *const ::std::os::raw::c_char,
