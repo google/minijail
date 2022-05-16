@@ -77,7 +77,6 @@ cc_defaults {
         "-Wall",
         "-Werror",
     ],
-    c_std: "gnu11",
     target: {
         darwin: {
             enabled: false,
