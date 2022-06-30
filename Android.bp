@@ -52,6 +52,7 @@ license {
 
 libminijailSrcFiles = [
     "bpf.c",
+    "landlock_util.c",
     "libminijail.c",
     "signal_handler.c",
     "syscall_filter.c",

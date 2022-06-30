@@ -80,7 +80,7 @@ endif
 UNITTEST_LIBS += $(GTEST_LIBS)
 
 CORE_OBJECT_FILES := libminijail.o syscall_filter.o signal_handler.o \
-		bpf.o util.o system.o syscall_wrapper.o \
+		bpf.o landlock_util.o util.o system.o syscall_wrapper.o \
 		config_parser.o libconstants.gen.o libsyscalls.gen.o
 UNITTEST_DEPS += $(CORE_OBJECT_FILES)
 
@@ -161,7 +161,7 @@ clean: CLEAN(util_unittest)
 
 
 CXX_BINARY(parse_seccomp_policy): parse_seccomp_policy.o syscall_filter.o \
-		bpf.o util.o libconstants.gen.o libsyscalls.gen.o
+		bpf.o landlock_util.o util.o libconstants.gen.o libsyscalls.gen.o
 clean: CLEAN(parse_seccomp_policy)
 
 

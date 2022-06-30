@@ -36,6 +36,7 @@
 #include <syscall.h>
 #include <unistd.h>
 
+#include "landlock_util.h"
 #include "libminijail-private.h"
 #include "libminijail.h"
 
@@ -190,6 +191,10 @@ struct minijail {
 	struct preserved_fd preserved_fds[MAX_PRESERVED_FDS];
 	size_t preserved_fd_count;
 	char *seccomp_policy_path;
+	/* Landlock ruleset file descriptor. */
+	int ruleset_fd;
+	/* Flag set to true if at least one landlock rule is used. */
+	bool landlock_used;
 };
 
 static void run_hooks_or_die(const struct minijail *j,
@@ -282,6 +287,36 @@ void minijail_preenter(struct minijail *j)
 	free_remounts_list(j);
 }
 
+/* Adds a rule to the landlock ruleset. */
+static bool add_fs_restriction_internal(struct minijail *j,
+					const char *path,
+					uint64_t landlock_flags)
+{
+	if (!j->landlock_used) {
+		struct minijail_landlock_ruleset_attr ruleset_attr = {
+			.handled_access_fs = ACCESS_FS_ROUGHLY_READ_EXECUTE |
+				ACCESS_FS_ROUGHLY_FULL_WRITE,
+		};
+		j->ruleset_fd = landlock_create_ruleset(
+			&ruleset_attr, sizeof(ruleset_attr), 0);
+		if (j->ruleset_fd < 0) {
+			const int err = errno;
+			pwarn("Failed to create a ruleset");
+			switch (err) {
+			case ENOSYS:
+				pwarn("Landlock is not supported by the current kernel");
+				break;
+			case EOPNOTSUPP:
+				pwarn("Landlock is currently disabled by kernel config");
+				break;
+			}
+			return false;
+		}
+		j->landlock_used = true;
+	}
+	return populate_ruleset_internal(path, j->ruleset_fd, landlock_flags);
+}
+
 /*
  * Strip out flags meant for the child.
  * We keep things that are inherited across execve(2).
@@ -324,6 +359,8 @@ struct minijail API *minijail_new(void)
 	struct minijail *j = calloc(1, sizeof(struct minijail));
 	if (j) {
 		j->remount_mode = MS_PRIVATE;
+		j->landlock_used = false;
+		j->ruleset_fd = -1;
 	}
 	return j;
 }
@@ -811,6 +848,31 @@ int API minijail_create_session(struct minijail *j)
 	j->flags.setsid = 1;
 	return 0;
 }
+
+int API minijail_add_fs_restriction_rx(struct minijail *j, const char *path)
+{
+	return !add_fs_restriction_internal(j, path,
+					    ACCESS_FS_ROUGHLY_READ_EXECUTE);
+}
+
+int API minijail_add_fs_restriction_ro(struct minijail *j, const char *path)
+{
+	return !add_fs_restriction_internal(j, path, ACCESS_FS_ROUGHLY_READ);
+}
+
+int API minijail_add_fs_restriction_rw(struct minijail *j, const char *path)
+{
+	return !add_fs_restriction_internal(j, path,
+		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_BASIC_WRITE);
+}
+
+int API minijail_add_fs_restriction_advanced_rw(struct minijail *j,
+						const char *path)
+{
+	return !add_fs_restriction_internal(j, path,
+		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_FULL_WRITE);
+}
+
 
 int API minijail_mount_with_data(struct minijail *j, const char *src,
 				 const char *dest, const char *type,
@@ -3523,6 +3585,21 @@ static int minijail_run_internal(struct minijail *j,
 		return 0;
 
 	/*
+	 * Apply Landlock restrictions if enabled. Restrictions are applied after
+	 * forking and before execve, because this helps prevent interfering with
+	 * other minijail system calls.
+	 */
+	if (j->landlock_used && j->ruleset_fd >= 0) {
+		if (landlock_restrict_self(j->ruleset_fd, 0)) {
+			pdie("Failed to enforce ruleset");
+		}
+	}
+	if (j->ruleset_fd >= 0) {
+		close(j->ruleset_fd);
+		j->ruleset_fd = -1;
+	}
+
+	/*
 	 * We're going to execve(), so make sure any remaining resources are
 	 * freed. Exceptions are:
 	 *  1. The child environment. No need to worry about freeing it since
@@ -3677,6 +3754,8 @@ void API minijail_destroy(struct minijail *j)
 {
 	size_t i;
 
+	if (j->ruleset_fd >= 0)
+		close(j->ruleset_fd);
 	if (j->filter_prog) {
 		free(j->filter_prog->filter);
 		free(j->filter_prog);

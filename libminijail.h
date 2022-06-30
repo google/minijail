@@ -188,6 +188,23 @@ int minijail_rlimit(struct minijail *j, int type, rlim_t cur, rlim_t max);
 int minijail_add_to_cgroup(struct minijail *j, const char *path);
 
 /*
+ * These functions are used for filesystem restrictions.
+ */
+
+/* Adds a read-execute path. */
+int minijail_add_fs_restriction_rx(struct minijail *j, const char *path);
+
+/* Adds a read-only path. */
+int minijail_add_fs_restriction_ro(struct minijail *j, const char *path);
+
+/* Adds a path with read and basic write permissions. */
+int minijail_add_fs_restriction_rw(struct minijail *j, const char *path);
+
+/* Adds a path with read and advanced write permissions. */
+int minijail_add_fs_restriction_advanced_rw(struct minijail *j,
+					    const char *path);
+
+/*
  * Install signal handlers in the minijail process that forward received
  * signals to the jailed child process.
  */
