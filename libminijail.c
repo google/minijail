@@ -898,7 +898,12 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 	if (!writeable)
 		flags |= MS_RDONLY;
 
-	return minijail_mount(j, src, dest, "", flags);
+	/*
+	 * |type| is ignored for bind mounts, use it to signal that this mount
+	 * came from minijail_bind().
+	 * TODO(b/238362528): Implement a better way to signal this.
+	 */
+	return minijail_mount(j, src, dest, "minijail_bind", flags);
 }
 
 int API minijail_add_remount(struct minijail *j, const char *mount_name,
@@ -1693,8 +1698,9 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 {
 	int ret;
 	char *dest;
-	int remount = 0;
-	int bind = m->flags & MS_BIND;
+	bool do_remount = false;
+	bool has_bind_flag = !!(m->flags & MS_BIND);
+	bool has_remount_flag = !!(m->flags & MS_REMOUNT);
 	unsigned long original_mnt_flags = 0;
 
 	/* We assume |dest| has a leading "/". */
@@ -1709,32 +1715,39 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 			return -ENOMEM;
 	}
 
-	ret = setup_mount_destination(m->src, dest, j->uid, j->gid, bind);
+	ret = setup_mount_destination(m->src, dest, j->uid, j->gid,
+				      has_bind_flag);
 	if (ret) {
 		warn("cannot create mount target '%s'", dest);
 		goto error;
 	}
 
-	/* If bind mounting, also grab the mount flags of the source. */
-	if (bind && get_mount_flags(m->src, &original_mnt_flags)) {
-		warn("cannot get mount flags for '%s'", m->src);
-		goto error;
-	}
-
 	/*
-	 * Bind mounts that add the 'ro' flag have to be remounted since 'bind'
-	 * and other flags can't both be specified in the same command.
-	 * Remount *after* the initial mount.
+	 * Remount bind mounts that:
+	 * - Come from the minijail_bind() API, and
+	 * - Add the 'ro' flag
+	 * since 'bind' and other flags can't both be specified in the same
+	 * mount(2) call.
+	 * Callers using minijail_mount() to perform bind mounts are expected to
+	 * know what they're doing and call minijail_mount() with MS_REMOUNT as
+	 * needed.
+	 * Therefore, if the caller is asking for a remount (using MS_REMOUNT),
+	 * there is no need to do an extra remount here.
 	 */
-	if (bind &&
-	    ((m->flags & MS_RDONLY) != (original_mnt_flags & MS_RDONLY))) {
+	if (has_bind_flag && strcmp(m->type, "minijail_bind") == 0 &&
+	    !has_remount_flag) {
 		/*
-		 * Only remount when the source is mounted RW and the dest
-		 * is required to be RO.
+		 * Grab the mount flags of the source. These are used to figure
+		 * out whether the bind mount needs to be remounted read-only.
 		 */
-		if ((original_mnt_flags & MS_RDONLY) == 0) {
-			/* The source is mounted RW. */
-			remount = 1;
+		if (get_mount_flags(m->src, &original_mnt_flags)) {
+			warn("cannot get mount flags for '%s'", m->src);
+			goto error;
+		}
+
+		if ((m->flags & MS_RDONLY) !=
+		    (original_mnt_flags & MS_RDONLY)) {
+			do_remount = 1;
 			/*
 			 * Restrict the mount flags to those that are
 			 * user-settable in a MS_REMOUNT request, but excluding
@@ -1744,20 +1757,18 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 			 */
 			original_mnt_flags &=
 			    (MS_USER_SETTABLE_MASK & ~MS_RDONLY);
-		} else {
-			/* The source is mounted RO. */
-			warn("not remounting '%s' as rw", dest);
 		}
 	}
 
 	ret = mount(m->src, dest, m->type, m->flags, m->data);
 	if (ret) {
-		pwarn("cannot bind-mount '%s' as '%s' with flags %#lx", m->src,
-		      dest, m->flags);
+		pwarn("cannot mount '%s' as '%s' with flags %#lx", m->src, dest,
+		      m->flags);
 		goto error;
 	}
 
-	if (remount) {
+	/* Remount *after* the initial mount. */
+	if (do_remount) {
 		ret =
 		    mount(m->src, dest, NULL,
 			  m->flags | original_mnt_flags | MS_REMOUNT, m->data);
@@ -1791,6 +1802,8 @@ static void process_mounts_or_die(const struct minijail *j)
 		pdie("mount_dev failed");
 
 	if (j->mounts_head && mount_one(j, j->mounts_head, dev_path)) {
+		warn("mount_one failed with /dev at '%s'", dev_path);
+
 		if (dev_path)
 			mount_dev_cleanup(dev_path);
 
