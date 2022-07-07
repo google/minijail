@@ -87,7 +87,7 @@ bool parse_config_line(const char *config_line, struct config_entry *entry)
 
 static bool match_special_directive(const char *line)
 {
-	return (strcmp(line, "% minijail-config-file v0\n") == 0);
+	return streq(line, "% minijail-config-file v0\n");
 }
 
 bool parse_config_file(FILE *config_file, struct config_entry_list *list)

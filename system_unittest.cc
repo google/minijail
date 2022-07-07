@@ -173,7 +173,7 @@ TEST(write_pid_to_path, basic) {
   char data[6] = {};
   EXPECT_EQ(5u, fread(data, 1, sizeof(data), fp));
   fclose(fp);
-  EXPECT_EQ(0, strcmp(data, "1234\n"));
+  EXPECT_STREQ(data, "1234\n");
 }
 
 // If the destination exists, there's nothing to do.

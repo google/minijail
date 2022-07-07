@@ -161,7 +161,7 @@ int lookup_syscall(const char *name, size_t *ind)
 	size_t ind_tmp = 0;
 	const struct syscall_entry *entry = syscall_table;
 	for (; entry->name && entry->nr >= 0; ++entry) {
-		if (!strcmp(entry->name, name)) {
+		if (streq(entry->name, name)) {
 			if (ind != NULL)
 				*ind = ind_tmp;
 			return entry->nr;
@@ -187,7 +187,7 @@ long int parse_single_constant(char *constant_str, char **endptr)
 	const struct constant_entry *entry = constant_table;
 	long int res = 0;
 	for (; entry->name; ++entry) {
-		if (!strcmp(entry->name, constant_str)) {
+		if (streq(entry->name, constant_str)) {
 			*endptr = constant_str + strlen(constant_str);
 			return entry->value;
 		}

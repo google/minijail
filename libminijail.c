@@ -719,7 +719,7 @@ char API *minijail_get_original_path(struct minijail *j,
 		 *    "/chroot/path/exe", the source of that mount,
 		 *    "/some/path/exe" is what should be returned.
 		 */
-		if (!strcmp(b->dest, path_inside_chroot))
+		if (streq(b->dest, path_inside_chroot))
 			return strdup(b->src);
 
 		/*
@@ -840,7 +840,7 @@ int API minijail_mount_with_data(struct minijail *j, const char *src,
 		 * people use these in practice, it's probably OK.  If they want
 		 * the kernel defaults, they can pass data="" instead of NULL.
 		 */
-		if (!strcmp(type, "tmpfs")) {
+		if (streq(type, "tmpfs")) {
 			/* tmpfs defaults to mode=1777 and size=50%. */
 			data = "mode=0755,size=10M";
 		}

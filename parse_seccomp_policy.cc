@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
   FILE* f = stdin;
   // If there is at least one additional unparsed argument, treat it as the
   // policy script.
-  if (argc > optind && strcmp(argv[optind], "-") != 0)
+  if (argc > optind && !streq(argv[optind], "-"))
     f = fopen(argv[optind], "re");
   if (!f)
     pdie("fopen(%s) failed", argv[1]);

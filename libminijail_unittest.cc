@@ -938,7 +938,7 @@ TEST(Test, test_minijail_preserve_fd) {
   status = read(read_pipe[0], buf, 8);
   EXPECT_EQ(status, (int)teststr_len);
   buf[teststr_len] = 0;
-  EXPECT_EQ(strcmp(buf, teststr), 0);
+  EXPECT_STREQ(buf, teststr);
 
   status = minijail_wait(j);
   EXPECT_EQ(status, 0);
@@ -1155,7 +1155,7 @@ TEST_F(NamespaceTest, test_namespaces) {
       ssize_t read_ret = read(child_stdout, buf, 8);
       EXPECT_EQ(read_ret, static_cast<ssize_t>(teststr_len));
       buf[teststr_len] = 0;
-      EXPECT_EQ(strcmp(buf, teststr), 0);
+      EXPECT_STREQ(buf, teststr);
 
       // Grab the set of namespaces in every container process. They must not
       // match the ones in the init namespace, and they must all match each

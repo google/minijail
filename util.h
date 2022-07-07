@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -233,6 +234,14 @@ long int parse_constant(char *constant_str, char **endptr);
 int parse_size(size_t *size, const char *sizespec);
 
 char *strip(char *s);
+
+/*
+ * streq: determine whether two strings are equal.
+ */
+static inline bool streq(const char *s1, const char *s2)
+{
+	return strcmp(s1, s2) == 0;
+}
 
 /*
  * tokenize: locate the next token in @stringp using the @delim

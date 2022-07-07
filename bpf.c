@@ -362,7 +362,7 @@ int bpf_label_id(struct bpf_labels *labels, const char *label)
 	}
 	end = begin + labels->count;
 	for (id = 0; begin < end; ++begin, ++id) {
-		if (!strcmp(label, begin->label)) {
+		if (streq(label, begin->label)) {
 			return id;
 		}
 	}
