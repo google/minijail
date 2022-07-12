@@ -924,6 +924,9 @@ impl Minijail {
     ///
     /// This Function may abort in the child on error because a partially
     /// entered jail isn't recoverable.
+    ///
+    /// Once this is invoked the object is no longer usable, after this call
+    /// this minijail object is invalid.
     pub unsafe fn fork(&self, inheritable_fds: Option<&[RawFd]>) -> Result<pid_t> {
         let m: Vec<(RawFd, RawFd)> = inheritable_fds
             .unwrap_or(&[])
