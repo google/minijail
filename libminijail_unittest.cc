@@ -26,6 +26,7 @@
 #include "libminijail-private.h"
 #include "libminijail.h"
 #include "scoped_minijail.h"
+#include "unittest_util.h"
 #include "util.h"
 
 namespace {
@@ -1004,6 +1005,35 @@ TEST(Test, test_minijail_reset_signal_handlers) {
   EXPECT_EQ(WEXITSTATUS(status), 0);
 
   minijail_destroy(j);
+}
+
+// Test that bind mounting with a symlink works (but we're about to make this
+// fail).
+TEST(Test, test_bind_mount_symlink) {
+  TemporaryDir dir;
+  ASSERT_TRUE(dir.is_valid());
+
+  // minijail_bind() expects absolute paths, but TemporaryDir::path can return
+  // relative paths on Linux.
+  std::string path = dir.path;
+  if (!is_android()) {
+    std::string cwd(getcwd(NULL, 0));
+    path = cwd + "/" + path;
+  }
+
+  std::string path_src = path + "/src";
+  std::string path_dest = path + "/dest";
+  std::string path_sym = path + "/symlink";
+
+  EXPECT_EQ(mkdir(path_src.c_str(), 0700), 0);
+  EXPECT_EQ(mkdir(path_dest.c_str(), 0700), 0);
+  EXPECT_EQ(symlink(path_src.c_str(), path_sym.c_str()), 0);
+
+  ScopedMinijail j(minijail_new());
+  int bind_res = minijail_bind(j.get(), path_sym.c_str(), path_dest.c_str(),
+                               0 /*writable*/);
+  EXPECT_EQ(bind_res, 0);
+  EXPECT_EQ(unlink(path_sym.c_str()), 0);
 }
 
 namespace {
