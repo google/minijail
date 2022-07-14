@@ -465,7 +465,7 @@ impl Minijail {
     }
     pub fn set_supplementary_gids(&mut self, ids: &[libc::gid_t]) {
         unsafe {
-            minijail_set_supplementary_gids(self.jail, ids.len() as size_t, ids.as_ptr());
+            minijail_set_supplementary_gids(self.jail, ids.len(), ids.as_ptr());
         }
     }
     pub fn keep_supplementary_gids(&mut self) {
@@ -767,7 +767,7 @@ impl Minijail {
     }
     pub fn mount_tmp_size(&mut self, size: usize) {
         unsafe {
-            minijail_mount_tmp_size(self.jail, size as size_t);
+            minijail_mount_tmp_size(self.jail, size);
         }
     }
     pub fn mount_bind<P1: AsRef<Path>, P2: AsRef<Path>>(

@@ -94,6 +94,7 @@ fn bindings_generation() -> io::Result<()> {
         .args(&["--blacklist-type", "__uint64_t"])
         .args(&["--whitelist-function", "^minijail_.*"])
         .args(&["--whitelist-var", "^MINIJAIL_.*"])
+        .arg("--size_t-is-usize")
         .arg("--no-layout-tests")
         .arg("--disable-header-comment")
         .args(&["--output", gen_file.to_str().unwrap()])

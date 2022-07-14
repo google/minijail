@@ -10,7 +10,6 @@ pub type rlim_t = __rlim64_t;
 pub type gid_t = __gid_t;
 pub type uid_t = __uid_t;
 pub type pid_t = __pid_t;
-pub type size_t = ::std::os::raw::c_ulong;
 #[repr(C)]
 pub struct sock_filter {
     pub code: __u16,
@@ -68,7 +67,7 @@ extern "C" {
     pub fn minijail_change_gid(j: *mut minijail, gid: gid_t);
 }
 extern "C" {
-    pub fn minijail_set_supplementary_gids(j: *mut minijail, size: size_t, list: *const gid_t);
+    pub fn minijail_set_supplementary_gids(j: *mut minijail, size: usize, list: *const gid_t);
 }
 extern "C" {
     pub fn minijail_keep_supplementary_gids(j: *mut minijail);
@@ -256,7 +255,7 @@ extern "C" {
     pub fn minijail_mount_tmp(j: *mut minijail);
 }
 extern "C" {
-    pub fn minijail_mount_tmp_size(j: *mut minijail, size: size_t);
+    pub fn minijail_mount_tmp_size(j: *mut minijail, size: usize);
 }
 extern "C" {
     pub fn minijail_mount_dev(j: *mut minijail);
