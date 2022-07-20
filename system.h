@@ -63,6 +63,15 @@ int seccomp_ret_log_available(void);
 int seccomp_ret_kill_process_available(void);
 bool seccomp_filter_flags_available(unsigned int flags);
 
+/*
+ * is_canonical_path: checks whether @path is a canonical path.
+ * This means:
+ * -Absolute.
+ * -No symlinks.
+ * -No /./, /../, or extra '/'.
+ */
+bool is_canonical_path(const char *path);
+
 #ifdef __cplusplus
 }; /* extern "C" */
 #endif

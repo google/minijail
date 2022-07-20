@@ -547,3 +547,9 @@ bool seccomp_filter_flags_available(unsigned int flags)
 	return sys_seccomp(SECCOMP_SET_MODE_FILTER, flags, NULL) != -1 ||
 	       errno != EINVAL;
 }
+
+bool is_canonical_path(const char *path)
+{
+	attribute_cleanup_str char *rp = realpath(path, NULL);
+	return rp != NULL ? streq(path, rp) : false;
+}

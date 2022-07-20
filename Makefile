@@ -60,6 +60,18 @@ CPPFLAGS += -DSECCOMP_DEFAULT_RET_LOG
 endif
 endif
 
+# Prevent Minijail from following symlinks when performing bind mounts.
+# BINDMOUNT_ALLOWED_PREFIXES allows some flexibility. This is especially useful
+# for directories that are not normally modifiable by non-root users.
+# If a process can modify these directories, they probably don't need to mess
+# with Minijail bind mounts to gain root privileges.
+BINDMOUNT_ALLOWED_PREFIXES ?= /dev,/sys
+CPPFLAGS += -DBINDMOUNT_ALLOWED_PREFIXES='"$(BINDMOUNT_ALLOWED_PREFIXES)"'
+BLOCK_SYMLINKS_IN_BINDMOUNT_PATHS ?= no
+ifeq ($(BLOCK_SYMLINKS_IN_BINDMOUNT_PATHS),yes)
+CPPFLAGS += -DBLOCK_SYMLINKS_IN_BINDMOUNT_PATHS
+endif
+
 ifeq ($(USE_ASAN),yes)
 CPPFLAGS += -fsanitize=address -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address -fno-omit-frame-pointer

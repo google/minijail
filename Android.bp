@@ -75,6 +75,7 @@ cc_defaults {
         "-DALLOW_DEBUG_LOGGING",
         "-DALLOW_DUPLICATE_SYSCALLS",
         "-DDEFAULT_PIVOT_ROOT=\"/var/empty\"",
+        "-DBINDMOUNT_ALLOWED_PREFIXES=\"\"",
         "-Wall",
         "-Werror",
     ],

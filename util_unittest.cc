@@ -402,6 +402,20 @@ TEST(path_join, basic) {
   free(path);
 }
 
+TEST(path_is_parent, simple) {
+  EXPECT_TRUE(path_is_parent("/dev", "/dev/rtc"));
+  EXPECT_TRUE(path_is_parent("/dev/", "/dev/rtc"));
+  EXPECT_TRUE(path_is_parent("/sys", "/sys/power"));
+  EXPECT_TRUE(path_is_parent("/sys/power", "/sys/power/something"));
+  EXPECT_TRUE(path_is_parent("/sys", "/sys/sys/power"));
+
+  EXPECT_FALSE(path_is_parent("/dev", ""));
+  EXPECT_FALSE(path_is_parent("/dev", "/sys"));
+  EXPECT_FALSE(path_is_parent("/dev", "dev"));
+  EXPECT_FALSE(path_is_parent("/dev", "/sys/dev"));
+  EXPECT_FALSE(path_is_parent("/dev", "/device"));
+}
+
 TEST(getmultiline, basic) {
   std::string config =
            "\n"

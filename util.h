@@ -221,6 +221,15 @@ static inline bool seccomp_default_ret_log(void)
 #endif
 }
 
+static inline bool block_symlinks_in_bindmount_paths(void)
+{
+#if defined(BLOCK_SYMLINKS_IN_BINDMOUNT_PATHS)
+	return true;
+#else
+	return false;
+#endif
+}
+
 static inline size_t get_num_syscalls(void)
 {
 	return syscall_table_size;
@@ -257,6 +266,13 @@ static inline bool streq(const char *s1, const char *s2)
 char *tokenize(char **stringp, const char *delim);
 
 char *path_join(const char *external_path, const char *internal_path);
+
+/*
+ * path_is_parent: checks whether @parent is a parent of @child.
+ * Note: this function does not evaluate '.' or '..' nor does it resolve
+ * symlinks.
+ */
+bool path_is_parent(const char *parent, const char *child);
 
 /*
  * consumebytes: consumes @length bytes from a buffer @buf of length @buflength

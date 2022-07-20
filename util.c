@@ -449,6 +449,22 @@ char *path_join(const char *external_path, const char *internal_path)
 		   : path;
 }
 
+bool path_is_parent(const char *parent, const char *child)
+{
+	/*
+	 * -Make sure |child| starts with |parent|.
+	 * -Make sure that if |child| is longer than |parent|, either:
+	 * --the last character in |parent| is a path separator, or
+	 * --the character immediately following |parent| in |child| is a path
+	 *  separator.
+	 */
+	size_t parent_len = strlen(parent);
+	return strncmp(parent, child, parent_len) == 0 &&
+	       (strlen(child) > parent_len ? (parent[parent_len - 1] == '/' ||
+					      child[parent_len] == '/')
+					   : false);
+}
+
 void *consumebytes(size_t length, char **buf, size_t *buflength)
 {
 	char *p = *buf;

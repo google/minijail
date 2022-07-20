@@ -247,3 +247,14 @@ TEST(seccomp_actions_available, smoke) {
   seccomp_ret_log_available();
   seccomp_ret_kill_process_available();
 }
+
+TEST(is_canonical_path, basic) {
+  EXPECT_FALSE(is_canonical_path("/proc/self"));
+  EXPECT_FALSE(is_canonical_path("relative"));
+  EXPECT_FALSE(is_canonical_path("/proc/./1"));
+  EXPECT_FALSE(is_canonical_path("/proc/../proc/1"));
+
+  EXPECT_TRUE(is_canonical_path("/"));
+  EXPECT_TRUE(is_canonical_path("/proc"));
+  EXPECT_TRUE(is_canonical_path("/proc/1"));
+}
