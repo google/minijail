@@ -2299,6 +2299,15 @@ static void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 	cap_free(caps);
 }
 
+static void apply_landlock_restrictions(const struct minijail *j)
+{
+	if (j->landlock_used && j->ruleset_fd >= 0) {
+		if (landlock_restrict_self(j->ruleset_fd, 0)) {
+			pdie("Failed to enforce ruleset");
+		}
+	}
+}
+
 static void set_seccomp_filter(const struct minijail *j)
 {
 	/*
@@ -2592,8 +2601,14 @@ void API minijail_enter(const struct minijail *j)
 		 */
 		drop_ugid(j);
 		drop_caps(j, last_valid_cap);
+
+		// Landlock is applied as late as possible. If no_new_privs is
+		// set, then it can be applied after dropping caps.
+		apply_landlock_restrictions(j);
 		set_seccomp_filter(j);
 	} else {
+		apply_landlock_restrictions(j);
+
 		/*
 		 * If we're not setting no_new_privs,
 		 * we need to set seccomp filter *before* dropping privileges.
@@ -3627,16 +3642,6 @@ static int minijail_run_internal(struct minijail *j,
 	if (!config->exec_in_child)
 		return 0;
 
-	/*
-	 * Apply Landlock restrictions if enabled. Restrictions are applied after
-	 * forking and before execve, because this helps prevent interfering with
-	 * other minijail system calls.
-	 */
-	if (j->landlock_used && j->ruleset_fd >= 0) {
-		if (landlock_restrict_self(j->ruleset_fd, 0)) {
-			pdie("Failed to enforce ruleset");
-		}
-	}
 	if (j->ruleset_fd >= 0) {
 		close(j->ruleset_fd);
 		j->ruleset_fd = -1;
