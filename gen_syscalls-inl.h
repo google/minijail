@@ -77,3 +77,13 @@
 #ifndef __NR_faccessat2
 #define __NR_faccessat2 439
 #endif
+
+#ifndef __NR_rseq
+#ifdef __x86_64__
+#define __NR_rseq 334
+#elif __i386__
+#define __NR_rseq 386
+#elif __arm64__
+#define __NR_rseq 293
+#endif
+#endif /* __NR_rseq */
