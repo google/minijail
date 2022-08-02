@@ -33,47 +33,47 @@
  * sendto(...)                                     <- important
  * exit_group(0)                                   <- finish!
  */
+const char *const log_syscalls[] = {
 #if defined(__x86_64__)
-#if defined(__ANDROID__)
-const char *const log_syscalls[] = {"socket", "connect", "fcntl", "writev"};
-#else
-const char *const log_syscalls[] = {"socket", "connect", "sendto", "writev"};
-#endif
+# if defined(__ANDROID__)
+  "socket", "connect", "fcntl", "writev",
+# else
+  "socket", "connect", "sendto", "writev",
+# endif
 #elif defined(__i386__)
-#if defined(__ANDROID__)
-const char *const log_syscalls[] = {"socketcall", "writev", "fcntl64",
-				    "clock_gettime"};
-#else
-const char *const log_syscalls[] = {"socketcall", "time", "writev"};
-#endif
+# if defined(__ANDROID__)
+  "socketcall", "writev", "fcntl64", "clock_gettime",
+# else
+  "socketcall", "time", "writev",
+# endif
 #elif defined(__arm__)
-#if defined(__ANDROID__)
-const char *const log_syscalls[] = {"clock_gettime", "connect", "fcntl64",
-				    "socket", "writev"};
-#else
-const char *const log_syscalls[] = {"socket", "connect", "gettimeofday", "send",
-				    "writev"};
-#endif
+# if defined(__ANDROID__)
+  "clock_gettime", "connect", "fcntl64", "socket", "writev",
+# else
+  "socket", "connect", "gettimeofday", "send", "writev",
+# endif
 #elif defined(__aarch64__)
-#if defined(__ANDROID__)
-const char *const log_syscalls[] = {"connect", "fcntl", "sendto", "socket",
-				    "writev"};
-#else
-const char *const log_syscalls[] = {"socket", "connect", "send", "writev"};
-#endif
-#elif defined(__powerpc__) || defined(__ia64__) || defined(__hppa__) ||        \
-    defined(__sparc__) || defined(__mips__)
-const char *const log_syscalls[] = {"socket", "connect", "send"};
+# if defined(__ANDROID__)
+  "connect", "fcntl", "sendto", "socket", "writev",
+# else
+  "socket", "connect", "send", "writev",
+# endif
+#elif defined(__hppa__) || \
+      defined(__ia64__) || \
+      defined(__mips__) || \
+      defined(__powerpc__) || \
+      defined(__sparc__)
+  "socket", "connect", "send",
 #elif defined(__riscv)
-#if defined(__ANDROID__)
-const char *const log_syscalls[] = {"connect", "fcntl", "sendto", "socket",
-                                    "writev"};
+# if defined(__ANDROID__)
+  "connect", "fcntl", "sendto", "socket", "writev",
+# else
+  "socket", "connect", "sendto",
+# endif
 #else
-const char *const log_syscalls[] = {"socket", "connect", "sendto"};
+# error "Unsupported platform"
 #endif
-#else
-#error "Unsupported platform"
-#endif
+};
 
 const size_t log_syscalls_len = ARRAY_SIZE(log_syscalls);
 
