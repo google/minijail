@@ -65,7 +65,12 @@ const char *const log_syscalls[] = {"socket", "connect", "send", "writev"};
     defined(__sparc__) || defined(__mips__)
 const char *const log_syscalls[] = {"socket", "connect", "send"};
 #elif defined(__riscv)
+#if defined(__ANDROID__)
+const char *const log_syscalls[] = {"connect", "fcntl", "sendto", "socket",
+                                    "writev"};
+#else
 const char *const log_syscalls[] = {"socket", "connect", "sendto"};
+#endif
 #else
 #error "Unsupported platform"
 #endif
