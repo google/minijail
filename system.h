@@ -69,6 +69,7 @@ bool seccomp_filter_flags_available(unsigned int flags);
  * -Absolute.
  * -No symlinks.
  * -No /./, /../, or extra '/'.
+ * -Single trailing '/' is OK.
  */
 bool is_canonical_path(const char *path);
 

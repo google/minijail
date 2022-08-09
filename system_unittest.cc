@@ -258,3 +258,8 @@ TEST(is_canonical_path, basic) {
   EXPECT_TRUE(is_canonical_path("/proc"));
   EXPECT_TRUE(is_canonical_path("/proc/1"));
 }
+
+TEST(is_canonical_path, trailing_slash) {
+  EXPECT_TRUE(is_canonical_path("/proc/1/"));
+  EXPECT_FALSE(is_canonical_path("/proc/1//"));
+}

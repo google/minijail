@@ -551,5 +551,17 @@ bool seccomp_filter_flags_available(unsigned int flags)
 bool is_canonical_path(const char *path)
 {
 	attribute_cleanup_str char *rp = realpath(path, NULL);
-	return rp != NULL ? streq(path, rp) : false;
+	if (!rp) {
+		return false;
+	}
+
+	if (streq(path, rp)) {
+		return true;
+	}
+
+	size_t path_len = strlen(path);
+	size_t rp_len = strlen(rp);
+	/* If |path| has a single trailing slash, that's OK. */
+	return path_len == rp_len + 1 && strncmp(path, rp, rp_len) == 0 &&
+	       path[path_len - 1] == '/';
 }
