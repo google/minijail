@@ -613,5 +613,13 @@ TEST_F(CliTest, conf_parsing_with_dac_override) {
   ASSERT_TRUE(parse_args_(argv));
 }
 
+TEST_F(CliTest, conf_fs_path) {
+  std::vector<std::string> argv = {"-c 2", "--config",
+                                   source_path("test/landlock.conf"),
+                                   "/bin/sh"};
+
+  ASSERT_TRUE(parse_args_(argv));
+}
+
 
 #endif  // !__ANDROID__
