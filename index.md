@@ -1,6 +1,6 @@
 ## About
 
-Minijail is a sandboxing and containment tool used in Chrome OS and Android.
+Minijail is a sandboxing and containment tool used in ChromeOS and Android.
 It provides an executable that can be used to launch and sandbox other programs,
 and a library that can be used by code to sandbox itself.
 
@@ -10,7 +10,7 @@ The Minijail homepage:<br/>
 <https://google.github.io/minijail/>
 
 The main repo:<br/>
-<https://android.googlesource.com/platform/external/minijail/>
+<https://chromium.googlesource.com/chromiumos/platform/minijail/>
 
 With a read-only mirror for people to fork:<br/>
 <https://github.com/google/minijail/>
@@ -29,7 +29,7 @@ Releases are tagged as `linux-vXX`:<br/>
 You're one `git clone` away from happiness.
 
 ```
-$ git clone https://android.googlesource.com/platform/external/minijail
+$ git clone https://chromium.googlesource.com/chromiumos/platform/minijail
 $ cd minijail
 ```
 
@@ -97,5 +97,5 @@ We've got a couple of contact points.
   Existing bug reports & feature requests.
 * [crbug.com/new](https://bugs.chromium.org/p/chromium/issues/entry?components=OS>Systems>Minijail):
   File new bug reports & feature requests.
-* [AOSP Gerrit](https://android-review.googlesource.com/q/project:platform/external/minijail):
+* [Chromium Gerrit](https://chromium-review.googlesource.com/q/project:chromiumos/platform/minijail):
   Code reviews.
