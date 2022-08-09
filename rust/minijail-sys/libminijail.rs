@@ -228,6 +228,30 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
+    pub fn minijail_add_fs_restriction_rx(
+        j: *mut minijail,
+        path: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn minijail_add_fs_restriction_ro(
+        j: *mut minijail,
+        path: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn minijail_add_fs_restriction_rw(
+        j: *mut minijail,
+        path: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn minijail_add_fs_restriction_advanced_rw(
+        j: *mut minijail,
+        path: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn minijail_forward_signals(j: *mut minijail) -> ::std::os::raw::c_int;
 }
 extern "C" {
