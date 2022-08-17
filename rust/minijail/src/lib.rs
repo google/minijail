@@ -319,7 +319,11 @@ impl Display for Error {
             SeccompViolation(s) => write!(f, "seccomp violation syscall #{}", s),
             Killed(s) => write!(f, "killed with signal number {}", s),
             ReturnCode(e) => write!(f, "exited with code {}", e),
-            Wait(errno) => write!(f, "failed to wait: {}", io::Error::from_raw_os_error(*errno)),
+            Wait(errno) => write!(
+                f,
+                "failed to wait: {}",
+                io::Error::from_raw_os_error(*errno)
+            ),
         }
     }
 }
