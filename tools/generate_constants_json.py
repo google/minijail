@@ -38,6 +38,21 @@ _TABLE_ENTRY_RE = re.compile(
 # number.
 _TABLE_ENTRY_CONTENTS = re.compile(r'.*?(null|@[a-zA-Z0-9.]+).* (-?\d+)')
 
+# When testing clang-r458909, we found a new constant_entry pattern:
+#   %struct.constant_entry { ptr @.str.894, i32 ptrtoint (ptr @.str.895 to i32) },
+# For the same constant, current clang-r458507 generates:
+#   %struct.constant_entry { i8* getelementptr inbounds
+#    ([19 x i8], [19 x i8]* @.str.894, i32 0, i32 0),
+#    i32 ptrtoint ([9 x i8]* @.str.895 to i32) },
+# This is for a char* constant defined in linux-x86/libconstants.gen.c:
+#   { "FS_KEY_DESC_PREFIX", (unsigned long) FS_KEY_DESC_PREFIX },
+# and FS_KEY_DESC_PREFIX is defined as a char* "fscrypt:"
+# Current output for that constant in constants.json is:
+#   "FS_KEY_DESC_PREFIX": 0,
+# but that value does not seem to be useful or accurate.
+# So here we define a pattern to ignore such pointer constants:
+_IGNORED_ENTRY_CONTENTS = re.compile(r'.*? ptrto.* \(.*\)')
+
 ParseResults = collections.namedtuple('ParseResults', ['table_name',
                                                        'table_entries'])
 
@@ -65,6 +80,8 @@ def parse_llvm_ir(ir):
             for entry in _TABLE_ENTRY_RE.findall(line):
                 groups = _TABLE_ENTRY_CONTENTS.match(entry)
                 if not groups:
+                    if _IGNORED_ENTRY_CONTENTS.match(entry):
+                        continue
                     raise ValueError('Failed to parse table entry %r' % entry)
                 name, value = groups.groups()
                 if name == 'null':
