@@ -230,6 +230,15 @@ static inline bool block_symlinks_in_bindmount_paths(void)
 #endif
 }
 
+static inline bool block_symlinks_in_noninit_mountns_tmp(void)
+{
+#if defined(BLOCK_SYMLINKS_IN_NONINIT_MOUNTNS_TMP)
+	return true;
+#else
+	return false;
+#endif
+}
+
 static inline size_t get_num_syscalls(void)
 {
 	return syscall_table_size;

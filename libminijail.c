@@ -73,6 +73,15 @@
 	(MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_NOATIME | MS_NODIRATIME |       \
 	 MS_RELATIME | MS_RDONLY)
 
+/*
+ * TODO(b/235960683): Drop this after CrOS upgrades to glibc >= 2.34
+ * because MS_NOSYMFOLLOW will be defined in sys/mount.h.
+ */
+#ifndef MS_NOSYMFOLLOW
+/* Added locally in kernels 4.x+. */
+#define MS_NOSYMFOLLOW 256
+#endif
+
 struct minijail_rlimit {
 	int type;
 	rlim_t cur;
@@ -2007,8 +2016,14 @@ static int mount_tmp(const struct minijail *j)
 		pdie("tmpfs size spec error");
 	else if ((size_t)ret >= sizeof(data))
 		pdie("tmpfs size spec too large");
-	return mount("none", "/tmp", "tmpfs", MS_NODEV | MS_NOEXEC | MS_NOSUID,
-		     data);
+
+	unsigned long flags = MS_NODEV | MS_NOEXEC | MS_NOSUID;
+
+	if (block_symlinks_in_noninit_mountns_tmp()) {
+		flags |= MS_NOSYMFOLLOW;
+	}
+
+	return mount("none", "/tmp", "tmpfs", flags, data);
 }
 
 static int remount_proc_readonly(const struct minijail *j)

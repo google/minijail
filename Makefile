@@ -72,6 +72,14 @@ ifeq ($(BLOCK_SYMLINKS_IN_BINDMOUNT_PATHS),yes)
 CPPFLAGS += -DBLOCK_SYMLINKS_IN_BINDMOUNT_PATHS
 endif
 
+# Prevents symlinks from being followed in the /tmp folder.
+# Symlinks could be followed to modify arbitrary files when a process
+# had access to the /tmp folder.
+BLOCK_SYMLINKS_IN_NONINIT_MOUNTNS_TMP ?= no
+ifeq ($(BLOCK_SYMLINKS_IN_NONINIT_MOUNTNS_TMP),yes)
+CPPFLAGS += -DBLOCK_SYMLINKS_IN_NONINIT_MOUNTNS_TMP
+endif
+
 ifeq ($(USE_ASAN),yes)
 CPPFLAGS += -fsanitize=address -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address -fno-omit-frame-pointer
