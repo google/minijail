@@ -996,12 +996,20 @@ int API minijail_bind(struct minijail *j, const char *src, const char *dest,
 {
 	unsigned long flags = MS_BIND;
 
+	/*
+	 * Check for symlinks in bind-mount source paths to warn the user early.
+	 * Minijail will perform one final check immediately before the mount()
+	 * call.
+	 */
 	if (!is_valid_bind_path(src)) {
 		warn("src '%s' is not a valid bind mount path", src);
 		return -ELOOP;
 	}
 
-	/* |dest| might not yet exist. */
+	/*
+	 * Symlinks in |dest| are blocked by the ChromiumOS LSM:
+	 * <kernel>/security/chromiumos/lsm.c#77
+	 */
 
 	if (!writeable)
 		flags |= MS_RDONLY;
@@ -1868,6 +1876,19 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 			original_mnt_flags &=
 			    (MS_USER_SETTABLE_MASK & ~MS_RDONLY);
 		}
+	}
+
+	/*
+	 * Do a final check for symlinks in |m->src|.
+	 * |m->src| will only contain a valid path when purely bind-mounting
+	 * (but not when remounting a bind mount).
+	 *
+	 * Short of having a version of mount(2) that can take fd's, this is the
+	 * smallest we can make the TOCTOU window.
+	 */
+	if (has_bind_flag && !has_remount_flag && !is_valid_bind_path(m->src)) {
+		warn("src '%s' is not a valid bind mount path", m->src);
+		goto error;
 	}
 
 	ret = mount(m->src, dest, m->type, m->flags, m->data);
