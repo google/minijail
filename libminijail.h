@@ -527,7 +527,8 @@ int minijail_wait(struct minijail *j);
 
 /*
  * Frees the given minijail. It does not matter if the process is inside the
- * minijail or not.
+ * minijail or not. It will not kill the process, see minijail_kill() if that is 
+ * desired.
  */
 void minijail_destroy(struct minijail *j);
 

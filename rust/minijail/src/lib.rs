@@ -1007,7 +1007,8 @@ impl Minijail {
 }
 
 impl Drop for Minijail {
-    /// Frees the Minijail created in Minijail::new.
+    /// Frees the Minijail created in Minijail::new. This will not terminate the
+    /// minijailed process.
     fn drop(&mut self) {
         unsafe {
             // Destroys the minijail's memory.  It is safe to do here because all references to
