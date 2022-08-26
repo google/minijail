@@ -6,10 +6,11 @@ minijail0 \- sandbox a process
 Runs PROGRAM inside a sandbox. See \fBminijail0\fR(1) for details.
 .SH EXAMPLES
 
-Safely switch from root to nobody while dropping all capabilities and
-inheriting any groups from nobody:
+Safely switch from user \fIroot\fR to \fInobody\fR, switch to primary group
+\fInobody\fR, drop all capabilities, and inherit any supplementary groups from
+user \fInobody\fR:
 
-  # minijail0 -c 0 -G -u nobody /usr/bin/whoami
+  # minijail0 -u nobody -g nobody -c 0 -G /usr/bin/whoami
   nobody
 
 Run in a PID and VFS namespace without superuser capabilities (but still
