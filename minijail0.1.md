@@ -413,11 +413,11 @@ target domain allows the operations to jail *program*.
 
 ## Author
 
-The Chromium OS Authors \<chromiumos-dev@chromium.org\>
+The ChromiumOS Authors \<chromiumos-dev@chromium.org\>
 
 ## Copyright
 
-Copyright © 2011 The Chromium OS Authors License BSD-like.
+Copyright © 2011 The ChromiumOS Authors License BSD-like.
 
 ## See Also
 

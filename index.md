@@ -45,7 +45,7 @@ The following talk serves as a good introduction to Minijail and how it can be u
 [video](https://drive.google.com/file/d/0BwPS_JpKyELWZTFBcTVsa1hhYjA/preview)
 [slides](https://docs.google.com/presentation/d/1r6LpvDZtYrsl7ryOV4HtpUR-phfCLRL6PA-chcL1Kno/present)
 
-The Chromium OS project has a
+The ChromiumOS project has a
 [comprehensive sandboxing guide](https://chromium.googlesource.com/chromiumos/docs/+/master/sandboxing.md)
 that is largely based on Minijail.
 
