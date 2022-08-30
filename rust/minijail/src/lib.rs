@@ -1196,7 +1196,7 @@ fi
     #[test]
     fn runnable_fd_success() {
         let bin_file = File::open("/bin/true").unwrap();
-        // On Chrome OS targets /bin/true is actually a script, so drop CLOEXEC to prevent ENOENT.
+        // On ChromeOS targets /bin/true is actually a script, so drop CLOEXEC to prevent ENOENT.
         clear_cloexec(&bin_file).unwrap();
 
         let j = Minijail::new().unwrap();

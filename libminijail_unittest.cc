@@ -1078,7 +1078,7 @@ namespace {
 
 // Tests that require userns access.
 // Android unit tests don't currently support entering user namespaces as
-// unprivileged users due to having an older kernel.  Chrome OS unit tests
+// unprivileged users due to having an older kernel.  ChromeOS unit tests
 // don't support it either due to being in a chroot environment (see man 2
 // clone for more information about failure modes with the CLONE_NEWUSER flag).
 class NamespaceTest : public ::testing::Test {

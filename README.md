@@ -12,7 +12,7 @@ There might be other copies floating around, but this is the official one!
 
 ## What is it?
 
-Minijail is a sandboxing and containment tool used in Chrome OS and Android.
+Minijail is a sandboxing and containment tool used in ChromeOS and Android.
 It provides an executable that can be used to launch and sandbox other programs,
 and a library that can be used by code to sandbox itself.
 
@@ -67,7 +67,7 @@ The following talk serves as a good introduction to Minijail and how it can be u
 
 ## Example usage
 
-The Chromium OS project has a comprehensive
+The ChromiumOS project has a comprehensive
 [sandboxing](https://chromium.googlesource.com/chromiumos/docs/+/master/sandboxing.md)
 document that is largely based on Minijail.
 
@@ -100,7 +100,7 @@ Q. "Why is it called minijail0?"
 
 A. It is minijail0 because it was a rewrite of an earlier program named
 minijail, which was considerably less mini, and in particular had a dependency
-on libchrome (the Chrome OS packaged version of Chromium's //base).  We needed a
+on libchrome (the ChromeOS packaged version of Chromium's //base).  We needed a
 new name to not collide with the deprecated one.
 
 We didn't want to call it minijail2 or something that would make people
