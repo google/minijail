@@ -38,7 +38,7 @@ $ cd minijail
 Check out the [minijail0(1)](./minijail0.1) and [minijail0(5)](./minijail0.5)
 online man pages for more details about using Minijail.
 
-See the [tools/README.md](https://github.com/google/minijail/blob/master/tools/README.md)
+See the [tools/README.md](https://github.com/google/minijail/blob/HEAD/tools/README.md)
 document for info about extra tools we provide to help with development.
 
 The following talk serves as a good introduction to Minijail and how it can be used.
@@ -46,7 +46,7 @@ The following talk serves as a good introduction to Minijail and how it can be u
 [slides](https://docs.google.com/presentation/d/1r6LpvDZtYrsl7ryOV4HtpUR-phfCLRL6PA-chcL1Kno/present)
 
 The ChromiumOS project has a
-[comprehensive sandboxing guide](https://chromium.googlesource.com/chromiumos/docs/+/master/sandboxing.md)
+[comprehensive sandboxing guide](https://chromium.googlesource.com/chromiumos/docs/+/HEAD/sandboxing.md)
 that is largely based on Minijail.
 
 ## Building
@@ -54,7 +54,7 @@ that is largely based on Minijail.
 Just run `make` and you're good to go!
 
 If that doesn't work out, please see the
-[HACKING.md](https://github.com/google/minijail/blob/master/HACKING.md)
+[HACKING.md](https://github.com/google/minijail/blob/HEAD/HACKING.md)
 document for more details.
 
 ## Examples
