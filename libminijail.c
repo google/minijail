@@ -196,6 +196,7 @@ struct minijail {
 	struct minijail_remount *remounts_head;
 	struct minijail_remount *remounts_tail;
 	size_t tmpfs_size;
+	bool using_minimalistic_mountns;
 	struct fs_rule *fs_rules_head;
 	struct fs_rule *fs_rules_tail;
 	char *cgroups[MAX_CGROUPS];
@@ -322,6 +323,14 @@ int add_fs_restriction_path(struct minijail *j,
 	return 0;
 }
 
+bool mount_has_bind_flag(struct mountpoint *m) {
+	return !!(m->flags & MS_BIND);
+}
+
+bool mount_has_readonly_flag(struct mountpoint *m) {
+	return !!(m->flags & MS_RDONLY);
+}
+
 /*
  * Strip out flags meant for the child.
  * We keep things that are inherited across execve(2).
@@ -364,6 +373,7 @@ struct minijail API *minijail_new(void)
 	struct minijail *j = calloc(1, sizeof(struct minijail));
 	if (j) {
 		j->remount_mode = MS_PRIVATE;
+		j->using_minimalistic_mountns = false;
 	}
 	return j;
 }
@@ -512,6 +522,58 @@ void API minijail_log_seccomp_filter_failures(struct minijail *j)
 		warn("non-debug build: ignoring request to enable seccomp "
 		     "logging");
 	}
+}
+
+void API minijail_set_using_minimalistic_mountns(struct minijail *j)
+{
+	j->using_minimalistic_mountns = true;
+}
+
+void API minijail_add_minimalistic_mountns_fs_rules(struct minijail *j)
+{
+	struct mountpoint *m = j->mounts_head;
+	bool landlock_enabled_by_profile = false;
+	if (!j->using_minimalistic_mountns)
+		return;
+
+	/* TODO(b/244966913): support non-bind mounts.*/
+	while (m) {
+		if (!mount_has_bind_flag(m))
+			return;
+		m = m->next;
+	}
+
+	/* Apply Landlock rules. */
+	m = j->mounts_head;
+	while (m) {
+		landlock_enabled_by_profile = true;
+		minijail_add_fs_restriction_rx(j, m->dest);
+		/* Allow rw if mounted as writable.*/
+		if (!mount_has_readonly_flag(m))
+			minijail_add_fs_restriction_rw(j, m->dest);
+		m = m->next;
+	}
+	if (landlock_enabled_by_profile) {
+		minijail_enable_default_fs_restrictions(j);
+		minijail_add_fs_restriction_edit(j, "/dev");
+		minijail_add_fs_restriction_ro(j, "/proc");
+		if (j->flags.vfs)
+			minijail_add_fs_restriction_rw(j, "/tmp");
+	}
+}
+
+void API minijail_enable_default_fs_restrictions(struct minijail *j)
+{
+	// Common library locations.
+	minijail_add_fs_restriction_rx(j, "/lib");
+	minijail_add_fs_restriction_rx(j, "/lib64");
+	minijail_add_fs_restriction_rx(j, "/usr/lib");
+	minijail_add_fs_restriction_rx(j, "/usr/lib64");
+	// Common locations for services invoking Minijail.
+	minijail_add_fs_restriction_rx(j, "/bin");
+	minijail_add_fs_restriction_rx(j, "/sbin");
+	minijail_add_fs_restriction_rx(j, "/usr/sbin");
+	minijail_add_fs_restriction_rx(j, "/usr/bin");
 }
 
 void API minijail_use_caps(struct minijail *j, uint64_t capmask)
@@ -874,6 +936,13 @@ int API minijail_add_fs_restriction_advanced_rw(struct minijail *j,
 {
 	return !add_fs_restriction_path(j, path,
 		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_FULL_WRITE);
+}
+
+int API minijail_add_fs_restriction_edit(struct minijail *j,
+						const char *path)
+{
+	return !add_fs_restriction_path(j, path,
+		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_EDIT);
 }
 
 static bool is_valid_bind_path(const char *path)
@@ -1817,7 +1886,7 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 	int ret;
 	char *dest;
 	bool do_remount = false;
-	bool has_bind_flag = !!(m->flags & MS_BIND);
+	bool has_bind_flag = mount_has_bind_flag(m);
 	bool has_remount_flag = !!(m->flags & MS_REMOUNT);
 	unsigned long original_mnt_flags = 0;
 

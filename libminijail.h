@@ -106,6 +106,10 @@ void minijail_use_seccomp(struct minijail *j);
 void minijail_no_new_privs(struct minijail *j);
 void minijail_use_seccomp_filter(struct minijail *j);
 void minijail_set_seccomp_filter_tsync(struct minijail *j);
+/* Sets using_minimalistic_mountns to true. */
+void minijail_set_using_minimalistic_mountns(struct minijail *j);
+void minijail_add_minimalistic_mountns_fs_rules(struct minijail *j);
+void minijail_enable_default_fs_restrictions(struct minijail *j);
 /*
  * Allow speculative execution features that may cause data leaks across
  * processes, by setting the SECCOMP_FILTER_FLAG_SPEC_ALLOW seccomp flag.
@@ -203,6 +207,9 @@ int minijail_add_fs_restriction_rw(struct minijail *j, const char *path);
 /* Adds a path with read and advanced write permissions. */
 int minijail_add_fs_restriction_advanced_rw(struct minijail *j,
 					    const char *path);
+
+/* Adds a path with read and write permissions that exclude create. */
+int minijail_add_fs_restriction_edit(struct minijail *j, const char *path);
 
 /*
  * Install signal handlers in the minijail process that forward received
