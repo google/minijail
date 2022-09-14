@@ -6,6 +6,7 @@
  * Utility functions for unit tests.
  */
 
+#include <errno.h>
 #include <ftw.h>
 #include <stdio.h>
 #include <stdlib.h>
