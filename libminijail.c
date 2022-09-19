@@ -331,6 +331,10 @@ bool mount_has_readonly_flag(struct mountpoint *m) {
 	return !!(m->flags & MS_RDONLY);
 }
 
+bool mount_events_allowed(struct mountpoint *m) {
+	return !!(m->flags & MS_SHARED) || !!(m->flags & MS_SLAVE);
+}
+
 /*
  * Strip out flags meant for the child.
  * We keep things that are inherited across execve(2).
@@ -536,20 +540,12 @@ void API minijail_add_minimalistic_mountns_fs_rules(struct minijail *j)
 	if (!j->using_minimalistic_mountns)
 		return;
 
-	/* TODO(b/244966913): support non-bind mounts.*/
-	while (m) {
-		if (!mount_has_bind_flag(m))
-			return;
-		m = m->next;
-	}
-
 	/* Apply Landlock rules. */
-	m = j->mounts_head;
 	while (m) {
 		landlock_enabled_by_profile = true;
 		minijail_add_fs_restriction_rx(j, m->dest);
-		/* Allow rw if mounted as writable.*/
-		if (!mount_has_readonly_flag(m))
+		/* Allow rw if mounted as writable, or mount flags allow mount events.*/
+		if (!mount_has_readonly_flag(m) || mount_events_allowed(m))
 			minijail_add_fs_restriction_rw(j, m->dest);
 		m = m->next;
 	}
