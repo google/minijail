@@ -3,6 +3,7 @@
  * found in the LICENSE file.
  */
 
+#include <ctype.h>
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
@@ -692,17 +693,26 @@ static int getopt_from_conf(const struct option *longopts,
 	/* Look up a matching long option. */
 	size_t i = 0;
 	const struct option *curr_opt;
+	bool long_option_found = false;
 	for (curr_opt = &longopts[0]; curr_opt->name != NULL;
 	     curr_opt = &longopts[++i])
-		if (streq(entry->key, curr_opt->name))
+		if (streq(entry->key, curr_opt->name)) {
+			long_option_found = true;
+			opt = curr_opt->val;
 			break;
-	if (curr_opt->name == NULL) {
+		}
+
+	/* Look up matching short option. */
+	if (!long_option_found && strlen(entry->key) == 1
+		&& isalpha(*entry->key)
+	    && strchr(optstring, *entry->key) != NULL) {
+		opt = *entry->key;
+	} else if (curr_opt->name == NULL) {
 		errx(1,
 		     "Unable to recognize '%s' as Minijail conf entry key, "
 		     "please refer to minijail0(5) for syntax and examples.",
 		     entry->key);
 	}
-	opt = curr_opt->val;
 	optarg = (char *)entry->value;
 	(*conf_index)++;
 	return opt;
