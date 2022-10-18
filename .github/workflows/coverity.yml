@@ -29,8 +29,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Install system packages
       run: sudo apt-get install -y libcap-dev
-    - uses: vapier/coverity-scan-action@v0
+    - uses: vapier/coverity-scan-action@v1
       with:
-        project: google%2Fminijail
-        email: vapier@google.com
+        email: ${{ secrets.COVERITY_SCAN_EMAIL }}
         token: ${{ secrets.COVERITY_SCAN_TOKEN }}
