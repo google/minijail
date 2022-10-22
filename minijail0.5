@@ -5,142 +5,158 @@ minijail0 \- sandbox a process
 .PP
 Runs PROGRAM inside a sandbox. See \fBminijail0\fR(1) for details.
 .SH EXAMPLES
-
 Safely switch from user \fIroot\fR to \fInobody\fR, switch to primary group
 \fInobody\fR, drop all capabilities, and inherit any supplementary groups from
 user \fInobody\fR:
-
-  # minijail0 -u nobody -g nobody -c 0 -G /usr/bin/whoami
-  nobody
-
+.IP
+.EX
+# minijail0 -u nobody -g nobody -c 0 -G /usr/bin/whoami
+nobody
+.EE
+.PP
 Run in a PID and VFS namespace without superuser capabilities (but still
 as root) and with a private view of /proc:
-
-  # minijail0 -p -v -r -c 0 /bin/ps
-    PID TTY           TIME CMD
-      1 pts/0     00:00:00 minijail0
-      2 pts/0     00:00:00 ps
-
+.IP
+.EX
+# minijail0 -p -v -r -c 0 /bin/ps
+  PID TTY           TIME CMD
+    1 pts/0     00:00:00 minijail0
+    2 pts/0     00:00:00 ps
+.EE
+.PP
 Running a process with a seccomp filter policy at reduced privileges:
-
-  # minijail0 -S /usr/share/minijail0/$(uname -m)/cat.policy -- \\
-              /bin/cat /proc/self/seccomp_filter
-  ...
-
+.IP
+.EX
+# minijail0 -S /usr/share/minijail0/$(uname -m)/cat.policy -- \\
+            /bin/cat /proc/self/seccomp_filter
+...
+.EE
 .SH SECCOMP_FILTER POLICY
 The policy file supplied to the \fB-S\fR argument supports the following syntax:
-
-  \fB<syscall_name>\fR:\fB<ftrace filter policy>\fR
-  \fB<syscall_number>\fR:\fB<ftrace filter policy>\fR
-  \fB<empty line>\fR
-  \fB# any single line comment\fR
-
+.IP
+.EX
+\fB<syscall_name>\fR:\fB<ftrace filter policy>\fR
+\fB<syscall_number>\fR:\fB<ftrace filter policy>\fR
+\fB<empty line>\fR
+\fB# any single line comment\fR
+.EE
+.PP
 Long lines may be broken up using \\ at the end.
-
+.PP
 A policy that emulates \fBseccomp\fR(2) in mode 1 may look like:
-  read: 1
-  write: 1
-  sig_return: 1
-  exit: 1
-
+.IP
+.EX
+read: 1
+write: 1
+sig_return: 1
+exit: 1
+.EE
+.PP
 The "1" acts as a wildcard and allows any use of the mentioned system
 call.  More advanced filtering is possible if your kernel supports
 CONFIG_FTRACE_SYSCALLS.  For example, we can allow a process to open any
 file read only and mmap PROT_READ only:
-
-  # open with O_LARGEFILE|O_RDONLY|O_NONBLOCK or some combination
-  open: arg1 == 32768 || arg1 == 0 || arg1 == 34816 || arg1 == 2048
-  mmap2: arg2 == 0x0
-  munmap: 1
-  close: 1
-
+.IP
+.EX
+# open with O_LARGEFILE|O_RDONLY|O_NONBLOCK or some combination.
+open: arg1 == 32768 || arg1 == 0 || arg1 == 34816 || arg1 == 2048
+mmap2: arg2 == 0x0
+munmap: 1
+close: 1
+.EE
+.PP
 The supported arguments may be found by reviewing the system call
 prototypes in the Linux kernel source code.  Be aware that any
 non-numeric comparison may be subject to time-of-check-time-of-use
 attacks and cannot be considered safe.
-
+.PP
 \fBexecve\fR may only be used when invoking with CAP_SYS_ADMIN privileges.
-
+.PP
 In order to promote reusability, policy files can include other policy files
 using the following syntax:
-
-  \fB@include /absolute/path/to/file.policy\fR
-  \fB@include ./path/relative/to/CWD/file.policy\fR
-
+.IP
+.EX
+\fB@include /absolute/path/to/file.policy\fR
+\fB@include ./path/relative/to/CWD/file.policy\fR
+.EE
+.PP
 Inclusion is limited to a single level (i.e. files that are \fB@include\fRd
 cannot themselves \fB@include\fR more files), since that makes the policies
 harder to understand.
-
 .SH SECCOMP_FILTER SYNTAX
 More formally, the expression after the colon can be an expression in
 Disjunctive Normal Form (DNF): a disjunction ("or", \fI||\fR) of
 conjunctions ("and", \fI&&\fR) of atoms.
-
 .SS "Atom Syntax"
 Atoms are of the form \fIarg{DNUM} {OP} {VAL}\fR where:
-.IP
-\[bu] \fIDNUM\fR is a decimal number
-
-\[bu] \fIOP\fR is an unsigned comparison operator:
+.IP \(bu 3
+\fIDNUM\fR is a decimal number
+.IP \(bu
+\fIOP\fR is an unsigned comparison operator:
 \fI==\fR, \fI!=\fR, \fI<\fR, \fI<=\fR, \fI>\fR, \fI>=\fR, \fI&\fR (flags set),
 or \fIin\fR (inclusion)
-
-\[bu] \fVAL\fR is a constant expression.  It can be a named constant (like
+.IP \(bu
+\fIVAL\fR is a constant expression.  It can be a named constant (like
 \fBO_RDONLY\fR), a number (octal, decimal, or hexadecimal), a mask of constants
 separated by \fI|\fR, or a parenthesized constant expression. Constant
 expressions can also be prefixed with the bitwise complement operator \fI~\fR
 to produce their complement.
-.RE
-
+.PP
 \fI==\fR, \fI!=\fR, \fI<\fR, \fI<=\fR, \fI>\fR, and \fI>=\fR should be pretty
 self explanatory.
-
+.PP
 \fI&\fR will test for a flag being set, for example, O_RDONLY for
 .BR open (2):
-
-  open: arg1 & O_RDONLY
-
+.IP
+.EX
+open: arg1 & O_RDONLY
+.EE
+.PP
 Minijail supports most common named constants, like O_RDONLY.
 It's preferable to use named constants rather than numeric values as not all
 architectures use the same numeric value.
-
+.PP
 When the possible combinations of allowed flags grow, specifying them all can
 be cumbersome.
 This is where the \fIin\fR operator comes handy.
 The system call will be allowed iff the flags set in the argument are included
 (as a set) in the flags in the policy:
-
-  mmap: arg3 in MAP_PRIVATE|MAP_ANONYMOUS
-
+.IP
+.EX
+mmap: arg3 in MAP_PRIVATE|MAP_ANONYMOUS
+.EE
+.PP
 This will allow \fBmmap\fR(2) as long as \fIarg3\fR (flags) has any combination
 of MAP_PRIVATE and MAP_ANONYMOUS, but nothing else.  One common use of this is
 to restrict \fBmmap\fR(2) / \fBmprotect\fR(2) to only allow write^exec
 mappings:
-
-  mmap: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
-  mprotect: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
-
+.IP
+.EX
+mmap: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
+mprotect: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
+.EE
 .SS "Return Values"
-
 By default, blocked syscalls call the process to be killed.
 The \fIreturn {NUM}\fR syntax can be used to force a specific errno to be
 returned instead.
-
-  read: return EBADF
-
+.IP
+.EX
+read: return EBADF
+.EE
+.PP
 This expression will block the \fBread\fR(2) syscall, make it return -1, and set
 \fBerrno\fR to EBADF (9 on x86 platforms).
-
+.PP
 An expression can also include an optional \fIreturn <errno>\fR clause,
 separated by a semicolon:
-
-  read: arg0 == 0; return EBADF
-
+.IP
+.EX
+read: arg0 == 0; return EBADF
+.EE
+.PP
 This is, if the first argument to read is 0, then allow the syscall;
 else, block the syscall, return -1, and set \fBerrno\fR to EBADF.
-
 .SH SECCOMP_FILTER POLICY WRITING
-
 Determining policy for seccomp_filter can be time consuming.  System
 calls are often named in arch-specific, or legacy tainted, ways.  E.g.,
 geteuid versus geteuid32.  On process death due to a seccomp filter
@@ -152,32 +168,34 @@ with the output of \fBstrace -f -e raw=all <program>\fR can generate the list
 of system calls that are needed.  Note that when using libminijail or minijail
 with preloading, supporting initial process setup calls will not be required.
 Be conservative.
-
+.PP
 It's also possible to analyze the binary checking for all non-dead
 functions and determining if any of them issue system calls.  There is
 no active implementation for this, but something like
 code.google.com/p/seccompsandbox is one possible runtime variant.
-
 .SH CONFIGURATION FILE
 A configuration file can be used to specify command line options and other
 settings.
-
+.PP
 It supports the following syntax:
-  \fB% minijail-config-file v0\fR
-  \fB<option>\fR=\fB<argument>\fR
-  \fB<no-argument-option>\fR
-  \fB<empty line>\fR
-  \fB# any single line comment\fR
-
+.IP
+.EX
+\fB% minijail-config-file v0\fR
+\fB<option>\fR=\fB<argument>\fR
+\fB<no-argument-option>\fR
+\fB<empty line>\fR
+\fB# any single line comment\fR
+.EE
+.PP
 Long lines may be broken up using \\ at the end.
-
+.PP
 The special directive "% minijail-config-file v0" must occupy the first line.
 "v0" also declares the version of the config file format.
-
+.PP
 Keys contain only alphabetic characters and '-'. Values can be any non-empty
 string. Leading and trailing whitespaces around keys and
 values are permitted but will be stripped before processing.
-
+.PP
 Currently all long options are supported such as
 \fBmount\fR, \fBbind-mount\fR. For a option that has no argument, the option
 will occupy a single line, without '=' and value. Otherwise, any string that
