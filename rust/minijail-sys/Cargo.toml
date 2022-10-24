@@ -1,6 +1,6 @@
 [package]
 name = "minijail-sys"
-version = "0.0.13"
+version = "0.0.14"
 description = "Provides raw (unsafe) bindings to the libminijail C library."
 authors = ["The ChromiumOS Authors"]
 edition = "2018"
@@ -13,5 +13,6 @@ path = "lib.rs"
 libc = "0.2.44"
 
 [build-dependencies]
+bindgen = "0.59"
 pkg-config = "0.3"
 which = "4.0.0"

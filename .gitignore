@@ -45,3 +45,6 @@ minijail.code-workspace
 # IntelliJ projects.
 .idea
 
+# Generated code:
+/rust/minijail-sys/libminijail.rs
+
