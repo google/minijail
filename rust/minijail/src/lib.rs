@@ -906,8 +906,8 @@ impl Minijail {
         }
 
         match cmd.program {
-            Program::Filename(ref path) => path.as_path().run_command(&self, &cmd),
-            Program::FileDescriptor(fd) => fd.run_command(&self, &cmd),
+            Program::Filename(ref path) => path.as_path().run_command(self, &cmd),
+            Program::FileDescriptor(fd) => fd.run_command(self, &cmd),
         }
     }
 
@@ -1100,7 +1100,7 @@ mod tests {
         j.no_new_privs();
         j.parse_seccomp_filters("src/test_filter.policy").unwrap();
         j.use_seccomp_filter();
-        j.run("/bin/true", &[], &EMPTY_STRING_SLICE).unwrap();
+        j.run("/bin/true", &[], EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
@@ -1152,7 +1152,7 @@ fi
     #[test]
     fn wait_success() {
         let j = Minijail::new().unwrap();
-        j.run("/bin/true", &[1, 2], &EMPTY_STRING_SLICE).unwrap();
+        j.run("/bin/true", &[1, 2], EMPTY_STRING_SLICE).unwrap();
         expect_result!(j.wait(), Ok(()));
     }
 
@@ -1171,21 +1171,21 @@ fi
     #[test]
     fn wait_returncode() {
         let j = Minijail::new().unwrap();
-        j.run("/bin/false", &[1, 2], &EMPTY_STRING_SLICE).unwrap();
+        j.run("/bin/false", &[1, 2], EMPTY_STRING_SLICE).unwrap();
         expect_result!(j.wait(), Err(Error::ReturnCode(1)));
     }
 
     #[test]
     fn wait_noaccess() {
         let j = Minijail::new().unwrap();
-        j.run("/dev/null", &[1, 2], &EMPTY_STRING_SLICE).unwrap();
+        j.run("/dev/null", &[1, 2], EMPTY_STRING_SLICE).unwrap();
         expect_result!(j.wait(), Err(Error::NoAccess));
     }
 
     #[test]
     fn wait_nocommand() {
         let j = Minijail::new().unwrap();
-        j.run("/bin/does not exist", &[1, 2], &EMPTY_STRING_SLICE)
+        j.run("/bin/does not exist", &[1, 2], EMPTY_STRING_SLICE)
             .unwrap();
         // TODO(b/194221986) Fix libminijail so that Error::NoAccess is not sometimes returned.
         assert!(matches!(
@@ -1201,7 +1201,7 @@ fi
         clear_cloexec(&bin_file).unwrap();
 
         let j = Minijail::new().unwrap();
-        j.run_fd(&bin_file, &[1, 2], &EMPTY_STRING_SLICE).unwrap();
+        j.run_fd(&bin_file, &[1, 2], EMPTY_STRING_SLICE).unwrap();
         expect_result!(j.wait(), Ok(()));
     }
 
@@ -1223,7 +1223,7 @@ fi
     fn chroot() {
         let mut j = Minijail::new().unwrap();
         j.enter_chroot(".").unwrap();
-        j.run("/bin/true", &[], &EMPTY_STRING_SLICE).unwrap();
+        j.run("/bin/true", &[], EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
@@ -1231,13 +1231,13 @@ fi
     fn namespace_vfs() {
         let mut j = Minijail::new().unwrap();
         j.namespace_vfs();
-        j.run("/bin/true", &[], &EMPTY_STRING_SLICE).unwrap();
+        j.run("/bin/true", &[], EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
     fn run() {
         let j = Minijail::new().unwrap();
-        j.run("/bin/true", &[], &EMPTY_STRING_SLICE).unwrap();
+        j.run("/bin/true", &[], EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
@@ -1245,8 +1245,8 @@ fi
         let j = Minijail::new().unwrap();
         let b = j.try_clone().unwrap();
         // Pass the same FDs to both clones and make sure they don't conflict.
-        j.run("/bin/true", &[1, 2], &EMPTY_STRING_SLICE).unwrap();
-        b.run("/bin/true", &[1, 2], &EMPTY_STRING_SLICE).unwrap();
+        j.run("/bin/true", &[1, 2], EMPTY_STRING_SLICE).unwrap();
+        b.run("/bin/true", &[1, 2], EMPTY_STRING_SLICE).unwrap();
     }
 
     #[test]
