@@ -1235,6 +1235,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	if (tmp_size)
 		minijail_mount_tmp_size(j, tmp_size);
 
+	/* Add Landlock rules for each processed mount arg. */
+	minijail_add_minimalistic_mountns_fs_rules(j);
+
 	/*
 	 * Copy our current env to the child if its |*envp| has not
 	 * already been initialized from --env-(reset|add) usage.

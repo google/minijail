@@ -197,6 +197,7 @@ struct minijail {
 	struct minijail_remount *remounts_tail;
 	size_t tmpfs_size;
 	bool using_minimalistic_mountns;
+	bool enable_profile_fs_restrictions;
 	struct fs_rule *fs_rules_head;
 	struct fs_rule *fs_rules_tail;
 	char *cgroups[MAX_CGROUPS];
@@ -378,6 +379,8 @@ struct minijail API *minijail_new(void)
 	if (j) {
 		j->remount_mode = MS_PRIVATE;
 		j->using_minimalistic_mountns = false;
+		/* TODO(b/255228171): set to true by default. */
+		j->enable_profile_fs_restrictions = false;
 	}
 	return j;
 }
@@ -537,7 +540,7 @@ void API minijail_add_minimalistic_mountns_fs_rules(struct minijail *j)
 {
 	struct mountpoint *m = j->mounts_head;
 	bool landlock_enabled_by_profile = false;
-	if (!j->using_minimalistic_mountns)
+	if (!j->using_minimalistic_mountns || !j->enable_profile_fs_restrictions)
 		return;
 
 	/* Apply Landlock rules. */
