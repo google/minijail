@@ -186,6 +186,11 @@ struct minijail {
 	char *gidmap;
 	char *hostname;
 	char *preload_path;
+	/*
+	 * Filename that will be executed, unless an ELF fd is used instead.
+	 * This field is only used for logs and isn't included in marshaling.
+	 */
+	char *filename;
 	size_t filter_len;
 	struct sock_fprog *filter_prog;
 	char *alt_syscall_table;
@@ -1516,6 +1521,7 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 
 	/* Potentially stale pointers not used as signals. */
 	j->preload_path = NULL;
+	j->filename = NULL;
 	j->pid_file_path = NULL;
 	j->uidmap = NULL;
 	j->gidmap = NULL;
@@ -2432,6 +2438,9 @@ static void apply_landlock_restrictions(const struct minijail *j)
 	}
 
 	if (ruleset_fd >= 0) {
+		if (j->filename != NULL) {
+			info("Applying Landlock to process %s", j->filename);
+		}
 		if (landlock_restrict_self(ruleset_fd, 0)) {
 			pdie("Failed to enforce ruleset");
 		}
@@ -3411,6 +3420,9 @@ static int minijail_run_internal(struct minijail *j,
 	if (config->filename != NULL && config->elf_fd != -1) {
 		die("filename and elf_fd cannot be set at the same time");
 	}
+	if (config->filename != NULL) {
+		j->filename = strdup(config->filename);
+	}
 
 	/*
 	 * Only copy the environment if we need to modify it. If this is done
@@ -3961,6 +3973,8 @@ void API minijail_destroy(struct minijail *j)
 		free(j->hostname);
 	if (j->preload_path)
 		free(j->preload_path);
+	if (j->filename)
+		free(j->filename);
 	if (j->alt_syscall_table)
 		free(j->alt_syscall_table);
 	for (i = 0; i < j->cgroup_count; ++i)
