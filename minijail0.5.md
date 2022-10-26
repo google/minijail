@@ -1,16 +1,16 @@
 # minijail0(5): sandbox a process
 
-  - [Description](#description)
-  - [Examples](#examples)
-  - [Seccomp\_Filter Policy](#seccomp_filter-policy)
-  - [Seccomp\_Filter Syntax](#seccomp_filter-syntax)
-      - [Atom Syntax](#atom-syntax)
-      - [Return Values](#return-values)
-  - [Seccomp\_Filter Policy Writing](#seccomp_filter-policy-writing)
-  - [Configuration File](#configuration-file)
-  - [Author](#author)
-  - [Copyright](#copyright)
-  - [See Also](#see-also)
+- [Description](#description)
+- [Examples](#examples)
+- [Seccomp_Filter Policy](#seccomp_filter-policy)
+- [Seccomp_Filter Syntax](#seccomp_filter-syntax)
+  - [Atom Syntax](#atom-syntax)
+  - [Return Values](#return-values)
+- [Seccomp_Filter Policy Writing](#seccomp_filter-policy-writing)
+- [Configuration File](#configuration-file)
+- [Author](#author)
+- [Copyright](#copyright)
+- [See Also](#see-also)
 
 ## Description
 
@@ -39,9 +39,9 @@ Running a process with a seccomp filter policy at reduced privileges:
     # minijail0 -S /usr/share/minijail0/$(uname -m)/cat.policy -- \
                 /bin/cat /proc/self/seccomp_filter
 
-## Seccomp\_Filter Policy
+## Seccomp_Filter Policy
 
-The policy file supplied to the **\-S** argument supports the following
+The policy file supplied to the **-S** argument supports the following
 syntax:
 
     <syscall_name>:<ftrace filter policy>
@@ -60,10 +60,10 @@ in mode 1 may look like:
     sig_return: 1
     exit: 1
 
-The "1" acts as a wildcard and allows any use of the mentioned system
+The \"1\" acts as a wildcard and allows any use of the mentioned system
 call. More advanced filtering is possible if your kernel supports
-CONFIG\_FTRACE\_SYSCALLS. For example, we can allow a process to open
-any file read only and mmap PROT\_READ only:
+CONFIG_FTRACE_SYSCALLS. For example, we can allow a process to open any
+file read only and mmap PROT_READ only:
 
     # open with O_LARGEFILE|O_RDONLY|O_NONBLOCK or some combination.
     open: arg1 == 32768 || arg1 == 0 || arg1 == 34816 || arg1 == 2048
@@ -76,8 +76,7 @@ prototypes in the Linux kernel source code. Be aware that any
 non-numeric comparison may be subject to time-of-check-time-of-use
 attacks and cannot be considered safe.
 
-**execve** may only be used when invoking with CAP\_SYS\_ADMIN
-privileges.
+**execve** may only be used when invoking with CAP_SYS_ADMIN privileges.
 
 In order to promote reusability, policy files can include other policy
 files using the following syntax:
@@ -89,36 +88,36 @@ Inclusion is limited to a single level (i.e. files that are
 **@include**d cannot themselves **@include** more files), since that
 makes the policies harder to understand.
 
-## Seccomp\_Filter Syntax
+## Seccomp_Filter Syntax
 
 More formally, the expression after the colon can be an expression in
-Disjunctive Normal Form (DNF): a disjunction ("or", *||*) of
-conjunctions ("and", *&&*) of atoms.
+Disjunctive Normal Form (DNF): a disjunction (\"or\", *\|\|*) of
+conjunctions (\"and\", *&&*) of atoms.
 
 ### Atom Syntax
 
 Atoms are of the form *arg{DNUM} {OP} {VAL}* where:
 
-  - *DNUM* is a decimal number
+- *DNUM* is a decimal number
 
-  - *OP* is an unsigned comparison operator: *==*, *\!=*, *\<*, *\<=*,
-    *\>*, *\>=*, *&* (flags set), or *in* (inclusion)
+- *OP* is an unsigned comparison operator: *==*, *!=*, *\<*, *\<=*,
+  *\>*, *\>=*, *&* (flags set), or *in* (inclusion)
 
-  - *VAL* is a constant expression. It can be a named constant (like
-    **O\_RDONLY**), a number (octal, decimal, or hexadecimal), a mask of
-    constants separated by *|*, or a parenthesized constant expression.
-    Constant expressions can also be prefixed with the bitwise
-    complement operator *\~* to produce their complement.
+- *VAL* is a constant expression. It can be a named constant (like
+  **O_RDONLY**), a number (octal, decimal, or hexadecimal), a mask of
+  constants separated by *\|*, or a parenthesized constant expression.
+  Constant expressions can also be prefixed with the bitwise complement
+  operator *\~* to produce their complement.
 
-*==*, *\!=*, *\<*, *\<=*, *\>*, and *\>=* should be pretty self
+*==*, *!=*, *\<*, *\<=*, *\>*, and *\>=* should be pretty self
 explanatory.
 
-*&* will test for a flag being set, for example, O\_RDONLY for
+*&* will test for a flag being set, for example, O_RDONLY for
 [**open**(2)](https://man7.org/linux/man-pages/man2/open.2.html):
 
     open: arg1 & O_RDONLY
 
-Minijail supports most common named constants, like O\_RDONLY. It's
+Minijail supports most common named constants, like O_RDONLY. It\'s
 preferable to use named constants rather than numeric values as not all
 architectures use the same numeric value.
 
@@ -131,8 +130,8 @@ included (as a set) in the flags in the policy:
 
 This will allow
 [**mmap**(2)](https://man7.org/linux/man-pages/man2/mmap.2.html) as long
-as *arg3* (flags) has any combination of MAP\_PRIVATE and
-MAP\_ANONYMOUS, but nothing else. One common use of this is to restrict
+as *arg3* (flags) has any combination of MAP_PRIVATE and MAP_ANONYMOUS,
+but nothing else. One common use of this is to restrict
 [**mmap**(2)](https://man7.org/linux/man-pages/man2/mmap.2.html) /
 [**mprotect**(2)](https://man7.org/linux/man-pages/man2/mprotect.2.html)
 to only allow write^exec mappings:
@@ -161,21 +160,21 @@ separated by a semicolon:
 This is, if the first argument to read is 0, then allow the syscall;
 else, block the syscall, return -1, and set **errno** to EBADF.
 
-## Seccomp\_Filter Policy Writing
+## Seccomp_Filter Policy Writing
 
-Determining policy for seccomp\_filter can be time consuming. System
+Determining policy for seccomp_filter can be time consuming. System
 calls are often named in arch-specific, or legacy tainted, ways. E.g.,
 geteuid versus geteuid32. On process death due to a seccomp filter rule,
 the offending system call number will be supplied with a best guess of
 the ABI defined name. This information may be used to produce working
 baseline policies. However, if the process being contained has a fairly
-tight working domain, using **tools/generate\_seccomp\_policy.py** with
-the output of **strace \-f \-e raw=all \<program\>** can generate the
-list of system calls that are needed. Note that when using libminijail
-or minijail with preloading, supporting initial process setup calls will
+tight working domain, using **tools/generate_seccomp_policy.py** with
+the output of **strace -f -e raw=all \<program\>** can generate the list
+of system calls that are needed. Note that when using libminijail or
+minijail with preloading, supporting initial process setup calls will
 not be required. Be conservative.
 
-It's also possible to analyze the binary checking for all non-dead
+It\'s also possible to analyze the binary checking for all non-dead
 functions and determining if any of them issue system calls. There is no
 active implementation for this, but something like
 code.google.com/p/seccompsandbox is one possible runtime variant.
@@ -195,17 +194,17 @@ It supports the following syntax:
 
 Long lines may be broken up using \\ at the end.
 
-The special directive "% minijail-config-file v0" must occupy the first
-line. "v0" also declares the version of the config file format.
+The special directive \"% minijail-config-file v0\" must occupy the
+first line. \"v0\" also declares the version of the config file format.
 
-Keys contain only alphabetic characters and '-'. Values can be any
+Keys contain only alphabetic characters and \'-\'. Values can be any
 non-empty string. Leading and trailing whitespaces around keys and
 values are permitted but will be stripped before processing.
 
 Currently all long options are supported such as **mount**,
 **bind-mount**. For a option that has no argument, the option will
-occupy a single line, without '=' and value. Otherwise, any string that
-is given after the '=' is interpreted as the argument.
+occupy a single line, without \'=\' and value. Otherwise, any string
+that is given after the \'=\' is interpreted as the argument.
 
 ## Author
 
