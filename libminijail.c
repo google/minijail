@@ -2438,17 +2438,16 @@ static void apply_landlock_restrictions(const struct minijail *j)
 	}
 }
 
+static void set_no_new_privs(const struct minijail *j) {
+	if (j->flags.no_new_privs) {
+		if (!sys_set_no_new_privs()) {
+			die("set_no_new_privs() failed");
+		}
+	}
+}
+
 static void set_seccomp_filter(const struct minijail *j)
 {
-	/*
-	 * Set no_new_privs. See </kernel/seccomp.c> and </kernel/sys.c>
-	 * in the kernel source tree for an explanation of the parameters.
-	 */
-	if (j->flags.no_new_privs) {
-		if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
-			pdie("prctl(PR_SET_NO_NEW_PRIVS)");
-	}
-
 	/*
 	 * Code running with ASan
 	 * (https://github.com/google/sanitizers/wiki/AddressSanitizer)
@@ -2732,8 +2731,14 @@ void API minijail_enter(const struct minijail *j)
 		drop_ugid(j);
 		drop_caps(j, last_valid_cap);
 
-		// Landlock is applied as late as possible. If no_new_privs is
-		// set, then it can be applied after dropping caps.
+		/*
+		 * Landlock is applied as late as possible. If no_new_privs is
+		 * requested, then we need to set that first because the
+		 * landlock_restrict_self() syscall has a seccomp(2) like check
+		 * for that. See:
+		 * https://elixir.bootlin.com/linux/v5.15.74/source/security/landlock/syscalls.c#L409
+		 */
+		set_no_new_privs(j);
 		apply_landlock_restrictions(j);
 		set_seccomp_filter(j);
 	} else {

@@ -542,6 +542,20 @@ int seccomp_ret_kill_process_available(void)
 	return ret_kill_process_available;
 }
 
+bool sys_set_no_new_privs(void)
+{
+	/*
+	 * Set no_new_privs. See </kernel/seccomp.c> and </kernel/sys.c>
+	 * in the kernel source tree for an explanation of the parameters.
+	 */
+	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == 0) {
+		return true;
+	} else {
+		pwarn("prctl(PR_SET_NO_NEW_PRIVS) failed");
+		return false;
+	}
+}
+
 bool seccomp_filter_flags_available(unsigned int flags)
 {
 	return sys_seccomp(SECCOMP_SET_MODE_FILTER, flags, NULL) != -1 ||

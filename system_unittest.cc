@@ -248,6 +248,10 @@ TEST(seccomp_actions_available, smoke) {
   seccomp_ret_kill_process_available();
 }
 
+TEST(set_no_new_privs, basic) {
+  EXPECT_TRUE(sys_set_no_new_privs());
+}
+
 TEST(is_canonical_path, basic) {
   EXPECT_FALSE(is_canonical_path("/proc/self"));
   EXPECT_FALSE(is_canonical_path("relative"));

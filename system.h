@@ -59,6 +59,8 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 int lookup_user(const char *user, uid_t *uid, gid_t *gid);
 int lookup_group(const char *group, gid_t *gid);
 
+/* sys_set_no_new_privs: returns true if successful. */
+bool sys_set_no_new_privs(void);
 int seccomp_ret_log_available(void);
 int seccomp_ret_kill_process_available(void);
 bool seccomp_filter_flags_available(unsigned int flags);
