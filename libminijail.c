@@ -2412,7 +2412,7 @@ static void apply_landlock_restrictions(const struct minijail *j)
 				&ruleset_attr, sizeof(ruleset_attr), 0);
 			if (ruleset_fd < 0) {
 				const int err = errno;
-				pwarn("Failed to create a ruleset");
+				pwarn("failed to create a ruleset");
 				switch (err) {
 				case ENOSYS:
 					pwarn("Landlock is not supported by the current kernel");
@@ -2430,10 +2430,10 @@ static void apply_landlock_restrictions(const struct minijail *j)
 
 	if (ruleset_fd >= 0) {
 		if (j->filename != NULL) {
-			info("Applying Landlock to process %s", j->filename);
+			info("applying Landlock to process %s", j->filename);
 		}
 		if (landlock_restrict_self(ruleset_fd, 0)) {
-			pdie("Failed to enforce ruleset");
+			pdie("failed to enforce ruleset");
 		}
 	}
 }
