@@ -73,15 +73,6 @@
 	(MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_NOATIME | MS_NODIRATIME |       \
 	 MS_RELATIME | MS_RDONLY)
 
-/*
- * TODO(b/235960683): Drop this after CrOS upgrades to glibc >= 2.34
- * because MS_NOSYMFOLLOW will be defined in sys/mount.h.
- */
-#ifndef MS_NOSYMFOLLOW
-/* Added locally in kernels 4.x+. */
-#define MS_NOSYMFOLLOW 256
-#endif
-
 struct minijail_rlimit {
 	int type;
 	rlim_t cur;
