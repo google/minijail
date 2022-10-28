@@ -115,7 +115,9 @@ struct preserved_fd {
 
 struct minijail {
 	/*
-	 * WARNING: if you add a flag here you need to make sure it's
+	 * WARNING: new bool flags should always be added to this struct,
+	 * unless you’re certain they don’t need to remain after marshaling.
+	 * If you add a flag here you need to make sure it's
 	 * accounted for in minijail_pre{enter|exec}() below.
 	 */
 	struct {
@@ -159,6 +161,8 @@ struct minijail {
 		bool new_session_keyring : 1;
 		bool forward_signals : 1;
 		bool setsid : 1;
+		bool using_minimalistic_mountns : 1;
+		bool enable_profile_fs_restrictions : 1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -192,8 +196,6 @@ struct minijail {
 	struct minijail_remount *remounts_head;
 	struct minijail_remount *remounts_tail;
 	size_t tmpfs_size;
-	bool using_minimalistic_mountns;
-	bool enable_profile_fs_restrictions;
 	struct fs_rule *fs_rules_head;
 	struct fs_rule *fs_rules_tail;
 	char *cgroups[MAX_CGROUPS];
@@ -295,6 +297,8 @@ void minijail_preenter(struct minijail *j)
 	j->flags.forward_signals = 0;
 	j->flags.setsid = 0;
 	j->remount_mode = 0;
+	j->flags.using_minimalistic_mountns = 0;
+	j->flags.enable_profile_fs_restrictions = 0;
 	free_remounts_list(j);
 }
 
@@ -345,6 +349,8 @@ void minijail_preexec(struct minijail *j)
 	int uts = j->flags.uts;
 	int remount_proc_ro = j->flags.remount_proc_ro;
 	int userns = j->flags.userns;
+	int using_minimalistic_mountns = j->flags.using_minimalistic_mountns;
+	int enable_profile_fs_restrictions = j->flags.enable_profile_fs_restrictions;
 	if (j->user)
 		free(j->user);
 	j->user = NULL;
@@ -364,6 +370,8 @@ void minijail_preexec(struct minijail *j)
 	j->flags.uts = uts;
 	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
+	j->flags.using_minimalistic_mountns = using_minimalistic_mountns;
+	j->flags.enable_profile_fs_restrictions = enable_profile_fs_restrictions;
 	/* Note, |pids| will already have been used before this call. */
 }
 
@@ -374,9 +382,9 @@ struct minijail API *minijail_new(void)
 	struct minijail *j = calloc(1, sizeof(struct minijail));
 	if (j) {
 		j->remount_mode = MS_PRIVATE;
-		j->using_minimalistic_mountns = false;
+		j->flags.using_minimalistic_mountns = false;
 		/* TODO(b/255228171): set to true by default. */
-		j->enable_profile_fs_restrictions = false;
+		j->flags.enable_profile_fs_restrictions = false;
 	}
 	return j;
 }
@@ -529,14 +537,15 @@ void API minijail_log_seccomp_filter_failures(struct minijail *j)
 
 void API minijail_set_using_minimalistic_mountns(struct minijail *j)
 {
-	j->using_minimalistic_mountns = true;
+	j->flags.using_minimalistic_mountns = true;
 }
 
 void API minijail_add_minimalistic_mountns_fs_rules(struct minijail *j)
 {
 	struct mountpoint *m = j->mounts_head;
 	bool landlock_enabled_by_profile = false;
-	if (!j->using_minimalistic_mountns || !j->enable_profile_fs_restrictions)
+	if (!j->flags.using_minimalistic_mountns ||
+	    !j->flags.enable_profile_fs_restrictions)
 		return;
 
 	/* Apply Landlock rules. */
