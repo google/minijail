@@ -113,6 +113,10 @@ struct preserved_fd {
 	int child_fd;
 };
 
+/*
+ * minijail struct: new fields should either be marshaled/unmarshaled or have a
+ * comment explaining why that's unnecessary.
+ */
 struct minijail {
 	/*
 	 * WARNING: new bool flags should always be added to this struct,
@@ -198,6 +202,7 @@ struct minijail {
 	size_t tmpfs_size;
 	struct fs_rule *fs_rules_head;
 	struct fs_rule *fs_rules_tail;
+	size_t fs_rules_count;
 	char *cgroups[MAX_CGROUPS];
 	size_t cgroup_count;
 	struct minijail_rlimit rlimits[MAX_RLIMITS];
@@ -243,6 +248,17 @@ static void free_remounts_list(struct minijail *j)
 	}
 	// No need to clear remounts_head as we know it's NULL after the loop.
 	j->remounts_tail = NULL;
+}
+
+static void free_fs_rules_list(struct minijail *j)
+{
+	while (j->fs_rules_head) {
+		struct fs_rule *r = j->fs_rules_head;
+		j->fs_rules_head = j->fs_rules_head->next;
+		free(r->path);
+		free(r);
+	}
+	j->fs_rules_tail = NULL;
 }
 
 /*
@@ -321,6 +337,7 @@ int add_fs_restriction_path(struct minijail *j,
 		j->fs_rules_tail = r;
 	}
 
+	j->fs_rules_count++;
 	return 0;
 }
 
@@ -361,6 +378,7 @@ void minijail_preexec(struct minijail *j)
 		free(j->preload_path);
 	j->preload_path = NULL;
 	free_mounts_list(j);
+	free_fs_rules_list(j);
 	memset(&j->flags, 0, sizeof(j->flags));
 	/* Now restore anything we meant to keep. */
 	j->flags.vfs = vfs;
@@ -1456,10 +1474,19 @@ static void marshal_mount(struct marshal_state *state,
 	marshal_append(state, (char *)&m->flags, sizeof(m->flags));
 }
 
+static void marshal_fs_rule(struct marshal_state *state,
+			    const struct fs_rule *r)
+{
+	marshal_append(state, r->path, strlen(r->path) + 1);
+	marshal_append(state, (char *)&r->landlock_flags,
+		       sizeof(r->landlock_flags));
+}
+
 static void minijail_marshal_helper(struct marshal_state *state,
 				    const struct minijail *j)
 {
 	struct mountpoint *m = NULL;
+	struct fs_rule *r = NULL;
 	size_t i;
 
 	marshal_append(state, (char *)j, sizeof(*j));
@@ -1487,6 +1514,8 @@ static void minijail_marshal_helper(struct marshal_state *state,
 	}
 	for (i = 0; i < j->cgroup_count; ++i)
 		marshal_append_string(state, j->cgroups[i]);
+	for (r = j->fs_rules_head; r; r = r->next)
+		marshal_fs_rule(state, r);
 	if (j->seccomp_policy_path)
 		marshal_append_string(state, j->seccomp_policy_path);
 }
@@ -1511,6 +1540,7 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 {
 	size_t i;
 	size_t count;
+	size_t fs_rules_count;
 	int ret = -EINVAL;
 
 	if (length < sizeof(*j))
@@ -1656,6 +1686,25 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 		++j->cgroup_count;
 	}
 
+	/* Unmarshal fs_rules. */
+	fs_rules_count = j->fs_rules_count;
+	j->fs_rules_count = 0;
+	for (i = 0; i < fs_rules_count; ++i) {
+		const char *path = consumestr(&serialized, &length);
+		uint64_t landlock_flags;
+		void *landlock_flags_bytes =
+		    consumebytes(sizeof(landlock_flags), &serialized, &length);
+
+		if (!path)
+			goto bad_fs_rules;
+		memcpy(&landlock_flags, landlock_flags_bytes,
+		       sizeof(landlock_flags));
+		if (!landlock_flags)
+			goto bad_fs_rules;
+		if (add_fs_restriction_path(j, path, landlock_flags))
+			goto bad_fs_rules;
+	}
+
 	if (j->seccomp_policy_path) { /* stale pointer */
 		char *seccomp_policy_path = consumestr(&serialized, &length);
 		if (!seccomp_policy_path)
@@ -1678,6 +1727,8 @@ bad_cgroups:
 	free_remounts_list(j);
 	for (i = 0; i < j->cgroup_count; ++i)
 		free(j->cgroups[i]);
+bad_fs_rules:
+	free_fs_rules_list(j);
 bad_mounts:
 	if (j->filter_prog && j->filter_prog->filter)
 		free(j->filter_prog->filter);
@@ -1706,6 +1757,7 @@ clear_pointers:
 	j->hostname = NULL;
 	j->alt_syscall_table = NULL;
 	j->cgroup_count = 0;
+	j->fs_rules_count = 0;
 	j->seccomp_policy_path = NULL;
 out:
 	return ret;
