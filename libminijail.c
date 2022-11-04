@@ -17,7 +17,6 @@
 #include <linux/filter.h>
 #include <sched.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -167,6 +166,7 @@ struct minijail {
 		bool setsid : 1;
 		bool using_minimalistic_mountns : 1;
 		bool enable_profile_fs_restrictions : 1;
+		bool enable_default_runtime : 1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -315,6 +315,7 @@ void minijail_preenter(struct minijail *j)
 	j->remount_mode = 0;
 	j->flags.using_minimalistic_mountns = 0;
 	j->flags.enable_profile_fs_restrictions = 0;
+	j->flags.enable_default_runtime = 0;
 	free_remounts_list(j);
 }
 
@@ -368,6 +369,7 @@ void minijail_preexec(struct minijail *j)
 	int userns = j->flags.userns;
 	int using_minimalistic_mountns = j->flags.using_minimalistic_mountns;
 	int enable_profile_fs_restrictions = j->flags.enable_profile_fs_restrictions;
+	int enable_default_runtime = j->flags.enable_default_runtime;
 	if (j->user)
 		free(j->user);
 	j->user = NULL;
@@ -390,6 +392,7 @@ void minijail_preexec(struct minijail *j)
 	j->flags.userns = userns;
 	j->flags.using_minimalistic_mountns = using_minimalistic_mountns;
 	j->flags.enable_profile_fs_restrictions = enable_profile_fs_restrictions;
+	j->flags.enable_default_runtime = enable_default_runtime;
 	/* Note, |pids| will already have been used before this call. */
 }
 
@@ -403,6 +406,7 @@ struct minijail API *minijail_new(void)
 		j->flags.using_minimalistic_mountns = false;
 		/* TODO(b/255228171): set to true by default. */
 		j->flags.enable_profile_fs_restrictions = false;
+		j->flags.enable_default_runtime = false;
 	}
 	return j;
 }
@@ -556,6 +560,10 @@ void API minijail_log_seccomp_filter_failures(struct minijail *j)
 void API minijail_set_using_minimalistic_mountns(struct minijail *j)
 {
 	j->flags.using_minimalistic_mountns = true;
+}
+
+bool API minijail_get_enable_default_runtime(struct minijail *j) {
+	return j->flags.enable_default_runtime;
 }
 
 /* Expose this for unit tests. */

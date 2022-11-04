@@ -451,6 +451,17 @@ static void read_seccomp_filter(const char *filter_path,
 	}
 }
 
+static void set_seccomp_filters(struct minijail *j, const char *filter_path)
+{
+	struct sock_fprog filter;
+	read_seccomp_filter(filter_path, &filter);
+	minijail_set_seccomp_filters(j, &filter);
+	free((void *)filter.filter);
+}
+
+/* Path for v0 of default runtime environment. */
+static const char default_policy_path[] = "/etc/security/minijail/v0.bin";
+
 /*
  * Long options use values starting at 0x100 so that they're out of range of
  * bytes which is how command line options are processed.  Practically speaking,
@@ -1225,10 +1236,12 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	if (use_seccomp_filter) {
 		minijail_parse_seccomp_filters(j, filter_path);
 	} else if (use_seccomp_filter_binary) {
-		struct sock_fprog filter;
-		read_seccomp_filter(filter_path, &filter);
-		minijail_set_seccomp_filters(j, &filter);
-		free((void *)filter.filter);
+		set_seccomp_filters(j, filter_path);
+	} else if (minijail_get_enable_default_runtime(j)) {
+		/* TODO(b/254506006): support more flags for runtime options. */
+		set_seccomp_filters(j, default_policy_path);
+		/* Set no_new_privs in addition to the seccomp policy. */
+		minijail_no_new_privs(j);
 	}
 
 	/* Mount a tmpfs under /tmp and set its size. */

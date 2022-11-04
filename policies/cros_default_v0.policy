@@ -1,0 +1,4 @@
+@denylist
+# ChromeOS default runtime policy v0.
+
+bpf: return 0
