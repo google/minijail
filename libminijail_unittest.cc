@@ -237,6 +237,19 @@ TEST_F(MarshalTest, copy_empty) {
   ASSERT_EQ(0, minijail_copy_jail(m_, j_));
 }
 
+TEST_F(MarshalTest, profile_flags) {
+  minijail_bind(m_, "/var", "/var", false);
+  minijail_set_using_minimalistic_mountns(m_);
+  minijail_set_enable_profile_fs_restrictions(m_);
+  minijail_add_minimalistic_mountns_fs_rules(m_);
+  size_ = minijail_size(m_);
+  for (size_t offset = 0; offset < 8; ++offset) {
+    do_log(LOG_INFO, "offset: %zu", offset);
+    ASSERT_EQ(0, minijail_marshal(m_, buf_ + offset, sizeof(buf_) - offset));
+    EXPECT_EQ(0, minijail_unmarshal(j_, buf_ + offset, size_));
+  }
+}
+
 TEST(KillTest, running_process) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "sleep 1000", nullptr};

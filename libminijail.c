@@ -558,6 +558,12 @@ void API minijail_set_using_minimalistic_mountns(struct minijail *j)
 	j->flags.using_minimalistic_mountns = true;
 }
 
+/* Expose this for unit tests. */
+void minijail_set_enable_profile_fs_restrictions(struct minijail *j)
+{
+	j->flags.enable_profile_fs_restrictions = true;
+}
+
 void API minijail_add_minimalistic_mountns_fs_rules(struct minijail *j)
 {
 	struct mountpoint *m = j->mounts_head;
