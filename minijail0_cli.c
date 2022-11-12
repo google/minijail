@@ -485,6 +485,7 @@ enum {
 	OPT_FS_PATH_RO,
 	OPT_FS_PATH_RW,
 	OPT_FS_PATH_ADVANCED_RW,
+	OPT_NO_DEFAULT_RUNTIME,
 	OPT_LOGGING,
 	OPT_PRELOAD_LIBRARY,
 	OPT_PROFILE,
@@ -524,6 +525,8 @@ static const struct option long_options[] = {
     {"fs-path-ro", required_argument, 0, OPT_FS_PATH_RO},
     {"fs-path-rw", required_argument, 0, OPT_FS_PATH_RW},
     {"fs-path-advanced-rw", required_argument, 0, OPT_FS_PATH_ADVANCED_RW},
+    {"no-default-runtime-environment", no_argument, 0,
+      OPT_NO_DEFAULT_RUNTIME},
     {0, 0, 0, 0},
 };
 
@@ -649,6 +652,8 @@ static const char help_text[] =
 "               Adds an allowed read-write path.\n"
 "  --fs-path-advanced-rw\n"
 "               Adds an allowed advanced read-write path.\n"
+"  --no-default-runtime-environment\n"
+"               Disables default seccomp policy and setting of no_new_privs.\n"
 "  --preload-library=<file>\n"
 "               Overrides the path to \"" PRELOADPATH "\".\n"
 "               This is only really useful for local testing.\n"
@@ -1060,6 +1065,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		case OPT_FS_PATH_ADVANCED_RW:
 			minijail_add_fs_restriction_advanced_rw(j, optarg);
 			break;
+		case OPT_NO_DEFAULT_RUNTIME:
+			minijail_set_enable_default_runtime(j, false);
+			break;
 		case OPT_SECCOMP_BPF_BINARY:
 			if (seccomp != None && seccomp != BpfBinaryFilter) {
 				errx(1, "Do not use -s, -S, or "
@@ -1238,8 +1246,12 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	} else if (use_seccomp_filter_binary) {
 		set_seccomp_filters(j, filter_path);
 	} else if (minijail_get_enable_default_runtime(j)) {
-		/* TODO(b/254506006): support more flags for runtime options. */
-		set_seccomp_filters(j, default_policy_path);
+		if (access(default_policy_path, F_OK) == 0) {
+			/* TODO(b/254506006): support more flags for runtime options. */
+			info("applying policy for default runtime: %s",
+			     default_policy_path);
+			set_seccomp_filters(j, default_policy_path);
+		}
 		/* Set no_new_privs in addition to the seccomp policy. */
 		minijail_no_new_privs(j);
 	}

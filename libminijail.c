@@ -562,6 +562,11 @@ void API minijail_set_using_minimalistic_mountns(struct minijail *j)
 	j->flags.using_minimalistic_mountns = true;
 }
 
+void API minijail_set_enable_default_runtime(struct minijail *j,
+					     bool enable_default_runtime) {
+	j->flags.enable_default_runtime = enable_default_runtime;
+}
+
 bool API minijail_get_enable_default_runtime(struct minijail *j) {
 	return j->flags.enable_default_runtime;
 }
