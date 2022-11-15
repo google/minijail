@@ -591,7 +591,7 @@ void API minijail_add_minimalistic_mountns_fs_rules(struct minijail *j)
 		minijail_add_fs_restriction_rx(j, m->dest);
 		/* Allow rw if mounted as writable, or mount flags allow mount events.*/
 		if (!mount_has_readonly_flag(m) || mount_events_allowed(m))
-			minijail_add_fs_restriction_rw(j, m->dest);
+			minijail_add_fs_restriction_advanced_rw(j, m->dest);
 		m = m->next;
 	}
 	if (landlock_enabled_by_profile) {
