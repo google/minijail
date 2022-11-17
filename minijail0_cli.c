@@ -480,6 +480,7 @@ enum {
 	OPT_CONFIG,
 	OPT_ENV_ADD,
 	OPT_ENV_RESET,
+	OPT_ENABLE_PROFILE_FS_RESTRICTIONS,
 	OPT_FS_DEFAULT_PATHS,
 	OPT_FS_PATH_RX,
 	OPT_FS_PATH_RO,
@@ -520,6 +521,8 @@ static const struct option long_options[] = {
     {"mount", required_argument, 0, 'k'},
     {"bind-mount", required_argument, 0, 'b'},
     {"ns-mount", no_argument, 0, 'v'},
+    {"enable-profile-fs-restrictions", no_argument, 0,
+      OPT_ENABLE_PROFILE_FS_RESTRICTIONS},
     {"fs-default-paths", no_argument, 0, OPT_FS_DEFAULT_PATHS},
     {"fs-path-rx", required_argument, 0, OPT_FS_PATH_RX},
     {"fs-path-ro", required_argument, 0, OPT_FS_PATH_RO},
@@ -641,6 +644,8 @@ static const char help_text[] =
 "Uncommon options:\n"
 "  --allow-speculative-execution\n"
 "               Allow speculative execution by disabling mitigations.\n"
+"  --enable-profile-fs-restrictions\n"
+"               Limit paths available when using minimalistic-mountns.\n"
 "  --fs-default-paths\n"
 "               Adds a set of allowed paths to allow running common system \n"
 "               executables.\n"
@@ -1049,6 +1054,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case OPT_PRELOAD_LIBRARY:
 			*preload_path = optarg;
+			break;
+		case OPT_ENABLE_PROFILE_FS_RESTRICTIONS:
+			minijail_set_enable_profile_fs_restrictions(j);
 			break;
 		case OPT_FS_DEFAULT_PATHS:
 			minijail_enable_default_fs_restrictions(j);

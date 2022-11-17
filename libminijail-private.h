@@ -32,9 +32,6 @@ struct minijail;
  */
 extern size_t minijail_size(const struct minijail *j);
 
-/* Sets enable_profile_fs_restrictions to true. */
-extern void minijail_set_enable_profile_fs_restrictions(struct minijail *j);
-
 /* minijail_marshal: serializes @j to @buf
  * @j    minijail to serialize
  * @buf  buffer to serialize to

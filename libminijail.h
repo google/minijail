@@ -111,7 +111,13 @@ void minijail_set_seccomp_filter_tsync(struct minijail *j);
 void minijail_set_using_minimalistic_mountns(struct minijail *j);
 void minijail_set_enable_default_runtime(struct minijail *j,
 					 bool enable_default_runtime);
+/*
+ * Sets enable_profile_fs_restrictions to true.
+ *
+ * Exposed for unit tests and allowlisting services.
+ */
 bool minijail_get_enable_default_runtime(struct minijail *j);
+void minijail_set_enable_profile_fs_restrictions(struct minijail *j);
 void minijail_add_minimalistic_mountns_fs_rules(struct minijail *j);
 void minijail_enable_default_fs_restrictions(struct minijail *j);
 /*

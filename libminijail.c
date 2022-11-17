@@ -571,8 +571,7 @@ bool API minijail_get_enable_default_runtime(struct minijail *j) {
 	return j->flags.enable_default_runtime;
 }
 
-/* Expose this for unit tests. */
-void minijail_set_enable_profile_fs_restrictions(struct minijail *j)
+void API minijail_set_enable_profile_fs_restrictions(struct minijail *j)
 {
 	j->flags.enable_profile_fs_restrictions = true;
 }
