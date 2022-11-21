@@ -406,7 +406,7 @@ struct minijail API *minijail_new(void)
 		j->flags.using_minimalistic_mountns = false;
 		/* TODO(b/255228171): set to true by default. */
 		j->flags.enable_profile_fs_restrictions = false;
-		j->flags.enable_default_runtime = true;
+		j->flags.enable_default_runtime = false;
 	}
 	return j;
 }
