@@ -405,7 +405,7 @@ struct minijail API *minijail_new(void)
 		j->remount_mode = MS_PRIVATE;
 		j->flags.using_minimalistic_mountns = false;
 		j->flags.enable_profile_fs_restrictions = true;
-		j->flags.enable_default_runtime = false;
+		j->flags.enable_default_runtime = true;
 	}
 	return j;
 }
