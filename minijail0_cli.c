@@ -1258,6 +1258,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			/* TODO(b/254506006): support more flags for runtime options. */
 			info("applying policy for default runtime: %s",
 			     default_policy_path);
+			minijail_use_seccomp_filter(j);
 			set_seccomp_filters(j, default_policy_path);
 		}
 		/* Set no_new_privs in addition to the seccomp policy. */
