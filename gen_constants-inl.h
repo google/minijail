@@ -75,3 +75,7 @@ struct fscrypt_policy_v1 {
 #if !defined(FS_IOC_GET_ENCRYPTION_POLICY_EX)
 #define FS_IOC_GET_ENCRYPTION_POLICY_EX _IOWR('f', 22, __u8[9])
 #endif
+
+#if !defined(MADV_FREE)
+#define MADV_FREE 8
+#endif
