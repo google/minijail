@@ -9,6 +9,7 @@
  * this test, we'd have to pull that struct into a common (internal) header.
  */
 
+#include <cstdio>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -585,6 +586,21 @@ TEST_F(CliTest, invalid_set_env) {
 
   argv2[1] = "=foo";
   ASSERT_EXIT(parse_args_(argv2), testing::ExitedWithCode(1), "");
+}
+
+// Valid calls to the gen-config option.
+TEST_F(CliTest, valid_gen_config) {
+  std::string config_path = std::tmpnam(NULL);
+  std::vector<std::string> argv = {"--gen-config=" + config_path, "--ambient",
+                                   "--fs-path-rx=/", "-n"};
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(0), "");
+}
+
+// Invalid calls to the gen-config option.
+TEST_F(CliTest, invalid_gen_config) {
+  std::vector<std::string> argv = {"--gen-config=/", "--ambient",
+                                   "--fs-path-rx=/", "-n"};
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
 
 // Android unit tests do not support data file yet.

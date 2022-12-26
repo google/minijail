@@ -35,6 +35,13 @@
 #define IDMAP_LEN 32U
 #define DEFAULT_TMP_SIZE (64 * 1024 * 1024)
 
+/* option_entry struct: tracks configuration options. */
+struct option_entry {
+	char *name;
+	char *args;
+	struct option_entry *next;
+};
+
 /*
  * A malloc() that aborts on failure.  We only implement this in the CLI as
  * the library should return ENOMEM errors when allocations fail.
@@ -462,6 +469,9 @@ static void set_seccomp_filters(struct minijail *j, const char *filter_path)
 /* Path for v0 of default runtime environment. */
 static const char default_policy_path[] = "/etc/security/minijail/v0.bin";
 
+static const char config_flag_name[] = "config";
+static const char gen_config_flag_name[] = "gen-config";
+
 /*
  * Long options use values starting at 0x100 so that they're out of range of
  * bytes which is how command line options are processed.  Practically speaking,
@@ -486,8 +496,9 @@ enum {
 	OPT_FS_PATH_RO,
 	OPT_FS_PATH_RW,
 	OPT_FS_PATH_ADVANCED_RW,
-	OPT_NO_DEFAULT_RUNTIME,
+	OPT_GEN_CONFIG,
 	OPT_LOGGING,
+	OPT_NO_DEFAULT_RUNTIME,
 	OPT_PRELOAD_LIBRARY,
 	OPT_PROFILE,
 	OPT_SECCOMP_BPF_BINARY,
@@ -515,7 +526,8 @@ static const struct option long_options[] = {
     {"add-suppl-group", required_argument, 0, OPT_ADD_SUPPL_GROUP},
     {"allow-speculative-execution", no_argument, 0,
      OPT_ALLOW_SPECULATIVE_EXECUTION},
-    {"config", required_argument, 0, OPT_CONFIG},
+    {config_flag_name, required_argument, 0, OPT_CONFIG},
+    {gen_config_flag_name, required_argument, 0, OPT_GEN_CONFIG},
     {"env-add", required_argument, 0, OPT_ENV_ADD},
     {"env-reset", no_argument, 0, OPT_ENV_RESET},
     {"mount", required_argument, 0, 'k'},
@@ -613,6 +625,11 @@ static const char help_text[] =
 "  --config <file>\n"
 "               Load the Minijail configuration file <file>.\n"
 "               If used, must be specified ahead of other options.\n"
+"  --gen-config <file>\n"
+"               Convert the current flags to a config file, then exit.\n"
+"               Only flags impacting the jailed process are included \n"
+"               (this flag, --config, and help messages are not).\n"
+"               Path must be specified.\n"
 "  --profile <p>\n"
 "               Configure minijail0 to run with the <p> sandboxing profile,\n"
 "               which is a convenient way to express multiple flags\n"
@@ -758,6 +775,32 @@ static int getopt_conf_or_cli(int argc, char *const argv[],
 	return opt;
 }
 
+static char *getname_from_opt(int opt) {
+	unsigned int i;
+	unsigned int entry_count =
+		sizeof(long_options)/sizeof(long_options[0]);
+	const struct option *entry = long_options;
+
+	for (i = 0; i < entry_count; i++) {
+		if (opt == entry->val) {
+			return strdup(entry->name);
+		}
+		entry++;
+	}
+	return NULL;
+}
+
+static void free_options_list(struct option_entry *opt_entry_head)
+{
+	while (opt_entry_head) {
+		struct option_entry *entry = opt_entry_head;
+		opt_entry_head = opt_entry_head->next;
+		free(entry->name);
+		free(entry->args);
+		free(entry);
+	}
+}
+
 static void set_child_env(char ***envp, char *arg, char *const environ[])
 {
 	/* We expect VAR=value format for arg. */
@@ -811,9 +854,34 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	int log_to_stderr = -1;
 	struct config_entry_list *conf_entry_list = NULL;
 	size_t conf_index = 0;
+	bool gen_config = false;
+	struct option_entry *opt_entry_head = NULL;
+	struct option_entry *opt_entry_tail = NULL;
+	char* config_path = NULL;
 
 	while ((opt = getopt_conf_or_cli(argc, argv, &conf_entry_list,
 					 &conf_index)) != -1) {
+
+		/* Track options for conf file generation. */
+		struct option_entry *opt_entry = calloc(1, sizeof(*opt_entry));
+		char *opt_name = getname_from_opt(opt);
+		if (opt_name != NULL) {
+			opt_entry->name = opt_name;
+		} else {
+			char str[2] = {opt, '\0'};
+			opt_entry->name = strdup(str);
+		}
+		if (optarg != NULL) {
+			opt_entry->args = strdup(optarg);
+		}
+
+		if (opt_entry_head) {
+			opt_entry_tail->next = opt_entry;
+		} else {
+			opt_entry_head = opt_entry;
+		}
+		opt_entry_tail = opt_entry;
+
 		switch (opt) {
 		case 'u':
 			if (use_uid)
@@ -1143,6 +1211,10 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			}
 			break;
 		}
+		case OPT_GEN_CONFIG:
+			gen_config = true;
+			config_path = strdup(optarg);
+			break;
 		case OPT_ENV_ADD:
 			/*
 			 * We either copy our current env to the child env
@@ -1189,6 +1261,36 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			errx(1, "Could not preserve stderr");
 		}
 	}
+
+	/* Handle config file generation. */
+	if (gen_config) {
+		struct option_entry *r = opt_entry_head;
+		if (access(config_path, F_OK) == 0) {
+			errx(1, "'%s' exists. Specify a new filename.\n",
+			     config_path);
+		}
+		attribute_cleanup_fp FILE *fp = fopen(config_path, "w");
+
+		fprintf(fp, "%% minijail-config-file v0\n\n");
+		while (r != NULL) {
+			/* Add all flags except --config and --gen-config. */
+			if (strcmp(r->name, config_flag_name) &&
+			    strcmp(r->name, gen_config_flag_name)) {
+				if (r->args == NULL) {
+					fprintf(fp, "%s\n", r->name);
+				} else {
+					fprintf(fp, "%s = %s\n", r->name, r->args);
+				}
+			}
+			r = r->next;
+		}
+
+		printf("config file created.\n");
+		exit(0);
+	}
+	free_options_list(opt_entry_head);
+	opt_entry_head = NULL;
+	opt_entry_tail = NULL;
 
 	/* Set up uid/gid mapping. */
 	if (set_uidmap || set_gidmap) {
