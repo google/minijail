@@ -1715,6 +1715,29 @@ TEST_F(LandlockTest, test_rule_rw_deny) {
   EXPECT_NE(status, 0);
 }
 
+TEST_F(LandlockTest, test_fs_rules_disabled) {
+  int mj_run_ret;
+  int status;
+  char *argv[4];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), kBinPath);
+  minijail_disable_fs_restrictions(j.get());
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "exec echo 'bar' > /tmp/fs-rules-test";
+  argv[3] = NULL;
+
+  mj_run_ret = minijail_run_no_preload(j.get(), argv[0], argv);
+  EXPECT_EQ(mj_run_ret, 0);
+  status = minijail_wait(j.get());
+  // Rules aren't applied, so cmd succeeds.
+  EXPECT_EQ(status, 0);
+}
+
 TEST_F(LandlockTest, test_rule_allow_symlinks_advanced_rw) {
   int mj_run_ret;
   int status;

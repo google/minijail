@@ -165,6 +165,7 @@ struct minijail {
 		bool forward_signals : 1;
 		bool setsid : 1;
 		bool using_minimalistic_mountns : 1;
+		bool enable_fs_restrictions : 1;
 		bool enable_profile_fs_restrictions : 1;
 		bool enable_default_runtime : 1;
 	} flags;
@@ -368,6 +369,7 @@ void minijail_preexec(struct minijail *j)
 	int remount_proc_ro = j->flags.remount_proc_ro;
 	int userns = j->flags.userns;
 	int using_minimalistic_mountns = j->flags.using_minimalistic_mountns;
+	int enable_fs_restrictions = j->flags.enable_fs_restrictions;
 	int enable_profile_fs_restrictions = j->flags.enable_profile_fs_restrictions;
 	int enable_default_runtime = j->flags.enable_default_runtime;
 	if (j->user)
@@ -391,6 +393,7 @@ void minijail_preexec(struct minijail *j)
 	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
 	j->flags.using_minimalistic_mountns = using_minimalistic_mountns;
+	j->flags.enable_fs_restrictions = enable_fs_restrictions;
 	j->flags.enable_profile_fs_restrictions = enable_profile_fs_restrictions;
 	j->flags.enable_default_runtime = enable_default_runtime;
 	/* Note, |pids| will already have been used before this call. */
@@ -404,6 +407,7 @@ struct minijail API *minijail_new(void)
 	if (j) {
 		j->remount_mode = MS_PRIVATE;
 		j->flags.using_minimalistic_mountns = false;
+		j->flags.enable_fs_restrictions = true;
 		j->flags.enable_profile_fs_restrictions = true;
 		j->flags.enable_default_runtime = true;
 	}
@@ -568,6 +572,10 @@ void API minijail_set_enable_default_runtime(struct minijail *j,
 
 bool API minijail_get_enable_default_runtime(struct minijail *j) {
 	return j->flags.enable_default_runtime;
+}
+
+void API minijail_disable_fs_restrictions(struct minijail *j) {
+	j->flags.enable_fs_restrictions = false;
 }
 
 void API minijail_set_enable_profile_fs_restrictions(struct minijail *j)
@@ -2492,6 +2500,9 @@ static void apply_landlock_restrictions(const struct minijail *j)
 {
 	struct fs_rule *r;
 	attribute_cleanup_fd int ruleset_fd = -1;
+	if (!j->flags.enable_fs_restrictions) {
+		return;
+	}
 
 	r = j->fs_rules_head;
 	while (r) {

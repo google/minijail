@@ -338,6 +338,23 @@ TEST_F(CliTest, invalid_profile) {
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
 
+// Valid usage of the no-fs-restrictions option.
+TEST_F(CliTest, valid_no_fs_restrictions) {
+  std::vector<std::string> argv = {"--profile", "minimalistic-mountns",
+                                   "--no-fs-restrictions", "/bin/sh"};
+
+  ASSERT_TRUE(parse_args_(argv));
+}
+
+// Invalid usage of the no-fs-restrictions option.
+TEST_F(CliTest, invalid_no_fs_restrictions) {
+  // Using an fs-path-* flag at the same time shouldn't be allowed.
+  std::vector<std::string> argv = {"--fs-path-rx", "/",
+                                   "--no-fs-restrictions", "/bin/sh"};
+
+   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+}
+
 // Valid calls to the chroot option.
 TEST_F(CliTest, valid_chroot) {
   std::vector<std::string> argv = {"-C", "/", "/bin/sh"};

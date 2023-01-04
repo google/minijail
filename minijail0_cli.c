@@ -499,6 +499,7 @@ enum {
 	OPT_GEN_CONFIG,
 	OPT_LOGGING,
 	OPT_NO_DEFAULT_RUNTIME,
+	OPT_NO_FS_RESTRICTIONS,
 	OPT_PRELOAD_LIBRARY,
 	OPT_PROFILE,
 	OPT_SECCOMP_BPF_BINARY,
@@ -542,6 +543,8 @@ static const struct option long_options[] = {
     {"fs-path-advanced-rw", required_argument, 0, OPT_FS_PATH_ADVANCED_RW},
     {"no-default-runtime-environment", no_argument, 0,
       OPT_NO_DEFAULT_RUNTIME},
+    {"no-fs-restrictions", no_argument, 0,
+      OPT_NO_FS_RESTRICTIONS},
     {0, 0, 0, 0},
 };
 
@@ -674,6 +677,8 @@ static const char help_text[] =
 "               Adds an allowed read-write path.\n"
 "  --fs-path-advanced-rw\n"
 "               Adds an allowed advanced read-write path.\n"
+"  --no-fs-restrictions\n"
+"               Disables path-based filesystem restrictions.\n"
 "  --no-default-runtime-environment\n"
 "               Disables default seccomp policy and setting of no_new_privs.\n"
 "  --preload-library=<file>\n"
@@ -858,6 +863,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	struct option_entry *opt_entry_head = NULL;
 	struct option_entry *opt_entry_tail = NULL;
 	char* config_path = NULL;
+	bool fs_path_flag_used = false;
+	bool fs_path_rules_enabled = true;
 
 	while ((opt = getopt_conf_or_cli(argc, argv, &conf_entry_list,
 					 &conf_index)) != -1) {
@@ -1128,18 +1135,27 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case OPT_FS_DEFAULT_PATHS:
 			minijail_enable_default_fs_restrictions(j);
+			fs_path_flag_used = true;
 			break;
 		case OPT_FS_PATH_RX:
 			minijail_add_fs_restriction_rx(j, optarg);
+			fs_path_flag_used = true;
 			break;
 		case OPT_FS_PATH_RO:
 			minijail_add_fs_restriction_ro(j, optarg);
+			fs_path_flag_used = true;
 			break;
 		case OPT_FS_PATH_RW:
 			minijail_add_fs_restriction_rw(j, optarg);
+			fs_path_flag_used = true;
 			break;
 		case OPT_FS_PATH_ADVANCED_RW:
 			minijail_add_fs_restriction_advanced_rw(j, optarg);
+			fs_path_flag_used = true;
+			break;
+		case OPT_NO_FS_RESTRICTIONS:
+			minijail_disable_fs_restrictions(j);
+			fs_path_rules_enabled = false;
 			break;
 		case OPT_NO_DEFAULT_RUNTIME:
 			minijail_set_enable_default_runtime(j, false);
@@ -1260,6 +1276,11 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		    minijail_preserve_fd(j, STDERR_FILENO, STDERR_FILENO)) {
 			errx(1, "Could not preserve stderr");
 		}
+	}
+
+	if (fs_path_flag_used && !fs_path_rules_enabled) {
+		errx(1, "Can't combine --no-fs-restrictions "
+			"with directly using fs path flags");
 	}
 
 	/* Handle config file generation. */

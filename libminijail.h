@@ -117,6 +117,7 @@ void minijail_set_enable_default_runtime(struct minijail *j,
  * Exposed for unit tests and allowlisting services.
  */
 bool minijail_get_enable_default_runtime(struct minijail *j);
+void minijail_disable_fs_restrictions(struct minijail *j);
 void minijail_set_enable_profile_fs_restrictions(struct minijail *j);
 void minijail_add_minimalistic_mountns_fs_rules(struct minijail *j);
 void minijail_enable_default_fs_restrictions(struct minijail *j);
