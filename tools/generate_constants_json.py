@@ -130,6 +130,8 @@ def main(argv=None):
         constants_json['arch_name'] = 'arm64'
     elif constants_json['arch_nr'] == 0x40000028:
         constants_json['arch_name'] = 'arm'
+    elif constants_json['arch_nr'] == 0xC00000F3:
+        constants_json['arch_name'] = 'riscv64'
     else:
         raise ValueError('Unknown architecture: 0x%08X' %
                          constants_json['arch_nr'])
