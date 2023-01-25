@@ -620,6 +620,12 @@ TEST_F(CliTest, invalid_gen_config) {
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
 
+TEST_F(CliTest, invalid_gen_config_not_writable) {
+  std::vector<std::string> argv = {"--gen-config=/sys/foo", "--ambient",
+                                   "--fs-path-rx=/", "-n"};
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+}
+
 // Android unit tests do not support data file yet.
 #if !defined(__ANDROID__)
 

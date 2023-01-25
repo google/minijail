@@ -1291,6 +1291,10 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			     config_path);
 		}
 		attribute_cleanup_fp FILE *fp = fopen(config_path, "w");
+		if (access(config_path, W_OK) != 0) {
+			errx(1, "'%s' not writable. Specify a new filename.\n",
+			     config_path);
+		}
 
 		fprintf(fp, "%% minijail-config-file v0\n\n");
 		while (r != NULL) {
