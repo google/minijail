@@ -320,8 +320,15 @@ void minijail_preenter(struct minijail *j)
 	free_remounts_list(j);
 }
 
+bool minijail_is_fs_restriction_available(void) {
+  const int abi =
+      landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+  // ABI > 0 is considered supported.
+  return abi > 0;
+}
+
 /* Adds a rule for a given path to apply once minijail is entered. */
-int add_fs_restriction_path(struct minijail *j,
+static int add_fs_restriction_path(struct minijail *j,
 		const char *path,
 		uint64_t landlock_flags)
 {

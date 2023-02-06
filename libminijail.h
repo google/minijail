@@ -206,6 +206,13 @@ int minijail_add_to_cgroup(struct minijail *j, const char *path);
  * These functions are used for filesystem restrictions.
  */
 
+/*
+ * Indicates whether minijail_add_fs_restriction_* functions are available. Even
+ * if they are unavailable, minijail_add_fs_restriction_* functions would still
+ * succeed, however without any actual effects.
+ */
+bool minijail_is_fs_restriction_available(void);
+
 /* Adds a read-execute path. */
 int minijail_add_fs_restriction_rx(struct minijail *j, const char *path);
 

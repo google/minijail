@@ -1738,6 +1738,37 @@ TEST_F(LandlockTest, test_fs_rules_disabled) {
   EXPECT_EQ(status, 0);
 }
 
+TEST_F(LandlockTest, test_fs_rules_availability) {
+  char *argv[4];
+  int status;
+  bool landlock_available;
+  // We always run regardless of LandlockSupported() because we would like to
+  // test even if Landlock is unavailable.
+  if (!UsernsSupported())
+    GTEST_SKIP();
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), kBinPath);
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "exec echo 'bar' > /tmp/fs-rules-test";
+  argv[3] = NULL;
+
+  EXPECT_EQ(minijail_run_no_preload(j.get(), argv[0], argv), 0);
+  status = minijail_wait(j.get());
+
+  landlock_available = minijail_is_fs_restriction_available();
+  EXPECT_EQ(landlock_available, LandlockSupported());
+  if (landlock_available) {
+    // Landlock is available, writing rule should fail.
+    EXPECT_NE(status, 0);
+  } else {
+    // Rules aren't effective, so cmd succeeds.
+    EXPECT_EQ(status, 0);
+  }
+}
+
 TEST_F(LandlockTest, test_rule_allow_symlinks_advanced_rw) {
   int mj_run_ret;
   int status;
