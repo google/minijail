@@ -320,13 +320,6 @@ void minijail_preenter(struct minijail *j)
 	free_remounts_list(j);
 }
 
-bool minijail_is_fs_restriction_available(void) {
-  const int abi =
-      landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
-  // ABI > 0 is considered supported.
-  return abi > 0;
-}
-
 /* Adds a rule for a given path to apply once minijail is entered. */
 static int add_fs_restriction_path(struct minijail *j,
 		const char *path,
@@ -581,7 +574,16 @@ bool API minijail_get_enable_default_runtime(struct minijail *j) {
 	return j->flags.enable_default_runtime;
 }
 
-void API minijail_disable_fs_restrictions(struct minijail *j) {
+bool API minijail_is_fs_restriction_available(void)
+{
+	const int abi =
+	    landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+	// ABI > 0 is considered supported.
+	return abi > 0;
+}
+
+void API minijail_disable_fs_restrictions(struct minijail *j)
+{
 	j->flags.enable_fs_restrictions = false;
 }
 
