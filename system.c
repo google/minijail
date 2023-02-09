@@ -566,6 +566,7 @@ bool is_canonical_path(const char *path)
 {
 	attribute_cleanup_str char *rp = realpath(path, NULL);
 	if (!rp) {
+		pwarn("realpath(%s) failed", path);
 		return false;
 	}
 
