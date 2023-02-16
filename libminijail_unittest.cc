@@ -1715,6 +1715,30 @@ TEST_F(LandlockTest, test_rule_rw_deny) {
   EXPECT_NE(status, 0);
 }
 
+TEST_F(LandlockTest, test_deny_rule_with_close_open_fds) {
+  int mj_run_ret;
+  int status;
+  char *argv[3];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  // Make sure Landlock still functions if fds are closed.
+  minijail_close_open_fds(j.get());
+  // Add irrelevant Landlock rule.
+  minijail_add_fs_restriction_rx(j.get(), "/var");
+
+  argv[0] = const_cast<char*>(kLsPath);
+  argv[1] = const_cast<char*>(kCatPath);
+  argv[2] = NULL;
+
+  mj_run_ret = minijail_run_no_preload(j.get(), argv[0], argv);
+  EXPECT_EQ(mj_run_ret, 0);
+  status = minijail_wait(j.get());
+  // We should see 126 because /bin is not executable.
+  EXPECT_EQ(status, 126);
+}
+
 TEST_F(LandlockTest, test_fs_rules_disabled) {
   int mj_run_ret;
   int status;
