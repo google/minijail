@@ -3568,9 +3568,7 @@ static int minijail_run_internal(struct minijail *j,
 		if (setup_preload(j, &state_out->child_env) ||
 		    setup_pipe(&state_out->child_env, state_out->pipe_fds))
 			return -EFAULT;
-	}
-
-	if (!use_preload) {
+	} else {
 		if (j->flags.use_caps && j->caps != 0 &&
 		    !j->flags.set_ambient_caps) {
 			die("non-empty, non-ambient capabilities are not "
