@@ -1087,6 +1087,16 @@ TEST(Test, test_bind_mount_symlink) {
   EXPECT_EQ(unlink(path_sym.c_str()), 0);
 }
 
+// Check for error when trying to enter a user namespace without a pid
+// namespace.
+TEST(Test, test_user_ns_without_pid_ns) {
+  ScopedMinijail j(minijail_new());
+  minijail_namespace_user(j.get());
+
+  ASSERT_EXIT((void)minijail_fork(j.get()), ::testing::KilledBySignal(6),
+              "user namespaces in Minijail require a PID namespace");
+}
+
 namespace {
 
 // Tests that require userns access.

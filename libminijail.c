@@ -3670,6 +3670,9 @@ static int minijail_run_internal(struct minijail *j,
 			pdie("clone(CLONE_NEWPID | ...) failed");
 		}
 	} else {
+		if (j->flags.userns)
+			die("user namespaces in Minijail require a PID namespace");
+
 		child_pid = fork();
 
 		if (child_pid < 0)
