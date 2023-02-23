@@ -91,3 +91,13 @@
 #ifndef __NR_clone3
 #define __NR_clone3 435
 #endif
+
+#ifndef __NR_userfaultfd
+#ifdef __x86_64__
+#define __NR_userfaultfd 323
+#elif __i386__
+#define __NR_userfaultfd 374
+#elif __arm64__
+#define __NR_userfaultfd 282
+#endif
+#endif /* __NR_userfaultfd */
