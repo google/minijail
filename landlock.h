@@ -129,4 +129,8 @@ struct minijail_landlock_path_beneath_attr {
 #define LANDLOCK_ACCESS_FS_MAKE_SYM			(1ULL << 12)
 #endif
 
+#ifndef LANDLOCK_ACCESS_FS_REFER
+#define LANDLOCK_ACCESS_FS_REFER			(1ULL << 13)
+#endif
+
 #endif /* _LANDLOCK_H */
