@@ -72,6 +72,15 @@
 	(MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_NOATIME | MS_NODIRATIME |       \
 	 MS_RELATIME | MS_RDONLY)
 
+/*
+ * Required for Android host glibc which is permanently stuck on 2.17. Causes
+ * no harm for newer glibc versions.
+ */
+#ifndef MS_NOSYMFOLLOW
+/* Added locally in kernels 4.x+. */
+#define MS_NOSYMFOLLOW 256
+#endif
+
 struct minijail_rlimit {
 	int type;
 	rlim_t cur;
