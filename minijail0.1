@@ -341,6 +341,44 @@ this option unless you know what you're doing.
 See the kernel documentation \fIDocumentation/userspace-api/spec_ctrl.rst\fR
 and \fIDocumentation/admin-guide/hw-vuln/spectre.rst\fR for more information.
 .TP
+\fB--fs-default-paths\fR
+Adds a set of allowed paths to allow running common system executables.
+.IP
+\fBLandlock support:\fR This flag, and the following \fB--fs*\fR flags, impact
+what filesystem access is available and require kernel support for Landlock in
+order to be enforced. Landlock is available on Linux kernels >= 5.13, or
+ChromeOS kernels >= 5.10, as long as it is configured to be available as
+outlined in the Landlock kernel docs at
+\fIhttps://docs.kernel.org/userspace-api/landlock.html#kernel-support\fR.
+.IP
+\fBFlag combinations:\fR As long as \fB--fs-path*\fR or
+\fB--fs-default-paths\fR are used, Minijail will utilize Landlock if it is
+available. Additional \fB--fs-path*\fR flags used will expand the allowlisted
+paths and access rights.
+.TP
+\fB--enable-profile-fs-restrictions\fR
+Limit paths available when using minimalistic-mountns.
+.TP
+\fB--fs-path-rx\fR
+Adds an allowed read-execute path.
+.TP
+\fB--fs-path-ro\fR
+Adds an allowed read-only path.
+.TP
+\fB--fs-path-rw\fR
+Adds an allowed read-write path.
+.TP
+\fB--fs-path-advanced-rw\fR
+Adds an allowed advanced read-write path.
+.TP
+\fB--no-fs-restrictions\fR
+Disables path-based filesystem restrictions.
+.TP
+\fB--no-default-runtime-environment\fR
+Disables default seccomp policy and setting of no_new_privs. The default
+runtime environment is used by Minijail if no other seccomp policy is set,
+unless this flag is set to opt out.
+.TP
 \fB--config <file path>\fR
 Use a Minijail configuration file to set options, through
 commandline-option-equivalent key-value pairs.
