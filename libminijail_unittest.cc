@@ -261,6 +261,7 @@ TEST(KillTest, running_process) {
 TEST(KillTest, process_already_awaited) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "sleep 1; exit 42", nullptr};
+  set_preload_path(j.get());
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
   EXPECT_EQ(minijail_wait(j.get()), 42);
   EXPECT_EQ(minijail_kill(j.get()), -ESRCH);
@@ -270,6 +271,7 @@ TEST(KillTest, process_already_finished_but_not_awaited) {
   int fds[2];
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "exit 42", nullptr};
+  set_preload_path(j.get());
   ASSERT_EQ(pipe(fds), 0);
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
   ASSERT_EQ(close(fds[1]), 0);
@@ -288,6 +290,7 @@ TEST(KillTest, process_not_started) {
 TEST(WaitTest, return_zero) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "exit 0", nullptr};
+  set_preload_path(j.get());
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
   EXPECT_EQ(minijail_wait(j.get()), 0);
 }
@@ -295,6 +298,7 @@ TEST(WaitTest, return_zero) {
 TEST(WaitTest, return_max) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "exit 255", nullptr};
+  set_preload_path(j.get());
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
   EXPECT_EQ(minijail_wait(j.get()), 255);
 }
@@ -302,6 +306,7 @@ TEST(WaitTest, return_max) {
 TEST(WaitTest, return_modulo) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "exit 256", nullptr};
+  set_preload_path(j.get());
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
   EXPECT_EQ(minijail_wait(j.get()), 0);
 }
@@ -309,6 +314,7 @@ TEST(WaitTest, return_modulo) {
 TEST(WaitTest, killed_by_sigkill) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "kill -KILL $$; sleep 1000", nullptr};
+  set_preload_path(j.get());
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
   EXPECT_EQ(minijail_wait(j.get()), MINIJAIL_ERR_SIG_BASE  + SIGKILL);
 }
@@ -316,6 +322,7 @@ TEST(WaitTest, killed_by_sigkill) {
 TEST(WaitTest, killed_by_sigsys) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "kill -SYS $$; sleep 1000", nullptr};
+  set_preload_path(j.get());
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
   EXPECT_EQ(minijail_wait(j.get()), MINIJAIL_ERR_JAIL);
 }
@@ -342,6 +349,7 @@ TEST(WaitTest, no_process) {
 TEST(WaitTest, can_wait_only_once) {
   const ScopedMinijail j(minijail_new());
   char* const argv[] = {"sh", "-c", "exit 0", nullptr};
+  set_preload_path(j.get());
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
   EXPECT_EQ(minijail_wait(j.get()), 0);
   EXPECT_EQ(minijail_wait(j.get()), -ECHILD);
@@ -706,6 +714,8 @@ TEST(Test, minijail_run_env_pid_pipes_with_local_preload) {
     GTEST_SKIP();
 
   ScopedMinijail j(minijail_new());
+  // Use the preload library from this test build.
+  set_preload_path(j.get());
 
   char *argv[4];
   argv[0] = const_cast<char*>(kCatPath);
@@ -744,9 +754,6 @@ TEST(Test, minijail_run_env_pid_pipes_with_local_preload) {
 
   // Set a canary env var in the parent that should not be present in the child.
   ASSERT_EQ(setenv("TEST_PARENT", "test", 1 /*overwrite*/), 0);
-
-  // Use the preload library from this test build.
-  set_preload_path(j.get());
 
   int child_stderr;
   mj_run_ret =
