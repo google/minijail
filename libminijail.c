@@ -190,6 +190,7 @@ struct minijail {
 	int mountns_fd;
 	int netns_fd;
 	int fs_rules_fd;
+	int fs_rules_landlock_abi;
 	char *chrootdir;
 	char *pid_file_path;
 	char *uidmap;
@@ -330,6 +331,24 @@ void minijail_preenter(struct minijail *j)
 	free_remounts_list(j);
 }
 
+static bool fs_refer_restriction_supported(struct minijail *j)
+{
+	if (j->fs_rules_landlock_abi < 0) {
+		const int abi = landlock_create_ruleset(
+			NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+		/*
+		 * If we have a valid ABI, save the result. Otherwise, leave
+		 * the struct field unmodified to make sure it's correctly
+		 * marshaled and unmarshaled.
+		 */
+		if (abi > 0) {
+			j->fs_rules_landlock_abi = abi;
+		}
+	}
+
+	return j->fs_rules_landlock_abi >= LANDLOCK_ABI_FS_REFER_SUPPORTED;
+}
+
 /* Adds a rule for a given path to apply once minijail is entered. */
 static int add_fs_restriction_path(struct minijail *j,
 		const char *path,
@@ -417,6 +436,7 @@ struct minijail API *minijail_new(void)
 	if (j) {
 		j->remount_mode = MS_PRIVATE;
 		j->fs_rules_fd = -1;
+		j->fs_rules_landlock_abi = -1;
 		j->flags.using_minimalistic_mountns = false;
 		j->flags.enable_fs_restrictions = true;
 		j->flags.enable_profile_fs_restrictions = true;
@@ -1006,8 +1026,13 @@ int API minijail_add_fs_restriction_rw(struct minijail *j, const char *path)
 int API minijail_add_fs_restriction_advanced_rw(struct minijail *j,
 						const char *path)
 {
-	return !add_fs_restriction_path(j, path,
-		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_FULL_WRITE);
+	uint16_t landlock_flags =
+		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_FULL_WRITE;
+	if (fs_refer_restriction_supported(j)) {
+		landlock_flags |= LANDLOCK_ACCESS_FS_REFER;
+	}
+
+	return !add_fs_restriction_path(j, path, landlock_flags);
 }
 
 int API minijail_add_fs_restriction_edit(struct minijail *j,
@@ -1015,6 +1040,13 @@ int API minijail_add_fs_restriction_edit(struct minijail *j,
 {
 	return !add_fs_restriction_path(j, path,
 		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_EDIT);
+}
+
+int API minijail_add_fs_restriction_access_rights(struct minijail *j,
+						  const char *path,
+						  uint16_t landlock_flags)
+{
+	return !add_fs_restriction_path(j, path, landlock_flags);
 }
 
 static bool is_valid_bind_path(const char *path)
@@ -2519,6 +2551,9 @@ static int setup_fs_rules_fd(struct minijail *j)
 {
 	struct minijail_landlock_ruleset_attr ruleset_attr = {
 	    .handled_access_fs = HANDLED_ACCESS_TYPES};
+	if (fs_refer_restriction_supported(j)) {
+		ruleset_attr.handled_access_fs |= LANDLOCK_ACCESS_FS_REFER;
+	}
 
 	j->fs_rules_fd =
 	    landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
@@ -3777,6 +3812,12 @@ static int minijail_run_internal(struct minijail *j,
 			pdie("sigemptyset failed");
 		if (sigprocmask(SIG_SETMASK, &signal_mask, NULL) != 0)
 			pdie("sigprocmask failed");
+	}
+
+	/* Log details about Landlock here to avoid duplicate logs. */
+	if (j->fs_rules_head) {
+		info("Landlock support for LANDLOCK_ACCESS_FS_REFER: %s",
+			fs_refer_restriction_supported(j) ? "true" : "false");
 	}
 
 	if (j->flags.reset_signal_handlers) {

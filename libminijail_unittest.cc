@@ -1547,7 +1547,7 @@ class LandlockTest : public NamespaceTest {
 
   static bool LandlockSupported() {
     // Check the Landlock version w/o creating a ruleset file descriptor.
-    int landlock_version = landlock_create_ruleset(
+    const int landlock_version = landlock_create_ruleset(
       NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
     if (landlock_version <= 0) {
       const int err = errno;
@@ -1917,6 +1917,75 @@ TEST_F(LandlockTest, test_rule_rw_cannot_exec) {
   minijail_add_fs_restriction_rw(j.get(), kLibPath);
   minijail_add_fs_restriction_rw(j.get(), kLib64Path);
   minijail_add_fs_restriction_rw(j.get(), kTmpPath);
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "exec echo 'bar' > /tmp/baz";
+  argv[3] = NULL;
+
+  mj_run_ret = minijail_run_no_preload(j.get(), argv[0], argv);
+  EXPECT_EQ(mj_run_ret, 0);
+  status = minijail_wait(j.get());
+  EXPECT_NE(status, 0);
+}
+
+// Tests that LANDLOCK_ACCESS_FS_REFER is supported when the kernel supports
+// Landlock version ABI=2.
+TEST_F(LandlockTest, test_refer_supported) {
+  int mj_run_ret;
+  int status;
+  char *argv[4];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+  const int landlock_version = landlock_create_ruleset(
+      NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+  if (landlock_version < LANDLOCK_ABI_FS_REFER_SUPPORTED) {
+    warn("Skipping LandlockTest test_refer_supported ABI=%i", landlock_version);
+    GTEST_SKIP();
+  }
+
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), "/");
+  // If LANDLOCK_ACCESS_FS_REFER isn’t part of the access rights handled by
+  // minijail, none of the access rights in this call will be added.
+  minijail_add_fs_restriction_access_rights(j.get(), "/tmp",
+      ACCESS_FS_ROUGHLY_FULL_WRITE | LANDLOCK_ACCESS_FS_REFER);
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "exec echo 'bar' > /tmp/baz";
+  argv[3] = NULL;
+
+  mj_run_ret = minijail_run_no_preload(j.get(), argv[0], argv);
+  EXPECT_EQ(mj_run_ret, 0);
+  status = minijail_wait(j.get());
+  EXPECT_EQ(status, 0);
+}
+
+TEST_F(LandlockTest, test_refer_not_supported) {
+  int mj_run_ret;
+  int status;
+  char *argv[4];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+  const int landlock_version = landlock_create_ruleset(
+      NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+  if (landlock_version >= LANDLOCK_ABI_FS_REFER_SUPPORTED) {
+    warn("Skipping LandlockTest test_refer_not_supported ABI=%i",
+        landlock_version);
+    GTEST_SKIP();
+  }
+
+  ScopedMinijail j(minijail_new());
+  std::string link_name = std::tmpnam(NULL);
+  std::string link_cmd = "exec /bin/ln -s /var " + link_name;
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), "/");
+  // This call shouldn't succeed, since we're adding an access right
+  // that doesn't have kernel support.
+  minijail_add_fs_restriction_access_rights(j.get(), "/tmp",
+      ACCESS_FS_ROUGHLY_FULL_WRITE | LANDLOCK_ACCESS_FS_REFER);
 
   argv[0] = const_cast<char*>(kShellPath);
   argv[1] = "-c";

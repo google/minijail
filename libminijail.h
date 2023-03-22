@@ -229,6 +229,11 @@ int minijail_add_fs_restriction_advanced_rw(struct minijail *j,
 /* Adds a path with read and write permissions that exclude create. */
 int minijail_add_fs_restriction_edit(struct minijail *j, const char *path);
 
+/* Adds a path with permissions based on a bitmask of Landlock flags. */
+int minijail_add_fs_restriction_access_rights(struct minijail *j,
+					      const char *path,
+					      uint16_t landlock_flags);
+
 /*
  * Install signal handlers in the minijail process that forward received
  * signals to the jailed child process.

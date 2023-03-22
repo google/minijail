@@ -75,6 +75,8 @@ extern "C" {
 #define HANDLED_ACCESS_TYPES (ACCESS_FS_ROUGHLY_READ_EXECUTE | \
 	ACCESS_FS_ROUGHLY_FULL_WRITE)
 
+#define LANDLOCK_ABI_FS_REFER_SUPPORTED 2
+
 /*
  * Performs Landlock create ruleset syscall.
  *
