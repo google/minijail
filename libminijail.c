@@ -2584,9 +2584,11 @@ static void apply_landlock_restrictions(const struct minijail *j)
 		return;
 	}
 
-	while (r) {
-		populate_ruleset_internal(r->path, ruleset_fd, r->landlock_flags);
-		r = r->next;
+	if (minijail_is_fs_restriction_available()) {
+		while (r) {
+			populate_ruleset_internal(r->path, ruleset_fd, r->landlock_flags);
+			r = r->next;
+		}
 	}
 
 	if (ruleset_fd >= 0) {
