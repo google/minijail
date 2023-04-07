@@ -245,7 +245,7 @@ static inline size_t get_num_syscalls(void)
 }
 
 int lookup_syscall(const char *name, size_t *ind);
-const char *lookup_syscall_name(int nr);
+const char *lookup_syscall_name(long nr);
 
 long int parse_single_constant(char *constant_str, char **endptr);
 long int parse_constant(char *constant_str, char **endptr);

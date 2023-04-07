@@ -674,6 +674,20 @@ int minijail_copy_jail(const struct minijail *from, struct minijail *out)
  */
 void minijail_log_to_fd(int fd, int min_priority);
 
+/*
+ * minijail_syscall_name: Returns the name of the provided system call on the
+ * current architecture. This is exposed to make tasks like including the
+ * system call name in crash reports possible. Note this does not support
+ * alt-syscall or other supported ABIs such as x86 (32-bit) when this is built
+ * for x86_64 (64-bit).
+ * @j            Optional minijail struct to check if features that affect
+ *               syscall tables. If NULL, the current syscall ABI is used.
+ * @nr           The system call number.
+ *
+ * Returns the system call name if found otherwise NULL.
+ */
+const char *minijail_syscall_name(const struct minijail *j, long nr);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

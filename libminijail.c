@@ -4162,3 +4162,10 @@ void API minijail_log_to_fd(int fd, int min_priority)
 {
 	init_logging(LOG_TO_FD, fd, min_priority);
 }
+
+const char API *minijail_syscall_name(const struct minijail *j, long nr)
+{
+	if (j && j->flags.alt_syscall)
+		return kAltSyscallNamePlaceholder;
+	return lookup_syscall_name(nr);
+}

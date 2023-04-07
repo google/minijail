@@ -178,7 +178,7 @@ int lookup_syscall(const char *name, size_t *ind)
 	return -1;
 }
 
-const char *lookup_syscall_name(int nr)
+const char *lookup_syscall_name(long nr)
 {
 	const struct syscall_entry *entry = syscall_table;
 	for (; entry->name && entry->nr >= 0; ++entry)

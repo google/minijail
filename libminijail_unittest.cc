@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -2040,4 +2041,29 @@ TEST(Test, default_no_new_session) {
 
 TEST(Test, create_new_session) {
   TestCreateSession(/*create_session=*/true);
+}
+
+TEST(Test, syscall_name_altsyscall) {
+  ScopedMinijail j(minijail_new());
+
+  // Use a placeholder since we don't need a valid table (yet).
+  minijail_use_alt_syscall(j.get(), "placeholder");
+
+  EXPECT_EQ(std::string(minijail_syscall_name(j.get(), 1)),
+            std::string(kAltSyscallNamePlaceholder));
+}
+
+TEST(Test, syscall_name) {
+  // With jail; Success.
+  ScopedMinijail j(minijail_new());
+  EXPECT_EQ(minijail_syscall_name(j.get(), SYS_read), "read");
+
+  // Without jail; Success.
+  EXPECT_EQ(minijail_syscall_name(nullptr, SYS_read), "read");
+
+  // With jail; Null.
+  EXPECT_EQ(minijail_syscall_name(j.get(), -1), nullptr);
+
+  // Without jail; Null.
+  EXPECT_EQ(minijail_syscall_name(nullptr, -1), nullptr);
 }
