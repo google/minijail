@@ -1227,8 +1227,6 @@ int API minijail_add_hook(struct minijail *j, minijail_hook_t hook,
 {
 	struct hook *c;
 
-	if (hook == NULL)
-		return -EINVAL;
 	if (event >= MINIJAIL_HOOK_EVENT_MAX)
 		return -EINVAL;
 	c = calloc(1, sizeof(*c));
