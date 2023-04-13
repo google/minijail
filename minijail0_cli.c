@@ -632,6 +632,9 @@ static const char help_text[] =
 "               Convert the current flags to a config file, then exit.\n"
 "               Only flags impacting the jailed process are included \n"
 "               (this flag, --config, and help messages are not).\n"
+"               This should be set first to avoid evaluating other flags, \n"
+"               or set later to evaluate users and paths currently available\n"
+"               (example: checking if -u is a valid user).\n"
 "               Path must be specified.\n"
 "  --profile <p>\n"
 "               Configure minijail0 to run with the <p> sandboxing profile,\n"
@@ -859,7 +862,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	int log_to_stderr = -1;
 	struct config_entry_list *conf_entry_list = NULL;
 	size_t conf_index = 0;
-	bool gen_config = false;
+	bool parse_mode = false;
 	struct option_entry *opt_entry_head = NULL;
 	struct option_entry *opt_entry_tail = NULL;
 	char* config_path = NULL;
@@ -894,13 +897,15 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			if (use_uid)
 				errx(1, "-u provided multiple times.");
 			use_uid = true;
-			set_user(j, optarg, &uid, &gid);
+			if (!parse_mode)
+				set_user(j, optarg, &uid, &gid);
 			break;
 		case 'g':
 			if (use_gid)
 				errx(1, "-g provided multiple times.");
 			use_gid = true;
-			set_group(j, optarg, &gid);
+			if (!parse_mode)
+				set_group(j, optarg, &gid);
 			break;
 		case 'n':
 			minijail_no_new_privs(j);
@@ -935,7 +940,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			minijail_log_seccomp_filter_failures(j);
 			break;
 		case 'b':
-			add_binding(j, optarg);
+			if (!parse_mode)
+				add_binding(j, optarg);
 			binding = 1;
 			break;
 		case 'B':
@@ -949,7 +955,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			use_chroot(j, optarg, &chroot, pivot_root);
 			break;
 		case 'k':
-			add_mount(j, optarg);
+			if (!parse_mode)
+				add_mount(j, optarg);
 			break;
 		case 'K':
 			remount_mode = optarg;
@@ -959,7 +966,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			use_pivot_root(j, optarg, &pivot_root, chroot);
 			break;
 		case 'f':
-			if (0 != minijail_write_pid_file(j, optarg))
+			if (!parse_mode && 0 != minijail_write_pid_file(j, optarg))
 				errx(1, "Could not prepare pid file path");
 			break;
 		case 't':
@@ -1012,7 +1019,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			mount_ns = 1;
 			break;
 		case 'V':
-			minijail_namespace_enter_vfs(j, optarg);
+			if (!parse_mode)
+				minijail_namespace_enter_vfs(j, optarg);
 			break;
 		case 'r':
 			minijail_remount_proc_readonly(j);
@@ -1036,10 +1044,12 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			minijail_namespace_pids(j);
 			break;
 		case 'e':
-			if (optarg)
-				minijail_namespace_enter_net(j, optarg);
-			else
-				minijail_namespace_net(j);
+			if (!parse_mode) {
+				if (optarg)
+					minijail_namespace_enter_net(j, optarg);
+				else
+					minijail_namespace_net(j);
+			}
 			break;
 		case 'i':
 			*exit_immediately = 1;
@@ -1228,7 +1238,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		}
 		case OPT_GEN_CONFIG:
-			gen_config = true;
+			parse_mode = true;
 			config_path = strdup(optarg);
 			break;
 		case OPT_ENV_ADD:
@@ -1284,7 +1294,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	}
 
 	/* Handle config file generation. */
-	if (gen_config) {
+	if (parse_mode) {
 		struct option_entry *r = opt_entry_head;
 		if (access(config_path, F_OK) == 0) {
 			errx(1, "'%s' exists. Specify a new filename.\n",

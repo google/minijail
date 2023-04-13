@@ -613,6 +613,16 @@ TEST_F(CliTest, valid_gen_config) {
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(0), "");
 }
 
+TEST_F(CliTest, valid_gen_config_with_users_mounts_not_found) {
+  std::string config_path = std::tmpnam(NULL);
+  std::vector<std::string> argv = {"--gen-config=" + config_path, "--ambient",
+                                   "-u fake-user", "-g fake-group",
+                                   "-b /fake-mount", "-k /fake-mount",
+                                   "-e /fake-path", "-f /fake-path",
+                                   "-V /fake-path", "-n"};
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(0), "");
+}
+
 // Invalid calls to the gen-config option.
 TEST_F(CliTest, invalid_gen_config) {
   std::vector<std::string> argv = {"--gen-config=/", "--ambient",
