@@ -28,6 +28,7 @@
 #include "libminijail-private.h"
 #include "libminijail.h"
 #include "scoped_minijail.h"
+#include "test_util.h"
 #include "unittest_util.h"
 #include "util.h"
 
@@ -1126,8 +1127,19 @@ class NamespaceTest : public ::testing::Test {
     if (pid == -1)
       pdie("could not fork");
 
+    // Check that unshare(CLONE_NEWUSER) works.
     if (pid == 0)
       _exit(unshare(CLONE_NEWUSER) == 0 ? 0 : 1);
+
+    // Check that /proc/[pid]/uid_map can be opened. When pivot_root is used to
+    // enter CrOS SDK chroot, unshare() works, but libminijail fails to open
+    // /proc/[pid]/uid_map because its owner uid and gid are set to 0.
+    char* filename = nullptr;
+    if (asprintf(&filename, "/proc/%d/uid_map", pid) == -1)
+      die("asprintf failed");
+    ScopedStr filename_deleter(filename);
+    bool fd_is_valid = ScopedFD(
+        open(filename, O_WRONLY | O_CLOEXEC)).get() != -1;
 
     int status;
     if (waitpid(pid, &status, 0) < 0)
@@ -1136,7 +1148,7 @@ class NamespaceTest : public ::testing::Test {
     if (!WIFEXITED(status))
       die("child did not exit properly: %#x", status);
 
-    bool ret = WEXITSTATUS(status) == 0;
+    bool ret = WEXITSTATUS(status) == 0 && fd_is_valid;
     if (!ret)
       warn("Skipping userns related tests");
     return ret;
