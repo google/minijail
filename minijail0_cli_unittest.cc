@@ -10,6 +10,7 @@
  */
 
 #include <cstdio>
+#include <fstream>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -649,6 +650,24 @@ TEST_F(CliTest, conf_parsing_invalid_key) {
 TEST_F(CliTest, conf_parsing) {
   std::vector<std::string> argv = {"--config",
                                    source_path("test/valid.conf"),
+                                   "/bin/sh"};
+
+  ASSERT_TRUE(parse_args_(argv));
+}
+
+TEST_F(CliTest, conf_parsing_seccomp) {
+  std::string seccomp_path = std::tmpnam(NULL);
+  std::ofstream seccomp_stream(seccomp_path);
+  // Intentionally empty policy.
+  std::string config_path = std::tmpnam(NULL);
+  std::ofstream config_stream(config_path);
+  config_stream <<
+      "% minijail-config-file v0\n"
+      "S = " + seccomp_path;
+  config_stream.flush();
+
+  std::vector<std::string> argv = {"--config",
+                                   config_path,
                                    "/bin/sh"};
 
   ASSERT_TRUE(parse_args_(argv));

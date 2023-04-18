@@ -925,7 +925,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			}
 			seccomp = Filter;
 			minijail_use_seccomp_filter(j);
-			filter_path = optarg;
+			filter_path = xstrdup(optarg);
 			use_seccomp_filter = 1;
 			break;
 		case 'l':
