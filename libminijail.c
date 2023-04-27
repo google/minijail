@@ -3814,12 +3814,6 @@ static int minijail_run_internal(struct minijail *j,
 			pdie("sigprocmask failed");
 	}
 
-	/* Log details about Landlock here to avoid duplicate logs. */
-	if (j->fs_rules_head) {
-		info("Landlock support for LANDLOCK_ACCESS_FS_REFER: %s",
-			fs_refer_restriction_supported(j) ? "true" : "false");
-	}
-
 	if (j->flags.reset_signal_handlers) {
 		int signum;
 		for (signum = 0; signum <= SIGRTMAX; signum++) {
