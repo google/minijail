@@ -349,6 +349,36 @@ static bool fs_refer_restriction_supported(struct minijail *j)
 	return j->fs_rules_landlock_abi >= LANDLOCK_ABI_FS_REFER_SUPPORTED;
 }
 
+/* Sets fs_rules_fd to an empty ruleset, if Landlock is available. */
+static int setup_fs_rules_fd(struct minijail *j)
+{
+	struct minijail_landlock_ruleset_attr ruleset_attr = {
+	    .handled_access_fs = HANDLED_ACCESS_TYPES};
+	if (fs_refer_restriction_supported(j)) {
+		ruleset_attr.handled_access_fs |= LANDLOCK_ACCESS_FS_REFER;
+	}
+
+	j->fs_rules_fd =
+	    landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
+	if (j->fs_rules_fd < 0) {
+		const int err = errno;
+		pwarn("failed to create a ruleset");
+		switch (err) {
+		case ENOSYS:
+			pwarn(
+			    "Landlock is not supported by the current kernel");
+			break;
+		case EOPNOTSUPP:
+			pwarn(
+			    "Landlock is currently disabled by kernel config");
+			break;
+		}
+		return err;
+	}
+
+	return 0;
+}
+
 /* Adds a rule for a given path to apply once minijail is entered. */
 static int add_fs_restriction_path(struct minijail *j,
 		const char *path,
@@ -367,6 +397,20 @@ static int add_fs_restriction_path(struct minijail *j,
 		j->fs_rules_head = r;
 		j->fs_rules_tail = r;
 	}
+
+	/*
+	 * If this is our first rule, set up the rules FD early for API users.
+	 *
+	 * This is important for users calling minijail_enter() directly.
+	 * Otherise, this is handled later inside minijail_run_internal().
+	 *
+	 * The reason for this is because setup_fs_rules_fd() needs to be
+	 * called from inside the process that applies Landlock rules. For
+	 * minijail_enter(), that's this process. For minijail_run_internal(),
+	 * that's the child process.
+	 */
+	if (j->fs_rules_count == 0)
+		setup_fs_rules_fd(j);
 
 	j->fs_rules_count++;
 	return 0;
@@ -1047,6 +1091,11 @@ int API minijail_add_fs_restriction_access_rights(struct minijail *j,
 						  uint16_t landlock_flags)
 {
 	return !add_fs_restriction_path(j, path, landlock_flags);
+}
+
+bool minijail_is_fs_restriction_ruleset_initialized(const struct minijail *j)
+{
+	return j->fs_rules_fd >= 0;
 }
 
 static bool is_valid_bind_path(const char *path)
@@ -2544,37 +2593,7 @@ static void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 	cap_free(caps);
 }
 
-/* Sets fs_rules_fd to an empty ruleset, if Landlock is available. */
-static int setup_fs_rules_fd(struct minijail *j)
-{
-	struct minijail_landlock_ruleset_attr ruleset_attr = {
-	    .handled_access_fs = HANDLED_ACCESS_TYPES};
-	if (fs_refer_restriction_supported(j)) {
-		ruleset_attr.handled_access_fs |= LANDLOCK_ACCESS_FS_REFER;
-	}
-
-	j->fs_rules_fd =
-	    landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
-	if (j->fs_rules_fd < 0) {
-		const int err = errno;
-		pwarn("failed to create a ruleset");
-		switch (err) {
-		case ENOSYS:
-			pwarn(
-			    "Landlock is not supported by the current kernel");
-			break;
-		case EOPNOTSUPP:
-			pwarn(
-			    "Landlock is currently disabled by kernel config");
-			break;
-		}
-		return err;
-	}
-
-	return 0;
-}
-
-/* Creates a ruleset for current inodes then calls landlock_restrict_self(). */
+/* Calls landlock_restrict_self(), based on current inodes. */
 static void apply_landlock_restrictions(const struct minijail *j)
 {
 	struct fs_rule *r = j->fs_rules_head;

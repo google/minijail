@@ -1823,6 +1823,20 @@ TEST_F(LandlockTest, test_fs_rules_availability) {
   }
 }
 
+TEST_F(LandlockTest, test_setup_fs_rules_fd) {
+  // Test that the Landlock ruleset FD is set up, because this is important
+  // behavior for API users calling minijail_enter() directly.
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  EXPECT_FALSE(minijail_is_fs_restriction_ruleset_initialized(j.get()));
+
+  minijail_add_fs_restriction_rx(j.get(), kBinPath);
+
+  EXPECT_TRUE(minijail_is_fs_restriction_ruleset_initialized(j.get()));
+}
+
 TEST_F(LandlockTest, test_rule_allow_symlinks_advanced_rw) {
   int mj_run_ret;
   int status;

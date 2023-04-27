@@ -302,6 +302,15 @@ int minijail_add_fs_restriction_access_rights(struct minijail *j,
 	MINIJAIL_ATTRIBUTE_NONNULL();
 
 /*
+ * Indicates whether a filesystem restriction ruleset has been initialized.
+ *
+ * Exposed primarily for testing.
+ *
+ * This only indicates initialization status, not sandboxing status.
+ */
+bool minijail_is_fs_restriction_ruleset_initialized(const struct minijail *j);
+
+/*
  * Install signal handlers in the minijail process that forward received
  * signals to the jailed child process.
  */
