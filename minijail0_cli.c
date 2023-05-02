@@ -959,7 +959,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				add_mount(j, optarg);
 			break;
 		case 'K':
-			remount_mode = optarg;
+			remount_mode = optarg == NULL ? NULL : xstrdup(optarg);
 			change_remount = 1;
 			break;
 		case 'P':
