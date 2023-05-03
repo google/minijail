@@ -1138,7 +1138,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			use_profile(j, optarg, &pivot_root, chroot, &tmp_size);
 			break;
 		case OPT_PRELOAD_LIBRARY:
-			*preload_path = optarg;
+			*preload_path = optarg == NULL ? NULL : xstrdup(optarg);
 			break;
 		case OPT_ENABLE_PROFILE_FS_RESTRICTIONS:
 			minijail_set_enable_profile_fs_restrictions(j);
@@ -1180,7 +1180,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 					"--seccomp-bpf-binary");
 			seccomp = BpfBinaryFilter;
 			minijail_use_seccomp_filter(j);
-			filter_path = optarg;
+			filter_path = optarg == NULL ? NULL : xstrdup(optarg);
 			use_seccomp_filter_binary = 1;
 			break;
 		case OPT_ADD_SUPPL_GROUP:
