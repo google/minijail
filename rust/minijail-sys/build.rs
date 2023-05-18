@@ -56,6 +56,7 @@ fn set_up_libminijail() -> io::Result<PathBuf> {
     let current_dir = env::var("CARGO_MANIFEST_DIR").unwrap() + "/../..";
     let out_dir = env::var("OUT_DIR").unwrap();
     let profile = env::var("PROFILE").unwrap();
+    let jobs = env::var("JOBS").unwrap_or("4".to_string());
 
     let status = Command::new("make")
         .current_dir(&out_dir)
@@ -65,6 +66,8 @@ fn set_up_libminijail() -> io::Result<PathBuf> {
         .env("BUILD_STATIC_LIBS", "yes")
         .arg("-C")
         .arg(&current_dir)
+        .arg("-j")
+        .arg(&jobs)
         .status()?;
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
