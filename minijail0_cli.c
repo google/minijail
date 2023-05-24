@@ -785,13 +785,11 @@ static int getopt_conf_or_cli(int argc, char *const argv[],
 
 static char *getname_from_opt(int opt) {
 	unsigned int i;
-	unsigned int entry_count =
-		sizeof(long_options)/sizeof(long_options[0]);
 	const struct option *entry = long_options;
 
-	for (i = 0; i < entry_count; i++) {
+	for (i = 0; i < ARRAY_SIZE(long_options); i++) {
 		if (opt == entry->val) {
-			return strdup(entry->name);
+			return xstrdup(entry->name);
 		}
 		entry++;
 	}
@@ -847,7 +845,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	int binding = 0;
 	int chroot = 0, pivot_root = 0;
 	int mount_ns = 0, change_remount = 0;
-	const char *remount_mode = NULL;
+	char *remount_mode = NULL;
 	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
 	int caps = 0, ambient_caps = 0;
 	bool use_uid = false, use_gid = false;
@@ -858,14 +856,14 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	char *uidmap = NULL, *gidmap = NULL;
 	int set_uidmap = 0, set_gidmap = 0;
 	size_t tmp_size = 0;
-	const char *filter_path = NULL;
+	char *filter_path = NULL;
 	int log_to_stderr = -1;
 	struct config_entry_list *conf_entry_list = NULL;
 	size_t conf_index = 0;
 	bool parse_mode = false;
 	struct option_entry *opt_entry_head = NULL;
 	struct option_entry *opt_entry_tail = NULL;
-	char* config_path = NULL;
+	char *config_path = NULL;
 	bool fs_path_flag_used = false;
 	bool fs_path_rules_enabled = true;
 
@@ -879,10 +877,10 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			opt_entry->name = opt_name;
 		} else {
 			char str[2] = {opt, '\0'};
-			opt_entry->name = strdup(str);
+			opt_entry->name = xstrdup(str);
 		}
 		if (optarg != NULL) {
-			opt_entry->args = strdup(optarg);
+			opt_entry->args = xstrdup(optarg);
 		}
 
 		if (opt_entry_head) {
@@ -925,6 +923,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			}
 			seccomp = Filter;
 			minijail_use_seccomp_filter(j);
+			free(filter_path);
 			filter_path = xstrdup(optarg);
 			use_seccomp_filter = 1;
 			break;
@@ -959,6 +958,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				add_mount(j, optarg);
 			break;
 		case 'K':
+			free(remount_mode);
 			remount_mode = optarg == NULL ? NULL : xstrdup(optarg);
 			change_remount = 1;
 			break;
@@ -1239,7 +1239,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		}
 		case OPT_GEN_CONFIG:
 			parse_mode = true;
-			config_path = strdup(optarg);
+			free(config_path);
+			config_path = xstrdup(optarg);
 			break;
 		case OPT_ENV_ADD:
 			/*
@@ -1295,22 +1296,22 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 
 	/* Handle config file generation. */
 	if (parse_mode) {
-		struct option_entry *r = opt_entry_head;
+		const struct option_entry *r = opt_entry_head;
 		if (access(config_path, F_OK) == 0) {
-			errx(1, "'%s' exists. Specify a new filename.\n",
+			errx(1, "'%s' exists. Specify a new filename.",
 			     config_path);
 		}
 		attribute_cleanup_fp FILE *fp = fopen(config_path, "w");
-		if (access(config_path, W_OK) != 0) {
-			errx(1, "'%s' not writable. Specify a new filename.\n",
+		if (fp == NULL) {
+			err(1, "'%s' not writable. Specify a new filename.",
 			     config_path);
 		}
 
 		fprintf(fp, "%% minijail-config-file v0\n\n");
 		while (r != NULL) {
 			/* Add all flags except --config and --gen-config. */
-			if (strcmp(r->name, config_flag_name) &&
-			    strcmp(r->name, gen_config_flag_name)) {
+			if (!streq(r->name, config_flag_name) &&
+			    !streq(r->name, gen_config_flag_name)) {
 				if (r->args == NULL) {
 					fprintf(fp, "%s\n", r->name);
 				} else {
@@ -1320,7 +1321,6 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			r = r->next;
 		}
 
-		printf("config file created.\n");
 		exit(0);
 	}
 	free_options_list(opt_entry_head);
