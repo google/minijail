@@ -1093,7 +1093,8 @@ int API minijail_add_fs_restriction_access_rights(struct minijail *j,
 	return !add_fs_restriction_path(j, path, landlock_flags);
 }
 
-bool minijail_is_fs_restriction_ruleset_initialized(const struct minijail *j)
+bool API minijail_is_fs_restriction_ruleset_initialized(const struct
+							minijail *j)
 {
 	return j->fs_rules_fd >= 0;
 }
@@ -4140,12 +4141,7 @@ void API minijail_destroy(struct minijail *j)
 		free(c);
 	}
 	j->hooks_tail = NULL;
-	while (j->fs_rules_head) {
-		struct fs_rule *r = j->fs_rules_head;
-		j->fs_rules_head = r->next;
-		free(r);
-	}
-	j->fs_rules_tail = NULL;
+	free_fs_rules_list(j);
 	if (j->user)
 		free(j->user);
 	if (j->suppl_gid_list)
