@@ -2082,10 +2082,10 @@ TEST(Test, syscall_name_altsyscall) {
 TEST(Test, syscall_name) {
   // With jail; Success.
   ScopedMinijail j(minijail_new());
-  EXPECT_EQ(minijail_syscall_name(j.get(), SYS_read), "read");
+  EXPECT_STREQ(minijail_syscall_name(j.get(), SYS_read), "read");
 
   // Without jail; Success.
-  EXPECT_EQ(minijail_syscall_name(nullptr, SYS_read), "read");
+  EXPECT_STREQ(minijail_syscall_name(nullptr, SYS_read), "read");
 
   // With jail; Null.
   EXPECT_EQ(minijail_syscall_name(j.get(), -1), nullptr);
