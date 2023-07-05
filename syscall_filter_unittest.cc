@@ -207,6 +207,19 @@ TEST(bpf, bpf_arg_comp) {
   free(arg_comp);
 }
 
+TEST(bpf, bpf_arg_comp_invalid) {
+  struct sock_filter *arg_comp;
+  int op = MIN_OPERATOR + 32;
+  const int argidx = 1;
+  unsigned long c = 3;
+  unsigned int label_id = 0;
+
+  size_t len = bpf_arg_comp(&arg_comp, op, argidx, c, label_id);
+
+  EXPECT_EQ(len, 0);
+  free(arg_comp);
+}
+
 TEST(bpf, bpf_validate_arch) {
   struct sock_filter validate_arch[ARCH_VALIDATION_LEN];
 

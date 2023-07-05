@@ -279,6 +279,8 @@ size_t bpf_arg_comp(struct sock_filter **pfilter, int op, int argidx,
 		flip = 0;
 		break;
 	default:
+		curr_block = filter;
+		free(filter);
 		*pfilter = NULL;
 		return 0;
 	}
