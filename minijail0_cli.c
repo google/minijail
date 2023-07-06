@@ -767,7 +767,7 @@ static int getopt_from_conf(const struct option *longopts,
 /*
  * Similar to getopt(3), return the next option char/value as it
  * parses through the CLI argument list. Config entries in
- * |*conf_entry_list| will be parsed with precendences over cli options.
+ * |*conf_entry_list| will be parsed with precedence over CLI options.
  * Same as getopt(3), |optarg| is pointing to the option argument.
  */
 static int getopt_conf_or_cli(int argc, char *const argv[],
@@ -856,7 +856,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	char *uidmap = NULL, *gidmap = NULL;
 	int set_uidmap = 0, set_gidmap = 0;
 	size_t tmp_size = 0;
-	char *filter_path = NULL;
+	attribute_cleanup_str char *filter_path = NULL;
 	int log_to_stderr = -1;
 	struct config_entry_list *conf_entry_list = NULL;
 	size_t conf_index = 0;
