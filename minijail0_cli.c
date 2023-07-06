@@ -132,7 +132,7 @@ static void suppl_group_add(size_t *suppl_gids_count, gid_t **suppl_gids,
 	 */
 	*suppl_gids =
 	    realloc(*suppl_gids, sizeof(gid_t) * ++(*suppl_gids_count));
-	if (!suppl_gids)
+	if (!*suppl_gids)
 		err(1, "failed to allocate memory");
 
 	(*suppl_gids)[*suppl_gids_count - 1] = gid;
