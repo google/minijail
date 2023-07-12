@@ -1180,6 +1180,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 					"--seccomp-bpf-binary");
 			seccomp = BpfBinaryFilter;
 			minijail_use_seccomp_filter(j);
+			free(filter_path);
 			filter_path = optarg == NULL ? NULL : xstrdup(optarg);
 			use_seccomp_filter_binary = 1;
 			break;
