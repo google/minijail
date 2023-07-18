@@ -404,7 +404,8 @@ class CompileFileTests(unittest.TestCase):
             num_entries = 64 * (i + 1) // iterations
             syscalls = dict(
                 zip(
-                    random.sample(self.arch.syscalls.keys(), num_entries),
+                    random.sample(
+                        list(self.arch.syscalls.keys()), num_entries),
                     (random.randint(1, 1024) for _ in range(num_entries)),
                 ))
 
@@ -479,7 +480,8 @@ class CompileFileTests(unittest.TestCase):
         # codegen layer will coalesce filters that compile to the same
         # instructions.
         policy_contents = []
-        for name in random.sample(self.arch.syscalls.keys(), num_entries):
+        for name in random.sample(
+            list(self.arch.syscalls.keys()), num_entries):
             values = random.sample(range(1024), num_entries)
             syscalls[name] = values
             policy_contents.append(
