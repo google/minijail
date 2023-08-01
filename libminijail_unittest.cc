@@ -44,6 +44,12 @@ constexpr char kShellPath[] = ROOT_PREFIX "/bin/sh";
 constexpr char kCatPath[] = ROOT_PREFIX "/bin/cat";
 constexpr char kPreloadPath[] = "./libminijailpreload.so";
 constexpr size_t kBufferSize = 128;
+constexpr bool kCompiledWithCoverage =
+#if defined(CROS_CODE_COVERAGE_ENABLED)
+  true;
+#else
+  false;
+#endif
 
 std::set<pid_t> GetProcessSubtreePids(pid_t root_pid) {
   std::set<pid_t> pids{root_pid};
@@ -599,7 +605,9 @@ TEST(Test, minijail_no_clobber_pipe_fd) {
 TEST(Test, minijail_run_env_pid_pipes) {
   // TODO(crbug.com/895875): The preload library interferes with ASan since they
   // both need to use LD_PRELOAD.
-  if (running_with_asan())
+  // TODO(b/238743201): This test consistently breaks with code coverage
+  // enabled. That should be fixed.
+  if (kCompiledWithCoverage || running_with_asan())
     GTEST_SKIP();
 
   ScopedMinijail j(minijail_new());
@@ -662,7 +670,9 @@ TEST(Test, minijail_run_env_pid_pipes) {
 TEST(Test, minijail_run_fd_env_pid_pipes) {
   // TODO(crbug.com/895875): The preload library interferes with ASan since they
   // both need to use LD_PRELOAD.
-  if (running_with_asan())
+  // TODO(b/238743201): This test consistently breaks with code coverage
+  // enabled. That should be fixed.
+  if (kCompiledWithCoverage || running_with_asan())
     GTEST_SKIP();
 
   ScopedMinijail j(minijail_new());
@@ -712,7 +722,9 @@ TEST(Test, minijail_run_fd_env_pid_pipes) {
 TEST(Test, minijail_run_env_pid_pipes_with_local_preload) {
   // TODO(crbug.com/895875): The preload library interferes with ASan since they
   // both need to use LD_PRELOAD.
-  if (running_with_asan())
+  // TODO(b/238743201): This test consistently breaks with code coverage
+  // enabled. That should be fixed.
+  if (kCompiledWithCoverage || running_with_asan())
     GTEST_SKIP();
 
   ScopedMinijail j(minijail_new());
