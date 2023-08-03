@@ -1394,8 +1394,6 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	} else if (minijail_get_enable_default_runtime(j)) {
 		if (access(default_policy_path, F_OK) == 0) {
 			/* TODO(b/254506006): support more flags for runtime options. */
-			info("applying policy for default runtime: %s",
-			     default_policy_path);
 			minijail_use_seccomp_filter(j);
 			set_seccomp_filters(j, default_policy_path);
 		}

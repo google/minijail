@@ -3360,9 +3360,7 @@ static void setup_child_std_fds(struct minijail *j,
 		}
 
 		if (isatty(STDIN_FILENO)) {
-			if (ioctl(STDIN_FILENO, TIOCSCTTY, 0) != 0) {
-				pwarn("failed to set controlling terminal");
-			}
+			ioctl(STDIN_FILENO, TIOCSCTTY, 0);
 		}
 	}
 }
