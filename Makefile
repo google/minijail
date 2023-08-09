@@ -108,7 +108,7 @@ UNITTEST_DEPS := testrunner.o test_util.o
 
 USE_SYSTEM_GTEST ?= no
 ifeq ($(USE_SYSTEM_GTEST),no)
-GTEST_CXXFLAGS := -std=gnu++14
+GTEST_CXXFLAGS := -std=gnu++20
 GTEST_LIBS := gtest.a
 UNITTEST_DEPS += $(GTEST_LIBS)
 else
