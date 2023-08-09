@@ -117,6 +117,7 @@ GTEST_CXXFLAGS := $(shell gtest-config --cxxflags 2>/dev/null || \
 GTEST_LIBS := $(shell gtest-config --libs 2>/dev/null || \
   echo "-lgtest -pthread -lpthread")
 endif
+GTEST_CXXFLAGS += -DGTEST_REMOVE_LEGACY_TEST_CASEAPI_
 UNITTEST_LIBS += $(GTEST_LIBS)
 
 CORE_OBJECT_FILES := libminijail.o syscall_filter.o signal_handler.o \
