@@ -361,19 +361,14 @@ static int setup_fs_rules_fd(struct minijail *j)
 	j->fs_rules_fd =
 	    landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
 	if (j->fs_rules_fd < 0) {
-		const int err = errno;
-		pwarn("failed to create a ruleset");
-		switch (err) {
-		case ENOSYS:
-			pwarn(
-			    "Landlock is not supported by the current kernel");
-			break;
-		case EOPNOTSUPP:
-			pwarn(
-			    "Landlock is currently disabled by kernel config");
-			break;
-		}
-		return err;
+		/*
+		 * As of Landlock ABI=3, the useful errors we expect here are
+		 * ENOSYS or EOPNOTSUPP. In both cases, Landlock is not
+		 * supported by the kernel and Minijail can silently ignore it.
+		 * TODO(b/300142205): log when we no longer have 5.4 kernels in
+		 * ChromeOS (~EoY 2024).
+		 */
+		return errno;
 	}
 
 	return 0;
