@@ -9,10 +9,18 @@ import json
 
 
 class Arch(
-        collections.namedtuple('Arch', [
-            'arch_nr', 'arch_name', 'bits', 'syscalls', 'constants',
-            'syscall_groups'
-        ])):
+    collections.namedtuple(
+        "Arch",
+        [
+            "arch_nr",
+            "arch_name",
+            "bits",
+            "syscalls",
+            "constants",
+            "syscall_groups",
+        ],
+    )
+):
     """Holds architecture-specific information."""
 
     def truncate_word(self, value):
@@ -32,13 +40,13 @@ class Arch(
     @staticmethod
     def load_from_json(json_path):
         """Return an Arch from a .json file."""
-        with open(json_path, 'r') as json_file:
+        with open(json_path, "r") as json_file:
             constants = json.load(json_file)
             return Arch(
-                arch_nr=constants['arch_nr'],
-                arch_name=constants['arch_name'],
-                bits=constants['bits'],
-                syscalls=constants['syscalls'],
-                constants=constants['constants'],
-                syscall_groups=constants.get('syscall_groups', {}),
+                arch_nr=constants["arch_nr"],
+                arch_name=constants["arch_name"],
+                bits=constants["bits"],
+                syscalls=constants["syscalls"],
+                constants=constants["constants"],
+                syscall_groups=constants.get("syscall_groups", {}),
             )
