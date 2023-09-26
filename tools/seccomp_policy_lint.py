@@ -28,10 +28,32 @@ DANGEROUS_SYSCALLS = (
     # TODO(b/193169195): Add argument granularity for the below syscalls.
     "prctl",
     "ioctl",
-    # "mmap",
-    # "mprotect",
-    # "mmap2",
+    "mmap",
+    "mmap2",
+    "mprotect",
 )
+
+
+# If a dangerous syscall uses these rules, then it's considered safe.
+SYSCALL_SAFE_RULES = {
+    "mmap": (
+        "arg2 == PROT_READ || arg2 == PROT_NONE",
+        "arg2 in ~PROT_EXEC",
+        "arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE",
+    ),
+    "mmap2": (
+        "arg2 == PROT_READ || arg2 == PROT_NONE",
+        "arg2 in ~PROT_EXEC",
+        "arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE",
+    ),
+    "mprotect": (
+        "arg2 == PROT_READ || arg2 == PROT_NONE",
+        "arg2 in ~PROT_EXEC",
+        "arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE",
+    ),
+}
+
+GLOBAL_SAFE_RULES = ("return 1",)
 
 
 class CheckPolicyReturn(NamedTuple):
@@ -86,28 +108,33 @@ def check_seccomp_policy(check_file, dangerous_syscalls):
             # Empty lines shouldn't reset prev_line_comment.
             continue
         else:
-            match = re.match(r"^\s*(\w*)\s*:", line)
+            match = re.match(r"^\s*(\w*)\s*:\s*(.*)\s*", line)
             if match:
                 syscall = match.group(1)
+                rule = match.group(2)
+                err_prefix = f"{check_file.name}:{line_num}:{syscall}:"
                 if syscall in found_syscalls:
-                    errors.append(
-                        f"{check_file.name}, line {line_num}: repeat "
-                        f"syscall: {syscall}"
-                    )
+                    errors.append(f"{err_prefix} duplicate entry found")
                 else:
                     found_syscalls.add(syscall)
-                    for dangerous in dangerous_syscalls:
-                        if dangerous == syscall:
-                            # Dangerous syscalls must be preceded with a
-                            # comment.
-                            contains_dangerous_syscall = True
-                            if not prev_line_comment:
+                    if syscall in dangerous_syscalls:
+                        contains_dangerous_syscall = True
+                        if not prev_line_comment:
+                            # Dangerous syscalls must be commented.
+                            safe_rules = SYSCALL_SAFE_RULES.get(syscall, ())
+                            if rule in GLOBAL_SAFE_RULES or rule in safe_rules:
+                                pass
+                            elif safe_rules:
+                                # Dangerous syscalls with known safe rules must
+                                # use those rules.
                                 errors.append(
-                                    f"{check_file.name}, line "
-                                    f"{line_num}: {syscall} syscall "
-                                    "is a dangerous syscall so "
-                                    "requires a comment on the "
-                                    "preceding line"
+                                    f"{err_prefix} syscall is dangerous and "
+                                    f"should use one of the rules: {safe_rules}"
+                                )
+                            else:
+                                errors.append(
+                                    f"{err_prefix} syscall is dangerous and "
+                                    "requires a comment on the preceding line"
                                 )
                 prev_line_comment = False
             else:
