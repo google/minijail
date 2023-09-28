@@ -37,10 +37,7 @@ DANGEROUS_SYSCALLS = (
 
 # If a dangerous syscall uses these rules, then it's considered safe.
 SYSCALL_SAFE_RULES = {
-    "getrandom": (
-        # Disallow GRND_RANDOM by default.
-        "arg2 in 0xfffffffd",
-    ),
+    "getrandom": ("arg2 in ~GRND_RANDOM",),
     "mmap": (
         "arg2 == PROT_READ || arg2 == PROT_NONE",
         "arg2 in ~PROT_EXEC",

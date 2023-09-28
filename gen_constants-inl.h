@@ -14,6 +14,7 @@
 #include <linux/mman.h>
 #include <linux/net.h>
 #include <linux/prctl.h>
+#include <linux/random.h>
 #include <linux/sched.h>
 #include <linux/serial.h>
 #include <linux/sockios.h>
