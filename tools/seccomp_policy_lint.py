@@ -8,7 +8,7 @@
 import argparse
 import re
 import sys
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Optional, Set
 
 
 # The syscalls we have determined are more dangerous and need justification
@@ -84,6 +84,10 @@ def parse_args(argv):
         help="Comma-separated list of dangerous sycalls (overrides default).",
     )
     parser.add_argument(
+        "--assume-filename",
+        help="The filename when parsing stdin.",
+    )
+    parser.add_argument(
         "policy",
         help="The seccomp policy.",
         type=argparse.FileType("r", encoding="utf-8"),
@@ -91,12 +95,16 @@ def parse_args(argv):
     return parser.parse_args(argv), parser
 
 
-def check_seccomp_policy(check_file, dangerous_syscalls):
+def check_seccomp_policy(
+    check_file, dangerous_syscalls: Set[str], filename: Optional[str] = None
+):
     """Fail if the seccomp policy file has dangerous, undocumented syscalls.
 
     Takes in a file object and a set of dangerous syscalls as arguments.
     """
 
+    if filename is None:
+        filename = check_file.name
     found_syscalls = set()
     errors = []
     msg = ""
@@ -114,7 +122,7 @@ def check_seccomp_policy(check_file, dangerous_syscalls):
             if match:
                 syscall = match.group(1)
                 rule = match.group(2)
-                err_prefix = f"{check_file.name}:{line_num}:{syscall}:"
+                err_prefix = f"{filename}:{line_num}:{syscall}:"
                 if syscall in found_syscalls:
                     errors.append(f"{err_prefix} duplicate entry found")
                 else:
@@ -146,12 +154,12 @@ def check_seccomp_policy(check_file, dangerous_syscalls):
 
     if contains_dangerous_syscall:
         msg = (
-            f"seccomp: {check_file.name} contains dangerous syscalls, so"
+            f"seccomp: {filename} contains dangerous syscalls, so"
             " requires review from chromeos-security@"
         )
     else:
         msg = (
-            f"seccomp: {check_file.name} does not contain any dangerous"
+            f"seccomp: {filename} does not contain any dangerous"
             " syscalls, so does not require review from"
             " chromeos-security@"
         )
@@ -170,8 +178,9 @@ def main(argv=None):
 
     opts, _arg_parser = parse_args(argv)
 
+    filename = opts.assume_filename if opts.assume_filename else opts.policy
     check = check_seccomp_policy(
-        opts.policy, set(opts.dangerous_syscalls.split(","))
+        opts.policy, set(opts.dangerous_syscalls.split(",")), filename=filename
     )
 
     formatted_items = ""
