@@ -26,7 +26,6 @@
 #include <sys/param.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
-#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
@@ -3134,19 +3133,31 @@ static int close_open_fds(int *inheritable_fds, size_t size)
 }
 
 /* Return true if the specified file descriptor is already open. */
-static int fd_is_open(int fd)
+int minijail_fd_is_open(int fd)
 {
 	return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 
-static_assert(FD_SETSIZE >= MAX_PRESERVED_FDS * 2 - 1,
-	      "If true, ensure_no_fd_conflict will always find an unused fd.");
+/*
+ * Returns true if |check_fd| is one of j->preserved_fds[:max_index].child_fd.
+ */
+static bool is_preserved_child_fd(struct minijail *j, int check_fd,
+				  size_t max_index)
+{
+	max_index = MIN(max_index, j->preserved_fd_count);
+	for (size_t i = 0; i < max_index; i++) {
+		if (j->preserved_fds[i].child_fd == check_fd) {
+			return true;
+		}
+	}
+	return false;
+}
 
 /* If parent_fd will be used by a child fd, move it to an unused fd. */
-static int ensure_no_fd_conflict(const fd_set *child_fds, int child_fd,
-				 int *parent_fd)
+static int ensure_no_fd_conflict(struct minijail *j, int child_fd,
+				 int *parent_fd, size_t max_index)
 {
-	if (!FD_ISSET(*parent_fd, child_fds)) {
+	if (!is_preserved_child_fd(j, *parent_fd, max_index)) {
 		return 0;
 	}
 
@@ -3155,9 +3166,10 @@ static int ensure_no_fd_conflict(const fd_set *child_fds, int child_fd,
 	 * temporary.
 	 */
 	int fd = child_fd;
-	if (fd == -1 || fd_is_open(fd)) {
-		fd = FD_SETSIZE - 1;
-		while (FD_ISSET(fd, child_fds) || fd_is_open(fd)) {
+	if (fd == -1 || minijail_fd_is_open(fd)) {
+		fd = 1023;
+		while (is_preserved_child_fd(j, fd, j->preserved_fd_count) ||
+		       minijail_fd_is_open(fd)) {
 			--fd;
 			if (fd < 0) {
 				die("failed to find an unused fd");
@@ -3182,28 +3194,22 @@ static int ensure_no_fd_conflict(const fd_set *child_fds, int child_fd,
 }
 
 /*
- * Populate child_fds_out with the set of file descriptors that will be replaced
- * by redirect_fds().
- *
- * NOTE: This creates temporaries for parent file descriptors that would
- * otherwise be overwritten during redirect_fds().
+ * Check for contradictory mappings and create temporaries for parent file
+ * descriptors that would otherwise be overwritten during redirect_fds().
  */
-static int get_child_fds(struct minijail *j, fd_set *child_fds_out)
+static int prepare_preserved_fds(struct minijail *j)
 {
 	/* Relocate parent_fds that would be replaced by a child_fd. */
 	for (size_t i = 0; i < j->preserved_fd_count; i++) {
 		int child_fd = j->preserved_fds[i].child_fd;
-		if (FD_ISSET(child_fd, child_fds_out)) {
+		if (is_preserved_child_fd(j, child_fd, i)) {
 			die("fd %d is mapped more than once", child_fd);
 		}
 
 		int *parent_fd = &j->preserved_fds[i].parent_fd;
-		if (ensure_no_fd_conflict(child_fds_out, child_fd, parent_fd) ==
-		    -1) {
+		if (ensure_no_fd_conflict(j, child_fd, parent_fd, i) == -1) {
 			return -1;
 		}
-
-		FD_SET(child_fd, child_fds_out);
 	}
 	return 0;
 }
@@ -3224,8 +3230,8 @@ struct minijail_run_state {
 /*
  * Move pipe_fds if they conflict with a child_fd.
  */
-static int avoid_pipe_conflicts(struct minijail_run_state *state,
-				fd_set *child_fds_out)
+static int avoid_pipe_conflicts(struct minijail *j,
+				struct minijail_run_state *state)
 {
 	int *pipe_fds[] = {
 	    state->pipe_fds,   state->child_sync_pipe_fds, state->stdin_fds,
@@ -3233,13 +3239,13 @@ static int avoid_pipe_conflicts(struct minijail_run_state *state,
 	};
 	for (size_t i = 0; i < ARRAY_SIZE(pipe_fds); ++i) {
 		if (pipe_fds[i][0] != -1 &&
-		    ensure_no_fd_conflict(child_fds_out, -1, &pipe_fds[i][0]) ==
-			-1) {
+		    ensure_no_fd_conflict(j, -1, &pipe_fds[i][0],
+					  j->preserved_fd_count) == -1) {
 			return -1;
 		}
 		if (pipe_fds[i][1] != -1 &&
-		    ensure_no_fd_conflict(child_fds_out, -1, &pipe_fds[i][1]) ==
-			-1) {
+		    ensure_no_fd_conflict(j, -1, &pipe_fds[i][1],
+					  j->preserved_fd_count) == -1) {
 			return -1;
 		}
 	}
@@ -3252,7 +3258,7 @@ static int avoid_pipe_conflicts(struct minijail_run_state *state,
  * NOTE: This will clear FD_CLOEXEC since otherwise the child_fd would not be
  * inherited after the exec call.
  */
-static int redirect_fds(struct minijail *j, fd_set *child_fds)
+static int redirect_fds(struct minijail *j)
 {
 	for (size_t i = 0; i < j->preserved_fd_count; i++) {
 		if (j->preserved_fds[i].parent_fd ==
@@ -3288,7 +3294,8 @@ static int redirect_fds(struct minijail *j, fd_set *child_fds)
 	 */
 	for (size_t i = 0; i < j->preserved_fd_count; i++) {
 		int parent_fd = j->preserved_fds[i].parent_fd;
-		if (!FD_ISSET(parent_fd, child_fds)) {
+		if (!is_preserved_child_fd(j, parent_fd,
+					   j->preserved_fd_count)) {
 			close(parent_fd);
 		}
 	}
@@ -3889,20 +3896,19 @@ static int minijail_run_internal(struct minijail *j,
 	}
 
 	/* The set of fds will be replaced. */
-	fd_set child_fds;
-	FD_ZERO(&child_fds);
-	if (get_child_fds(j, &child_fds))
+	if (prepare_preserved_fds(j))
 		die("failed to set up fd redirections");
 
-	if (avoid_pipe_conflicts(state_out, &child_fds))
+	if (avoid_pipe_conflicts(j, state_out))
 		die("failed to redirect conflicting pipes");
 
 	/* The elf_fd needs to be mutable so use a stack copy from now on. */
 	int elf_fd = config->elf_fd;
-	if (elf_fd != -1 && ensure_no_fd_conflict(&child_fds, -1, &elf_fd))
+	if (elf_fd != -1 &&
+	    ensure_no_fd_conflict(j, -1, &elf_fd, j->preserved_fd_count))
 		die("failed to redirect elf_fd");
 
-	if (redirect_fds(j, &child_fds))
+	if (redirect_fds(j))
 		die("failed to set up fd redirections");
 
 	if (sync_child)
