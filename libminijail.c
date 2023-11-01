@@ -335,7 +335,7 @@ static bool fs_refer_restriction_supported(struct minijail *j)
 {
 	if (j->fs_rules_landlock_abi < 0) {
 		const int abi = landlock_create_ruleset(
-			NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+		    NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
 		/*
 		 * If we have a valid ABI, save the result. Otherwise, leave
 		 * the struct field unmodified to make sure it's correctly
@@ -375,9 +375,8 @@ static int setup_fs_rules_fd(struct minijail *j)
 }
 
 /* Adds a rule for a given path to apply once minijail is entered. */
-static int add_fs_restriction_path(struct minijail *j,
-		const char *path,
-		uint64_t landlock_flags)
+static int add_fs_restriction_path(struct minijail *j, const char *path,
+				   uint64_t landlock_flags)
 {
 	struct fs_rule *r = calloc(1, sizeof(*r));
 	if (!r)
@@ -411,15 +410,18 @@ static int add_fs_restriction_path(struct minijail *j,
 	return 0;
 }
 
-bool mount_has_bind_flag(struct mountpoint *m) {
+bool mount_has_bind_flag(struct mountpoint *m)
+{
 	return !!(m->flags & MS_BIND);
 }
 
-bool mount_has_readonly_flag(struct mountpoint *m) {
+bool mount_has_readonly_flag(struct mountpoint *m)
+{
 	return !!(m->flags & MS_RDONLY);
 }
 
-bool mount_events_allowed(struct mountpoint *m) {
+bool mount_events_allowed(struct mountpoint *m)
+{
 	return !!(m->flags & MS_SHARED) || !!(m->flags & MS_SLAVE);
 }
 
@@ -438,7 +440,8 @@ void minijail_preexec(struct minijail *j)
 	int userns = j->flags.userns;
 	int using_minimalistic_mountns = j->flags.using_minimalistic_mountns;
 	int enable_fs_restrictions = j->flags.enable_fs_restrictions;
-	int enable_profile_fs_restrictions = j->flags.enable_profile_fs_restrictions;
+	int enable_profile_fs_restrictions =
+	    j->flags.enable_profile_fs_restrictions;
 	int enable_default_runtime = j->flags.enable_default_runtime;
 	if (j->user)
 		free(j->user);
@@ -462,7 +465,8 @@ void minijail_preexec(struct minijail *j)
 	j->flags.userns = userns;
 	j->flags.using_minimalistic_mountns = using_minimalistic_mountns;
 	j->flags.enable_fs_restrictions = enable_fs_restrictions;
-	j->flags.enable_profile_fs_restrictions = enable_profile_fs_restrictions;
+	j->flags.enable_profile_fs_restrictions =
+	    enable_profile_fs_restrictions;
 	j->flags.enable_default_runtime = enable_default_runtime;
 	/* Note, |pids| will already have been used before this call. */
 }
@@ -1048,7 +1052,7 @@ int API minijail_create_session(struct minijail *j)
 int API minijail_add_fs_restriction_rx(struct minijail *j, const char *path)
 {
 	return !add_fs_restriction_path(j, path,
-		ACCESS_FS_ROUGHLY_READ_EXECUTE);
+					ACCESS_FS_ROUGHLY_READ_EXECUTE);
 }
 
 int API minijail_add_fs_restriction_ro(struct minijail *j, const char *path)
@@ -1058,15 +1062,15 @@ int API minijail_add_fs_restriction_ro(struct minijail *j, const char *path)
 
 int API minijail_add_fs_restriction_rw(struct minijail *j, const char *path)
 {
-	return !add_fs_restriction_path(j, path,
-		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_BASIC_WRITE);
+	return !add_fs_restriction_path(
+	    j, path, ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_BASIC_WRITE);
 }
 
 int API minijail_add_fs_restriction_advanced_rw(struct minijail *j,
 						const char *path)
 {
 	uint16_t landlock_flags =
-		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_FULL_WRITE;
+	    ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_FULL_WRITE;
 	if (fs_refer_restriction_supported(j)) {
 		landlock_flags |= LANDLOCK_ACCESS_FS_REFER;
 	}
@@ -1074,11 +1078,10 @@ int API minijail_add_fs_restriction_advanced_rw(struct minijail *j,
 	return !add_fs_restriction_path(j, path, landlock_flags);
 }
 
-int API minijail_add_fs_restriction_edit(struct minijail *j,
-						const char *path)
+int API minijail_add_fs_restriction_edit(struct minijail *j, const char *path)
 {
-	return !add_fs_restriction_path(j, path,
-		ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_EDIT);
+	return !add_fs_restriction_path(
+	    j, path, ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_EDIT);
 }
 
 int API minijail_add_fs_restriction_access_rights(struct minijail *j,
@@ -1088,8 +1091,8 @@ int API minijail_add_fs_restriction_access_rights(struct minijail *j,
 	return !add_fs_restriction_path(j, path, landlock_flags);
 }
 
-bool API minijail_is_fs_restriction_ruleset_initialized(const struct
-							minijail *j)
+bool API
+minijail_is_fs_restriction_ruleset_initialized(const struct minijail *j)
 {
 	return j->fs_rules_fd >= 0;
 }
@@ -2593,7 +2596,8 @@ static void drop_caps(const struct minijail *j, unsigned int last_valid_cap)
 static void apply_landlock_restrictions(const struct minijail *j)
 {
 	struct fs_rule *r = j->fs_rules_head;
-	/* The ruleset_fd needs to be mutable so use a stack copy from now on. */
+	/* The ruleset_fd needs to be mutable so use a stack copy from now on.
+	 */
 	int ruleset_fd = j->fs_rules_fd;
 	if (!j->flags.enable_fs_restrictions || !r) {
 		return;
@@ -2601,7 +2605,8 @@ static void apply_landlock_restrictions(const struct minijail *j)
 
 	if (minijail_is_fs_restriction_available()) {
 		while (r) {
-			populate_ruleset_internal(r->path, ruleset_fd, r->landlock_flags);
+			populate_ruleset_internal(r->path, ruleset_fd,
+						  r->landlock_flags);
 			r = r->next;
 		}
 	}
@@ -2617,7 +2622,8 @@ static void apply_landlock_restrictions(const struct minijail *j)
 	}
 }
 
-static void set_no_new_privs(const struct minijail *j) {
+static void set_no_new_privs(const struct minijail *j)
+{
 	if (j->flags.no_new_privs) {
 		if (!sys_set_no_new_privs()) {
 			die("set_no_new_privs() failed");
@@ -3719,7 +3725,8 @@ static int minijail_run_internal(struct minijail *j,
 		}
 	} else {
 		if (j->flags.userns)
-			die("user namespaces in Minijail require a PID namespace");
+			die("user namespaces in Minijail require a PID "
+			    "namespace");
 
 		child_pid = fork();
 

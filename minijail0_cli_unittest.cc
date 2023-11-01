@@ -50,9 +50,9 @@ class CliTest : public ::testing::Test {
 
     // We create & destroy this for every parse_args call because some API
     // calls can dupe memory which confuses LSAN.  https://crbug.com/844615
-    struct minijail *j = minijail_new();
+    struct minijail* j = minijail_new();
 
-    std::vector<const char *> pargv;
+    std::vector<const char*> pargv;
     pargv.push_back("minijail0");
     for (const std::string& arg : argv)
       pargv.push_back(arg.c_str());
@@ -62,7 +62,7 @@ class CliTest : public ::testing::Test {
     testing::internal::CaptureStdout();
 
     const char* preload_path = PRELOADPATH;
-    char **envp = NULL;
+    char** envp = NULL;
     int ret =
         parse_args(j, pargv.size(), const_cast<char* const*>(pargv.data()),
                    NULL, exit_immediately, elftype, &preload_path, &envp);
@@ -241,8 +241,8 @@ TEST_F(CliTest, valid_logging) {
 
   // This should list all valid logging targets.
   const std::vector<std::string> profiles = {
-    "stderr",
-    "syslog",
+      "stderr",
+      "syslog",
   };
 
   for (const auto& profile : profiles) {
@@ -320,8 +320,8 @@ TEST_F(CliTest, valid_profile) {
 
   // This should list all valid profiles.
   const std::vector<std::string> profiles = {
-    "minimalistic-mountns",
-    "minimalistic-mountns-nodev",
+      "minimalistic-mountns",
+      "minimalistic-mountns-nodev",
   };
 
   for (const auto& profile : profiles) {
@@ -350,10 +350,10 @@ TEST_F(CliTest, valid_no_fs_restrictions) {
 // Invalid usage of the no-fs-restrictions option.
 TEST_F(CliTest, invalid_no_fs_restrictions) {
   // Using an fs-path-* flag at the same time shouldn't be allowed.
-  std::vector<std::string> argv = {"--fs-path-rx", "/",
-                                   "--no-fs-restrictions", "/bin/sh"};
+  std::vector<std::string> argv = {"--fs-path-rx", "/", "--no-fs-restrictions",
+                                   "/bin/sh"};
 
-   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
 }
 
 // Valid calls to the chroot option.
@@ -528,10 +528,10 @@ TEST_F(CliTest, valid_remount_mode) {
 
   // This should list all valid modes.
   const std::vector<std::string> modes = {
-    "shared",
-    "private",
-    "slave",
-    "unbindable",
+      "shared",
+      "private",
+      "slave",
+      "unbindable",
   };
 
   for (const auto& mode : modes) {
@@ -577,22 +577,23 @@ TEST_F(CliTest, valid_set_env) {
   ASSERT_TRUE(parse_args_(argv1));
 
   // multiple occurences are allowed.
-  std::vector<std::string> argv2 = {"--env-add", "A=b",
-                                    "--env-add", "b=C=D", "/bin/sh"};
+  std::vector<std::string> argv2 = {"--env-add", "A=b", "--env-add", "b=C=D",
+                                    "/bin/sh"};
   ASSERT_TRUE(parse_args_(argv2));
 
   // --env-reset before any --env-add to not pass our own env.
-  std::vector<std::string> argv3 = {"--env-reset", "--env-add", "A=b", "/bin/sh"};
+  std::vector<std::string> argv3 = {"--env-reset", "--env-add", "A=b",
+                                    "/bin/sh"};
   ASSERT_TRUE(parse_args_(argv3));
 
   // --env-add before an --env-reset doesn't have any effect, but is allowed.
-  std::vector<std::string> argv4 = {"--env-add", "A=b", "--env-reset", "/bin/sh"};
+  std::vector<std::string> argv4 = {"--env-add", "A=b", "--env-reset",
+                                    "/bin/sh"};
   ASSERT_TRUE(parse_args_(argv4));
 }
 
 // Invalid calls to the set env options.
 TEST_F(CliTest, invalid_set_env) {
-
   // invalid env=value arguments.
   std::vector<std::string> argv2 = {"--env-add", "", "/bin/sh"};
 
@@ -616,11 +617,16 @@ TEST_F(CliTest, valid_gen_config) {
 
 TEST_F(CliTest, valid_gen_config_with_users_mounts_not_found) {
   std::string config_path = std::tmpnam(NULL);
-  std::vector<std::string> argv = {"--gen-config=" + config_path, "--ambient",
-                                   "-u fake-user", "-g fake-group",
-                                   "-b /fake-mount", "-k /fake-mount",
-                                   "-e /fake-path", "-f /fake-path",
-                                   "-V /fake-path", "-n"};
+  std::vector<std::string> argv = {"--gen-config=" + config_path,
+                                   "--ambient",
+                                   "-u fake-user",
+                                   "-g fake-group",
+                                   "-b /fake-mount",
+                                   "-k /fake-mount",
+                                   "-e /fake-path",
+                                   "-f /fake-path",
+                                   "-V /fake-path",
+                                   "-n"};
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(0), "");
 }
 
@@ -648,8 +654,7 @@ TEST_F(CliTest, conf_parsing_invalid_key) {
 }
 
 TEST_F(CliTest, conf_parsing) {
-  std::vector<std::string> argv = {"--config",
-                                   source_path("test/valid.conf"),
+  std::vector<std::string> argv = {"--config", source_path("test/valid.conf"),
                                    "/bin/sh"};
 
   ASSERT_TRUE(parse_args_(argv));
@@ -661,33 +666,28 @@ TEST_F(CliTest, conf_parsing_seccomp) {
   // Intentionally empty policy.
   std::string config_path = std::tmpnam(NULL);
   std::ofstream config_stream(config_path);
-  config_stream <<
-      "% minijail-config-file v0\n"
-      "S = " + seccomp_path;
+  config_stream << "% minijail-config-file v0\n"
+                   "S = " +
+                       seccomp_path;
   config_stream.flush();
 
-  std::vector<std::string> argv = {"--config",
-                                   config_path,
-                                   "/bin/sh"};
+  std::vector<std::string> argv = {"--config", config_path, "/bin/sh"};
 
   ASSERT_TRUE(parse_args_(argv));
 }
 
 TEST_F(CliTest, conf_parsing_with_dac_override) {
   std::vector<std::string> argv = {"-c 2", "--config",
-                                   source_path("test/valid.conf"),
-                                   "/bin/sh"};
+                                   source_path("test/valid.conf"), "/bin/sh"};
 
   ASSERT_TRUE(parse_args_(argv));
 }
 
 TEST_F(CliTest, conf_fs_path) {
-  std::vector<std::string> argv = {"-c 2", "--config",
-                                   source_path("test/landlock.conf"),
-                                   "/bin/sh"};
+  std::vector<std::string> argv = {
+      "-c 2", "--config", source_path("test/landlock.conf"), "/bin/sh"};
 
   ASSERT_TRUE(parse_args_(argv));
 }
-
 
 #endif  // !__ANDROID__

@@ -32,7 +32,7 @@
 #include "system.h"
 #include "util.h"
 
-#define IDMAP_LEN 32U
+#define IDMAP_LEN	 32U
 #define DEFAULT_TMP_SIZE (64 * 1024 * 1024)
 
 /* option_entry struct: tracks configuration options. */
@@ -535,16 +535,14 @@ static const struct option long_options[] = {
     {"bind-mount", required_argument, 0, 'b'},
     {"ns-mount", no_argument, 0, 'v'},
     {"enable-profile-fs-restrictions", no_argument, 0,
-      OPT_ENABLE_PROFILE_FS_RESTRICTIONS},
+     OPT_ENABLE_PROFILE_FS_RESTRICTIONS},
     {"fs-default-paths", no_argument, 0, OPT_FS_DEFAULT_PATHS},
     {"fs-path-rx", required_argument, 0, OPT_FS_PATH_RX},
     {"fs-path-ro", required_argument, 0, OPT_FS_PATH_RO},
     {"fs-path-rw", required_argument, 0, OPT_FS_PATH_RW},
     {"fs-path-advanced-rw", required_argument, 0, OPT_FS_PATH_ADVANCED_RW},
-    {"no-default-runtime-environment", no_argument, 0,
-      OPT_NO_DEFAULT_RUNTIME},
-    {"no-fs-restrictions", no_argument, 0,
-      OPT_NO_FS_RESTRICTIONS},
+    {"no-default-runtime-environment", no_argument, 0, OPT_NO_DEFAULT_RUNTIME},
+    {"no-fs-restrictions", no_argument, 0, OPT_NO_FS_RESTRICTIONS},
     {0, 0, 0, 0},
 };
 
@@ -749,9 +747,8 @@ static int getopt_from_conf(const struct option *longopts,
 		}
 
 	/* Look up matching short option. */
-	if (!long_option_found && strlen(entry->key) == 1
-		&& isalpha(*entry->key)
-	    && strchr(optstring, *entry->key) != NULL) {
+	if (!long_option_found && strlen(entry->key) == 1 &&
+	    isalpha(*entry->key) && strchr(optstring, *entry->key) != NULL) {
 		opt = *entry->key;
 	} else if (curr_opt->name == NULL) {
 		errx(1,
@@ -783,7 +780,8 @@ static int getopt_conf_or_cli(int argc, char *const argv[],
 	return opt;
 }
 
-static char *getname_from_opt(int opt) {
+static char *getname_from_opt(int opt)
+{
 	unsigned int i;
 	const struct option *entry = long_options;
 
@@ -812,8 +810,10 @@ static void set_child_env(char ***envp, char *arg, char *const environ[])
 	/* We expect VAR=value format for arg. */
 	char *delim = strchr(arg, '=');
 	if (!delim) {
-		errx(1, "Expected an argument of the "
-		        "form VAR=value (got '%s')", arg);
+		errx(1,
+		     "Expected an argument of the "
+		     "form VAR=value (got '%s')",
+		     arg);
 	}
 	*delim = '\0';
 	const char *env_value = delim + 1;
@@ -831,11 +831,15 @@ static void set_child_env(char ***envp, char *arg, char *const environ[])
 }
 
 int parse_args(struct minijail *j, int argc, char *const argv[],
-	       char *const environ[], int *exit_immediately,
-	       ElfType *elftype, const char **preload_path,
-	       char ***envp)
+	       char *const environ[], int *exit_immediately, ElfType *elftype,
+	       const char **preload_path, char ***envp)
 {
-	enum seccomp_type { None, Strict, Filter, BpfBinaryFilter };
+	enum seccomp_type {
+		None,
+		Strict,
+		Filter,
+		BpfBinaryFilter
+	};
 	enum seccomp_type seccomp = None;
 	int opt;
 	int use_seccomp_filter = 0;
@@ -966,7 +970,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			use_pivot_root(j, optarg, &pivot_root, chroot);
 			break;
 		case 'f':
-			if (!parse_mode && 0 != minijail_write_pid_file(j, optarg))
+			if (!parse_mode &&
+			    0 != minijail_write_pid_file(j, optarg))
 				errx(1, "Could not prepare pid file path");
 			break;
 		case 't':
@@ -1305,7 +1310,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		attribute_cleanup_fp FILE *fp = fopen(config_path, "w");
 		if (fp == NULL) {
 			err(1, "'%s' not writable. Specify a new filename.",
-			     config_path);
+			    config_path);
 		}
 
 		fprintf(fp, "%% minijail-config-file v0\n\n");
@@ -1316,7 +1321,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				if (r->args == NULL) {
 					fprintf(fp, "%s\n", r->name);
 				} else {
-					fprintf(fp, "%s = %s\n", r->name, r->args);
+					fprintf(fp, "%s = %s\n", r->name,
+						r->args);
 				}
 			}
 			r = r->next;
@@ -1393,7 +1399,8 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		set_seccomp_filters(j, filter_path);
 	} else if (minijail_get_enable_default_runtime(j)) {
 		if (access(default_policy_path, F_OK) == 0) {
-			/* TODO(b/254506006): support more flags for runtime options. */
+			/* TODO(b/254506006): support more flags for runtime
+			 * options. */
 			minijail_use_seccomp_filter(j);
 			set_seccomp_filters(j, default_policy_path);
 		}

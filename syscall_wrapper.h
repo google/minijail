@@ -12,7 +12,7 @@ extern "C" {
 
 /* Seccomp filter related flags. */
 #ifndef PR_SET_NO_NEW_PRIVS
-# define PR_SET_NO_NEW_PRIVS 38
+#define PR_SET_NO_NEW_PRIVS 38
 #endif
 
 #ifndef SECCOMP_MODE_FILTER
@@ -20,18 +20,18 @@ extern "C" {
 #endif
 
 #ifndef SECCOMP_SET_MODE_STRICT
-# define SECCOMP_SET_MODE_STRICT 0
+#define SECCOMP_SET_MODE_STRICT 0
 #endif
 #ifndef SECCOMP_SET_MODE_FILTER
-# define SECCOMP_SET_MODE_FILTER 1
+#define SECCOMP_SET_MODE_FILTER 1
 #endif
 
 #ifndef SECCOMP_FILTER_FLAG_TSYNC
-# define SECCOMP_FILTER_FLAG_TSYNC 1
+#define SECCOMP_FILTER_FLAG_TSYNC 1
 #endif
 
 #ifndef SECCOMP_FILTER_FLAG_SPEC_ALLOW
-# define SECCOMP_FILTER_FLAG_SPEC_ALLOW (1 << 2)
+#define SECCOMP_FILTER_FLAG_SPEC_ALLOW (1 << 2)
 #endif
 /* End seccomp filter related flags. */
 

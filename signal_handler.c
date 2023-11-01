@@ -23,16 +23,16 @@ static int get_si_syscall(const siginfo_t *info)
 #endif
 
 	typedef struct {
-		void		*ip;
-		int		nr;
-		unsigned int	arch;
+		void *ip;
+		int nr;
+		unsigned int arch;
 	} local_siginfo_t;
 
 	union {
 		const siginfo_t *info;
 		const local_siginfo_t *local_info;
 	} local_info = {
-		.info = info,
+	    .info = info,
 	};
 	return local_info.local_info->nr;
 }

@@ -40,8 +40,8 @@ int main() {
       first = false;
     else
       std::cout << ",\n";
-    std::cout << "    \"" << entry->name << "\": "
-	      << std::to_string(entry->value);
+    std::cout << "    \"" << entry->name
+              << "\": " << std::to_string(entry->value);
   }
   std::cout << "\n  }\n";
   std::cout << "}\n";

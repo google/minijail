@@ -84,7 +84,7 @@ TEST(write_pid_to_path, basic) {
   ASSERT_TRUE(tmp.is_valid());
 
   EXPECT_EQ(0, write_pid_to_path(1234, tmp.path.c_str()));
-  FILE *fp = fopen(tmp.path.c_str(), "re");
+  FILE* fp = fopen(tmp.path.c_str(), "re");
   EXPECT_NE(nullptr, fp);
   char data[6] = {};
   EXPECT_EQ(5u, fread(data, 1, sizeof(data), fp));
@@ -181,8 +181,8 @@ TEST(setup_mount_destination, create_pseudo_fs) {
 
   // Passing -1 for user ID/group ID tells chown to make no changes.
   std::string no_chmod = dir.path + "/no_chmod";
-  EXPECT_EQ(0, setup_mount_destination("none", no_chmod.c_str(), -1, -1,
-                                       false));
+  EXPECT_EQ(0,
+            setup_mount_destination("none", no_chmod.c_str(), -1, -1, false));
   // We check it's a directory by deleting it as such.
   EXPECT_EQ(0, rmdir(no_chmod.c_str()));
 
@@ -211,8 +211,8 @@ TEST(setup_mount_destination, create_bind_dir) {
 
   // Passing -1 for user ID/group ID tells chown to make no changes.
   std::string child_dir = dir.path + "/child_dir";
-  EXPECT_EQ(0, setup_mount_destination(kValidDir, child_dir.c_str(), -1, -1,
-                                       true));
+  EXPECT_EQ(
+      0, setup_mount_destination(kValidDir, child_dir.c_str(), -1, -1, true));
   // We check it's a directory by deleting it as such.
   EXPECT_EQ(0, rmdir(child_dir.c_str()));
 }
@@ -224,8 +224,8 @@ TEST(setup_mount_destination, create_bind_file) {
 
   // Passing -1 for user ID/group ID tells chown to make no changes.
   std::string child_file = dir.path + "/child_file";
-  EXPECT_EQ(0, setup_mount_destination(kValidFile, child_file.c_str(), -1, -1,
-                                       true));
+  EXPECT_EQ(
+      0, setup_mount_destination(kValidFile, child_file.c_str(), -1, -1, true));
   // We check it's a file by deleting it as such.
   EXPECT_EQ(0, unlink(child_file.c_str()));
 }

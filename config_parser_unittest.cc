@@ -15,20 +15,20 @@
 namespace {
 
 class ConfigFileTest : public ::testing::Test {
-protected:
+ protected:
   virtual void SetUp() {
     list_ = new_config_entry_list();
     ASSERT_NE(list_, nullptr);
   }
   virtual void TearDown() { free_config_entry_list(list_); }
-  struct config_entry_list *list_;
+  struct config_entry_list* list_;
 };
 
-} // namespace
+}  // namespace
 
 TEST(ParsingConfigTest, valid_config_line) {
   ScopedConfigEntry entry(
-      (config_entry *)calloc(1, sizeof(struct config_entry)));
+      (config_entry*)calloc(1, sizeof(struct config_entry)));
   const std::vector<std::string> valid_conf_lines = {
       "mount=none",
       "valueless_key"
@@ -44,7 +44,7 @@ TEST(ParsingConfigTest, valid_config_line) {
 
 TEST(ParsingConfigTest, invalid_config_line) {
   ScopedConfigEntry entry(
-      (config_entry *)calloc(1, sizeof(struct config_entry)));
+      (config_entry*)calloc(1, sizeof(struct config_entry)));
   const std::vector<std::string> invalid_conf_lines = {
       "= none",
       "",
@@ -58,8 +58,9 @@ TEST(ParsingConfigTest, invalid_config_line) {
 }
 
 TEST_F(ConfigFileTest, malformed_config_line) {
-  std::string config = "% minijail-config-file v0\n"
-                       "=malformed";
+  std::string config =
+      "% minijail-config-file v0\n"
+      "=malformed";
   ScopedFILE config_file(write_to_pipe(config));
   ASSERT_NE(config_file.get(), nullptr);
 
@@ -71,8 +72,9 @@ TEST_F(ConfigFileTest, malformed_config_line) {
 }
 
 TEST_F(ConfigFileTest, bad_directive) {
-  std::string config = "% bad-directive\n"
-                       "# comments";
+  std::string config =
+      "% bad-directive\n"
+      "# comments";
   ScopedFILE config_file(write_to_pipe(config));
   ASSERT_NE(config_file.get(), nullptr);
 
@@ -84,12 +86,13 @@ TEST_F(ConfigFileTest, bad_directive) {
 }
 
 TEST_F(ConfigFileTest, wellformed_single_line) {
-  std::string config = "% minijail-config-file v0\n"
-                       "# Comments \n"
-                       "\n"
-                       "uts\n"
-                       "mount= xyz\n"
-                       "binding = none,/tmp";
+  std::string config =
+      "% minijail-config-file v0\n"
+      "# Comments \n"
+      "\n"
+      "uts\n"
+      "mount= xyz\n"
+      "binding = none,/tmp";
   ScopedFILE config_file(write_to_pipe(config));
   ASSERT_NE(config_file.get(), nullptr);
 
@@ -97,9 +100,9 @@ TEST_F(ConfigFileTest, wellformed_single_line) {
 
   ASSERT_TRUE(res);
   ASSERT_EQ(list_->num_entries, 3);
-  struct config_entry *first_entry = list_->entries;
-  struct config_entry *second_entry = list_->entries + 1;
-  struct config_entry *third_entry = list_->entries + 2;
+  struct config_entry* first_entry = list_->entries;
+  struct config_entry* second_entry = list_->entries + 1;
+  struct config_entry* third_entry = list_->entries + 2;
   ASSERT_EQ(std::string(first_entry->key), "uts");
   ASSERT_EQ(first_entry->value, nullptr);
   ASSERT_EQ(std::string(second_entry->key), "mount");
@@ -109,13 +112,14 @@ TEST_F(ConfigFileTest, wellformed_single_line) {
 }
 
 TEST_F(ConfigFileTest, wellformed_multi_line) {
-  std::string config = "% minijail-config-file v0\n"
-                       "# Comments \n"
-                       "\n"
-                       "mount = \\\n"
-                       "none\n"
-                       "binding = none,\\\n"
-                       "/tmp";
+  std::string config =
+      "% minijail-config-file v0\n"
+      "# Comments \n"
+      "\n"
+      "mount = \\\n"
+      "none\n"
+      "binding = none,\\\n"
+      "/tmp";
   ScopedFILE config_file(write_to_pipe(config));
   ASSERT_NE(config_file.get(), nullptr);
 
@@ -123,8 +127,8 @@ TEST_F(ConfigFileTest, wellformed_multi_line) {
 
   ASSERT_TRUE(res);
   ASSERT_EQ(list_->num_entries, 2);
-  struct config_entry *first_entry = list_->entries;
-  struct config_entry *second_entry = list_->entries + 1;
+  struct config_entry* first_entry = list_->entries;
+  struct config_entry* second_entry = list_->entries + 1;
   ASSERT_EQ(std::string(first_entry->key), "mount");
   ASSERT_EQ(std::string(first_entry->value), "none");
   ASSERT_EQ(std::string(second_entry->key), "binding");

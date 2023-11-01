@@ -35,43 +35,58 @@
  */
 const char *const log_syscalls[] = {
 #if defined(__x86_64__)
-# if defined(__ANDROID__)
-  "socket", "connect", "fcntl", "writev",
-# else
-  "socket", "connect", "sendto", "writev",
-# endif
-#elif defined(__i386__)
-# if defined(__ANDROID__)
-  "socketcall", "writev", "fcntl64", "clock_gettime",
-# else
-  "socketcall", "time", "writev",
-# endif
-#elif defined(__arm__)
-# if defined(__ANDROID__)
-  "clock_gettime", "connect", "fcntl64", "socket", "writev",
-# else
-  "socket", "connect", "gettimeofday", "send", "writev",
-# endif
-#elif defined(__aarch64__)
-# if defined(__ANDROID__)
-  "connect", "fcntl", "sendto", "socket", "writev",
-# else
-  "socket", "connect", "send", "writev",
-# endif
-#elif defined(__hppa__) || \
-      defined(__ia64__) || \
-      defined(__mips__) || \
-      defined(__powerpc__) || \
-      defined(__sparc__)
-  "socket", "connect", "send",
-#elif defined(__riscv)
-# if defined(__ANDROID__)
-  "connect", "fcntl", "sendto", "socket", "writev",
-# else
-  "socket", "connect", "sendto",
-# endif
+#if defined(__ANDROID__)
+    "socket",
+    "connect",
+    "fcntl",
+    "writev",
 #else
-# error "Unsupported platform"
+    "socket",
+    "connect",
+    "sendto",
+    "writev",
+#endif
+#elif defined(__i386__)
+#if defined(__ANDROID__)
+    "socketcall",
+    "writev",
+    "fcntl64",
+    "clock_gettime",
+#else
+    "socketcall",
+    "time",
+    "writev",
+#endif
+#elif defined(__arm__)
+#if defined(__ANDROID__)
+    "clock_gettime", "connect", "fcntl64", "socket", "writev",
+#else
+    "socket", "connect", "gettimeofday", "send", "writev",
+#endif
+#elif defined(__aarch64__)
+#if defined(__ANDROID__)
+    "connect", "fcntl", "sendto", "socket", "writev",
+#else
+    "socket",
+    "connect",
+    "send",
+    "writev",
+#endif
+#elif defined(__hppa__) || defined(__ia64__) || defined(__mips__) ||           \
+    defined(__powerpc__) || defined(__sparc__)
+    "socket",
+    "connect",
+    "send",
+#elif defined(__riscv)
+#if defined(__ANDROID__)
+    "connect", "fcntl", "sendto", "socket", "writev",
+#else
+    "socket",
+    "connect",
+    "sendto",
+#endif
+#else
+#error "Unsupported platform"
 #endif
 };
 
@@ -537,7 +552,8 @@ char **minijail_copy_env(char *const *env)
  * minijail_getenv, returns true if |name| is found, false if not.
  * If found, |*i| is |name|'s index. If not, |*i| is the length of |envp|.
  */
-static bool getenv_index(char **envp, const char *name, int *i) {
+static bool getenv_index(char **envp, const char *name, int *i)
+{
 	if (!envp || !name || !i)
 		return false;
 
@@ -637,7 +653,8 @@ ssize_t getmultiline(char **lineptr, size_t *n, FILE *stream)
 	return *n - 1;
 }
 
-char *minijail_getenv(char **envp, const char *name) {
+char *minijail_getenv(char **envp, const char *name)
+{
 	if (!envp || !name)
 		return NULL;
 

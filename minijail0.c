@@ -24,9 +24,8 @@ int main(int argc, char *argv[], char *environ[])
 	int exit_immediately = 0;
 	ElfType elftype = ELFERROR;
 	char **envp = NULL;
-	int consumed = parse_args(j, argc, argv, environ,
-				  &exit_immediately, &elftype,
-				  &preload_path, &envp);
+	int consumed = parse_args(j, argc, argv, environ, &exit_immediately,
+				  &elftype, &preload_path, &envp);
 	argc -= consumed;
 	argv += consumed;
 

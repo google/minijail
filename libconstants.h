@@ -12,4 +12,4 @@ struct constant_entry {
 
 extern const struct constant_entry constant_table[];
 
-#endif  /* MINIJAIL_LIBCONSTANTS_H_ */
+#endif /* MINIJAIL_LIBCONSTANTS_H_ */

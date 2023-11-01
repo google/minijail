@@ -9,8 +9,8 @@
  * See the minijail0.1 for a design explanation.
  */
 
-#include "libminijail.h"
 #include "libminijail-private.h"
+#include "libminijail.h"
 #include "util.h"
 
 #include <dlfcn.h>
@@ -21,7 +21,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-static int (*real_main) (int, char **, char **);
+static int (*real_main)(int, char **, char **);
 static void *libc_handle;
 
 static void truncate_preload_env(char **envp, const char *name)

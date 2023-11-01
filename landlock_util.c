@@ -13,10 +13,9 @@
 
 #include "util.h"
 
-
-int landlock_create_ruleset(const struct
-			    minijail_landlock_ruleset_attr *const attr,
-			    const size_t size, const __u32 flags)
+int landlock_create_ruleset(
+    const struct minijail_landlock_ruleset_attr *const attr, const size_t size,
+    const __u32 flags)
 {
 	return syscall(__NR_landlock_create_ruleset, attr, size, flags);
 }
@@ -25,22 +24,20 @@ int landlock_add_rule(const int ruleset_fd,
 		      const enum minijail_landlock_rule_type rule_type,
 		      const void *const rule_attr, const __u32 flags)
 {
-	return syscall(__NR_landlock_add_rule, ruleset_fd, rule_type,
-			rule_attr, flags);
+	return syscall(__NR_landlock_add_rule, ruleset_fd, rule_type, rule_attr,
+		       flags);
 }
 
-int landlock_restrict_self(const int ruleset_fd,
-			   const __u32 flags)
+int landlock_restrict_self(const int ruleset_fd, const __u32 flags)
 {
 	return syscall(__NR_landlock_restrict_self, ruleset_fd, flags);
 }
 
-bool populate_ruleset_internal(const char *const path,
-			       const int ruleset_fd,
+bool populate_ruleset_internal(const char *const path, const int ruleset_fd,
 			       const uint64_t allowed_access)
 {
 	struct minijail_landlock_path_beneath_attr path_beneath = {
-		.parent_fd = -1,
+	    .parent_fd = -1,
 	};
 	struct stat statbuf;
 	attribute_cleanup_fd int parent_fd = open(path, O_PATH | O_CLOEXEC);
@@ -57,7 +54,7 @@ bool populate_ruleset_internal(const char *const path,
 		path_beneath.allowed_access &= ACCESS_FILE;
 	}
 	if (landlock_add_rule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH,
-			&path_beneath, 0)) {
+			      &path_beneath, 0)) {
 		pwarn("Failed to update ruleset \"%s\"", path);
 		return false;
 	}

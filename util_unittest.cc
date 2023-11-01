@@ -19,7 +19,7 @@
 
 namespace {
 
-std::string dump_env(const char *const *env) {
+std::string dump_env(const char* const* env) {
   std::string result;
   for (; *env; ++env) {
     result += *env;
@@ -43,14 +43,14 @@ TEST(tokenize, null_stringp) {
   ASSERT_EQ(nullptr, tokenize(nullptr, ""));
   ASSERT_EQ(nullptr, tokenize(nullptr, ","));
 
-  char *p = nullptr;
+  char* p = nullptr;
   ASSERT_EQ(nullptr, tokenize(&p, nullptr));
 }
 
 // Make sure we don't crash with various "null"-like inputs.
 TEST(tokenize, null_delim) {
   char str[] = "a,b,c";
-  char *p = str;
+  char* p = str;
   ASSERT_EQ(str, tokenize(&p, nullptr));
   ASSERT_EQ(nullptr, p);
   ASSERT_EQ(str, std::string("a,b,c"));
@@ -64,7 +64,7 @@ TEST(tokenize, null_delim) {
 // Sanity check for the tokenize func.
 TEST(tokenize, basic) {
   char str[] = "a,b,c";
-  char *p = str;
+  char* p = str;
   ASSERT_EQ("a", std::string(tokenize(&p, ",")));
   ASSERT_EQ("b", std::string(tokenize(&p, ",")));
   ASSERT_EQ("c", std::string(tokenize(&p, ",")));
@@ -75,7 +75,7 @@ TEST(tokenize, basic) {
 // Check edge case with an empty string.
 TEST(tokenize, empty_string) {
   char str[] = "";
-  char *p = str;
+  char* p = str;
   ASSERT_EQ("", std::string(tokenize(&p, ",")));
   ASSERT_EQ(nullptr, p);
   ASSERT_EQ(nullptr, tokenize(&p, ","));
@@ -84,7 +84,7 @@ TEST(tokenize, empty_string) {
 // Check behavior with empty tokens at the start/middle/end.
 TEST(tokenize, empty_tokens) {
   char str[] = ",,a,b,,,c,,";
-  char *p = str;
+  char* p = str;
   ASSERT_EQ("", std::string(tokenize(&p, ",")));
   ASSERT_EQ("", std::string(tokenize(&p, ",")));
   ASSERT_EQ("a", std::string(tokenize(&p, ",")));
@@ -102,17 +102,12 @@ TEST(tokenize, empty_tokens) {
 TEST(environment, copy_and_modify) {
   minijail_free_env(nullptr);
 
-  char **env = minijail_copy_env(nullptr);
+  char** env = minijail_copy_env(nullptr);
   EXPECT_EQ("", dump_env(env));
   minijail_free_env(env);
 
-  const char *const kConstEnv[] = {
-    "val1=1",
-    "val2=2",
-    "dup=1",
-    "dup=2",
-    "empty=",
-    nullptr,
+  const char* const kConstEnv[] = {
+      "val1=1", "val2=2", "dup=1", "dup=2", "empty=", nullptr,
   };
 
   // libc unfortunately uses char* const[] as the type for the environment, and
@@ -129,7 +124,7 @@ TEST(environment, copy_and_modify) {
   EXPECT_EQ("val1=1\nval2=2\ndup=1\ndup=2\nempty=\n", dump_env(env));
 
   EXPECT_EQ(EINVAL, minijail_setenv(nullptr, "val1", "3", 1));
-  char **env_ret = nullptr;
+  char** env_ret = nullptr;
   EXPECT_EQ(EINVAL, minijail_setenv(&env_ret, "val1", "3", 1));
 
   env_ret = env;
@@ -198,7 +193,7 @@ TEST(environment, copy_and_modify) {
 }
 
 TEST(parse_single_constant, formats) {
-  char *end;
+  char* end;
   long int c = 0;
   std::string constant;
 
@@ -219,7 +214,7 @@ TEST(parse_single_constant, formats) {
 }
 
 TEST(parse_constant, unsigned) {
-  char *end;
+  char* end;
   long int c = 0;
   std::string constant;
 
@@ -234,12 +229,12 @@ TEST(parse_constant, unsigned) {
   EXPECT_EQ(0x8000000000000000UL, static_cast<unsigned long int>(c));
 
 #else
-# error "unknown bits!"
+#error "unknown bits!"
 #endif
 }
 
 TEST(parse_constant, unsigned_toobig) {
-  char *end;
+  char* end;
   long int c = 0;
   std::string constant;
 
@@ -256,12 +251,12 @@ TEST(parse_constant, unsigned_toobig) {
   EXPECT_EQ(0, c);
 
 #else
-# error "unknown bits!"
+#error "unknown bits!"
 #endif
 }
 
 TEST(parse_constant, signed) {
-  char *end;
+  char* end;
   long int c = 0;
   std::string constant = "-1";
   c = parse_constant(const_cast<char*>(constant.data()), &end);
@@ -269,7 +264,7 @@ TEST(parse_constant, signed) {
 }
 
 TEST(parse_constant, signed_toonegative) {
-  char *end;
+  char* end;
   long int c = 0;
   std::string constant;
 
@@ -286,7 +281,7 @@ TEST(parse_constant, signed_toonegative) {
   EXPECT_EQ(0, c);
 
 #else
-# error "unknown bits!"
+#error "unknown bits!"
 #endif
 }
 
@@ -312,7 +307,7 @@ TEST(parse_constant, complements) {
   EXPECT_EQ(c, 0xFFFF00000000FFFFUL);
 
 #else
-# error "unknown bits!"
+#error "unknown bits!"
 #endif
 }
 
@@ -397,7 +392,7 @@ TEST(parse_size, complete) {
 }
 
 TEST(path_join, basic) {
-  char *path = path_join("a", "b");
+  char* path = path_join("a", "b");
   ASSERT_EQ(std::string("a/b"), path);
   free(path);
 }
@@ -418,17 +413,17 @@ TEST(path_is_parent, simple) {
 
 TEST(getmultiline, basic) {
   std::string config =
-           "\n"
-           "mount = none\n"
-           "mount =\\\n"
-           "none\n"
-           "binding = none,/tmp\n"
-           "binding = none,\\\n"
-           "/tmp";
-  FILE *config_file = write_to_pipe(config);
+      "\n"
+      "mount = none\n"
+      "mount =\\\n"
+      "none\n"
+      "binding = none,/tmp\n"
+      "binding = none,\\\n"
+      "/tmp";
+  FILE* config_file = write_to_pipe(config);
   ASSERT_NE(config_file, nullptr);
 
-  char *line = NULL;
+  char* line = NULL;
   size_t len = 0;
   ASSERT_EQ(0, getmultiline(&line, &len, config_file));
   EXPECT_EQ(std::string(line), "");

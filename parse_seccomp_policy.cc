@@ -79,8 +79,7 @@ int main(int argc, char** argv) {
     pdie("fopen(%s) failed", argv[1]);
 
   struct filter_options fopts {
-    .action = ACTION_RET_KILL,
-    .allow_logging = 0,
+    .action = ACTION_RET_KILL, .allow_logging = 0,
     .allow_syscalls_for_logging = 0,
     .allow_duplicate_syscalls = allow_duplicate_syscalls(),
   };
