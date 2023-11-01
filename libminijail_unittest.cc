@@ -374,13 +374,20 @@ TEST(Test, minijail_preserve_fd_no_leak) {
     )";
   char* const argv[] = {"sh", "-c", script, nullptr};
 
-  const int npipes = 3;
+  const int high_fd = 99999;
+  const int npipes = 4;
   int fds[npipes][2];
 
   // Create pipes.
   for (int i = 0; i < npipes; ++i) {
     ASSERT_EQ(pipe(fds[i]), 0);
   }
+
+  // (b/308042314) Move a pipe to > 1024 to check for a crash.
+  ASSERT_FALSE(minijail_fd_is_open(high_fd)) << "high_fd is already in use";
+  ASSERT_EQ(dup2(fds[3][1], high_fd), high_fd);
+  EXPECT_EQ(close(fds[3][1]), 0);
+  fds[3][1] = high_fd;
 
   // All pipes are output pipes except for the first one which is used as
   // input pipe.

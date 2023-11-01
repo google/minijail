@@ -89,6 +89,10 @@ extern void minijail_preexec(struct minijail *j);
  */
 extern void minijail_preenter(struct minijail *j);
 
+/* minijail_fd_is_open: returns true if the specified file descriptor is open.
+ */
+extern int minijail_fd_is_open(int fd);
+
 #ifdef __cplusplus
 }; /* extern "C" */
 #endif
