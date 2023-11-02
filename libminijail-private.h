@@ -10,6 +10,8 @@
 #ifndef LIBMINIJAIL_PRIVATE_H
 #define LIBMINIJAIL_PRIVATE_H
 
+#include <sys/types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
