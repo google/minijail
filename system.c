@@ -175,6 +175,10 @@ unsigned int get_last_valid_cap(void)
 			pdie("fscanf(%s)", cap_file);
 		fclose(fp);
 	}
+	/* Caps are bitfields stored in 64-bit int. */
+	if (last_valid_cap > 64)
+		pdie("unable to detect last valid cap: %u > 64",
+		     last_valid_cap);
 	return last_valid_cap;
 }
 
