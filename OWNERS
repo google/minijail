@@ -1,5 +1,5 @@
 set noparent
 include OWNERS_GENERAL
 # Emeritus.
-drewry@google.com
-keescook@google.com
+drewry@google.com #{LAST_RESORT_SUGGESTION}
+keescook@google.com #{LAST_RESORT_SUGGESTION}
