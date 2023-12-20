@@ -176,6 +176,7 @@ struct minijail {
 		bool enable_fs_restrictions : 1;
 		bool enable_profile_fs_restrictions : 1;
 		bool enable_default_runtime : 1;
+		bool enable_new_sessions : 1;
 	} flags;
 	uid_t uid;
 	gid_t gid;
@@ -327,6 +328,7 @@ void minijail_preenter(struct minijail *j)
 	j->flags.using_minimalistic_mountns = 0;
 	j->flags.enable_profile_fs_restrictions = 0;
 	j->flags.enable_default_runtime = 0;
+	j->flags.enable_new_sessions = 0;
 	free_remounts_list(j);
 }
 
@@ -442,6 +444,7 @@ void minijail_preexec(struct minijail *j)
 	int enable_profile_fs_restrictions =
 	    j->flags.enable_profile_fs_restrictions;
 	int enable_default_runtime = j->flags.enable_default_runtime;
+	int enable_new_sessions = j->flags.enable_new_sessions;
 	if (j->user)
 		free(j->user);
 	j->user = NULL;
@@ -467,6 +470,7 @@ void minijail_preexec(struct minijail *j)
 	j->flags.enable_profile_fs_restrictions =
 	    enable_profile_fs_restrictions;
 	j->flags.enable_default_runtime = enable_default_runtime;
+	j->flags.enable_new_sessions = enable_new_sessions;
 	/* Note, |pids| will already have been used before this call. */
 }
 
@@ -483,6 +487,7 @@ struct minijail API *minijail_new(void)
 		j->flags.enable_fs_restrictions = true;
 		j->flags.enable_profile_fs_restrictions = true;
 		j->flags.enable_default_runtime = true;
+		j->flags.enable_new_sessions = true;
 	}
 	return j;
 }
@@ -636,6 +641,12 @@ void API minijail_log_seccomp_filter_failures(struct minijail *j)
 void API minijail_set_using_minimalistic_mountns(struct minijail *j)
 {
 	j->flags.using_minimalistic_mountns = true;
+}
+
+void API minijail_set_enable_new_sessions(struct minijail *j,
+					  bool enable_new_sessions)
+{
+	j->flags.enable_new_sessions = enable_new_sessions;
 }
 
 void API minijail_set_enable_default_runtime(struct minijail *j,
@@ -3352,17 +3363,24 @@ static void setup_child_std_fds(struct minijail *j,
 		close_and_reset(&std_pipes[i][1]);
 	}
 
+	/* Make sure we're not trying to skip setsid() with a PID namespace. */
+	if (!j->flags.enable_new_sessions && j->flags.pids) {
+		die("cannot skip setsid() with PID namespace");
+	}
+
 	/*
-	 * If any of stdin, stdout, or stderr are TTYs, or setsid flag is
-	 * set, create a new session. This prevents the jailed process from
-	 * using the TIOCSTI ioctl to push characters into the parent process
-	 * terminal's input buffer, therefore escaping the jail.
+	 * If new sessions are enabled and any of stdin, stdout, or stderr are
+	 * TTYs, or setsid flag is set, create a new session. This prevents
+	 * the jailed process from using the TIOCSTI ioctl to push characters
+	 * into the parent process terminal's input buffer, therefore escaping
+	 * the jail.
 	 *
 	 * Since it has just forked, the child will not be a process group
 	 * leader, and this call to setsid() should always succeed.
 	 */
-	if (j->flags.setsid || isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) ||
-	    isatty(STDERR_FILENO)) {
+	if (j->flags.enable_new_sessions &&
+	    (j->flags.setsid || isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) ||
+	     isatty(STDERR_FILENO))) {
 		if (setsid() < 0) {
 			pdie("setsid() failed");
 		}

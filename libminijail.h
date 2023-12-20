@@ -130,6 +130,9 @@ void minijail_set_using_minimalistic_mountns(struct minijail *j)
 void minijail_set_enable_default_runtime(struct minijail *j,
 					 bool enable_default_runtime)
     MINIJAIL_ATTRIBUTE_NONNULL();
+void minijail_set_enable_new_sessions(struct minijail *j,
+				      bool enable_new_sessions)
+    MINIJAIL_ATTRIBUTE_NONNULL();
 /*
  * Sets enable_profile_fs_restrictions to true.
  *

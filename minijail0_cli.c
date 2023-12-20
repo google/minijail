@@ -500,6 +500,7 @@ enum {
 	OPT_LOGGING,
 	OPT_NO_DEFAULT_RUNTIME,
 	OPT_NO_FS_RESTRICTIONS,
+	OPT_NO_NEW_SESSIONS,
 	OPT_PRELOAD_LIBRARY,
 	OPT_PROFILE,
 	OPT_SECCOMP_BPF_BINARY,
@@ -543,6 +544,7 @@ static const struct option long_options[] = {
     {"fs-path-advanced-rw", required_argument, 0, OPT_FS_PATH_ADVANCED_RW},
     {"no-default-runtime-environment", no_argument, 0, OPT_NO_DEFAULT_RUNTIME},
     {"no-fs-restrictions", no_argument, 0, OPT_NO_FS_RESTRICTIONS},
+    {"no-new-sessions", no_argument, 0, OPT_NO_NEW_SESSIONS},
     {0, 0, 0, 0},
 };
 
@@ -682,6 +684,10 @@ static const char help_text[] =
 "               Disables path-based filesystem restrictions.\n"
 "  --no-default-runtime-environment\n"
 "               Disables default seccomp policy and setting of no_new_privs.\n"
+"  --no-new-sessions\n"
+"               Skips having Minijail call setsid(). This is useful when\n"
+"               running a process that expects to have a controlling\n"
+"               terminal set.\n"
 "  --preload-library=<file>\n"
 "               Overrides the path to \"" PRELOADPATH "\".\n"
 "               This is only really useful for local testing.\n"
@@ -1174,6 +1180,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case OPT_NO_DEFAULT_RUNTIME:
 			minijail_set_enable_default_runtime(j, false);
+			break;
+		case OPT_NO_NEW_SESSIONS:
+			minijail_set_enable_new_sessions(j, false);
 			break;
 		case OPT_SECCOMP_BPF_BINARY:
 			if (seccomp != None && seccomp != BpfBinaryFilter) {
