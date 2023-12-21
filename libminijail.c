@@ -3729,7 +3729,7 @@ static int minijail_run_internal(struct minijail *j,
 	 * memory regions / etc attached). We'd need to keep the child around to
 	 * avoid having its children get reparented to init.
 	 *
-	 * TODO(ellyjones): figure out if the "forked child hanging around"
+	 * TODO(b/317404364): figure out if the "forked child hanging around"
 	 * problem is fixable or not. It would be nice if we worked in this
 	 * case.
 	 */
