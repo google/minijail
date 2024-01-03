@@ -502,6 +502,7 @@ enum {
 	OPT_NO_FS_RESTRICTIONS,
 	OPT_NO_NEW_SESSIONS,
 	OPT_PRELOAD_LIBRARY,
+	OPT_PRESERVE_FD,
 	OPT_PROFILE,
 	OPT_SECCOMP_BPF_BINARY,
 	OPT_UTS,
@@ -545,6 +546,7 @@ static const struct option long_options[] = {
     {"no-default-runtime-environment", no_argument, 0, OPT_NO_DEFAULT_RUNTIME},
     {"no-fs-restrictions", no_argument, 0, OPT_NO_FS_RESTRICTIONS},
     {"no-new-sessions", no_argument, 0, OPT_NO_NEW_SESSIONS},
+    {"preserve-fd", required_argument, 0, OPT_PRESERVE_FD},
     {0, 0, 0, 0},
 };
 
@@ -688,6 +690,9 @@ static const char help_text[] =
 "               Skips having Minijail call setsid(). This is useful when\n"
 "               running a process that expects to have a controlling\n"
 "               terminal set.\n"
+"  --preserve-fd\n"
+"               Preserves an fd and makes it available in the child process.\n"
+"               The fd is preserved with the same integer value.\n"
 "  --preload-library=<file>\n"
 "               Overrides the path to \"" PRELOADPATH "\".\n"
 "               This is only really useful for local testing.\n"
@@ -876,6 +881,9 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	char *config_path = NULL;
 	bool fs_path_flag_used = false;
 	bool fs_path_rules_enabled = true;
+	/* Variables for --preserve-fd. */
+	char *fd_end;
+	int fd_to_preserve;
 
 	while ((opt = getopt_conf_or_cli(argc, argv, &conf_entry_list,
 					 &conf_index)) != -1) {
@@ -1183,6 +1191,14 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		case OPT_NO_NEW_SESSIONS:
 			minijail_set_enable_new_sessions(j, false);
+			break;
+		case OPT_PRESERVE_FD:
+			fd_to_preserve = strtol(optarg, &fd_end, 10);
+			if ((*fd_end) != '\0') {
+				errx(1, "--preserve-fd must be an integer");
+			}
+
+			minijail_preserve_fd(j, fd_to_preserve, fd_to_preserve);
 			break;
 		case OPT_SECCOMP_BPF_BINARY:
 			if (seccomp != None && seccomp != BpfBinaryFilter) {

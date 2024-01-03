@@ -383,6 +383,10 @@ unless this flag is set to opt out.
 Skips having Minijail call setsid(). This is useful when running a process that
 expects to have a controlling terminal set.
 .TP
+\fB--preserve-fd\fR
+Preserves an fd and makes it available in the child process. The fd is
+preserved with the same integer value.
+.TP
 \fB--config <file path>\fR
 Use a Minijail configuration file to set options, through
 commandline-option-equivalent key-value pairs.
