@@ -55,7 +55,12 @@ SYSCALL_SAFE_RULES = {
     ),
 }
 
-GLOBAL_SAFE_RULES = ("return 1",)
+GLOBAL_SAFE_RULES = (
+    "kill",
+    "kill-process",
+    "kill-thread",
+    "return 1",
+)
 
 
 class CheckPolicyReturn(NamedTuple):
