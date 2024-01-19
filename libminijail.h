@@ -200,18 +200,40 @@ void minijail_namespace_ipc(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
 void minijail_namespace_uts(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
 int minijail_namespace_set_hostname(struct minijail *j, const char *name)
     MINIJAIL_ATTRIBUTE_NONNULL();
+
+/*
+ * Starts a new network namespace with or without a loopback interface.
+ * It is rare for jails to not bring up the loopback interface, and having it
+ * available is not a security concern. Please double check you actually need to
+ * disable it before using this API.
+ *
+ * @j minijail to apply restriction to.
+ * @enable_loopback indicates whether the loopback interface should be enabled
+ * in this new network namespace.
+ */
+void minijail_namespace_net_loopback(struct minijail *j, bool enable_loopback)
+    MINIJAIL_ATTRIBUTE_NONNULL();
+
+/*
+ * Starts a new network namespace featuring a loopback interface.
+ * This has the same effect as `minijail_namespace_net_loopback(j, true)`.
+ */
 void minijail_namespace_net(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
+
 void minijail_namespace_enter_net(struct minijail *j, const char *ns_path)
     MINIJAIL_ATTRIBUTE_NONNULL();
 void minijail_namespace_cgroups(struct minijail *j)
     MINIJAIL_ATTRIBUTE_NONNULL();
+
 /* Closes all open file descriptors after forking. */
 void minijail_close_open_fds(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
+
 /*
  * Implies namespace_vfs and remount_proc_readonly.
  * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
  */
 void minijail_namespace_pids(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
+
 /*
  * Implies namespace_vfs.
  * WARNING: this is NOT THREAD SAFE. See the block comment in </libminijail.c>.
@@ -222,6 +244,7 @@ void minijail_namespace_pids(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
  */
 void minijail_namespace_pids_rw_proc(struct minijail *j)
     MINIJAIL_ATTRIBUTE_NONNULL();
+
 void minijail_namespace_user(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
 void minijail_namespace_user_disable_setgroups(struct minijail *j)
     MINIJAIL_ATTRIBUTE_NONNULL();
@@ -236,6 +259,7 @@ int minijail_write_pid_file(struct minijail *j, const char *path)
     MINIJAIL_ATTRIBUTE_NONNULL();
 void minijail_inherit_usergroups(struct minijail *j)
     MINIJAIL_ATTRIBUTE_NONNULL();
+
 /*
  * Changes the jailed process's syscall table to the alt_syscall table
  * named |table|.

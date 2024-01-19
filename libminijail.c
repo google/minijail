@@ -146,6 +146,7 @@ struct minijail {
 		bool ipc : 1;
 		bool uts : 1;
 		bool net : 1;
+		bool net_loopback : 1;
 		bool enter_net : 1;
 		bool ns_cgroups : 1;
 		bool userns : 1;
@@ -315,6 +316,7 @@ void minijail_preenter(struct minijail *j)
 	j->flags.enter_vfs = 0;
 	j->flags.ns_cgroups = 0;
 	j->flags.net = 0;
+	j->flags.net_loopback = 0;
 	j->flags.uts = 0;
 	j->flags.remount_proc_ro = 0;
 	j->flags.pids = 0;
@@ -436,6 +438,7 @@ void minijail_preexec(struct minijail *j)
 	int enter_vfs = j->flags.enter_vfs;
 	int ns_cgroups = j->flags.ns_cgroups;
 	int net = j->flags.net;
+	int net_loopback = j->flags.net_loopback;
 	int uts = j->flags.uts;
 	int remount_proc_ro = j->flags.remount_proc_ro;
 	int userns = j->flags.userns;
@@ -462,6 +465,7 @@ void minijail_preexec(struct minijail *j)
 	j->flags.enter_vfs = enter_vfs;
 	j->flags.ns_cgroups = ns_cgroups;
 	j->flags.net = net;
+	j->flags.net_loopback = net_loopback;
 	j->flags.uts = uts;
 	j->flags.remount_proc_ro = remount_proc_ro;
 	j->flags.userns = userns;
@@ -845,9 +849,16 @@ int API minijail_namespace_set_hostname(struct minijail *j, const char *name)
 	return 0;
 }
 
-void API minijail_namespace_net(struct minijail *j)
+void API minijail_namespace_net_loopback(struct minijail *j,
+					 bool enable_loopback)
 {
 	j->flags.net = 1;
+	j->flags.net_loopback = enable_loopback;
+}
+
+void API minijail_namespace_net(struct minijail *j)
+{
+	minijail_namespace_net_loopback(j, true);
 }
 
 void API minijail_namespace_enter_net(struct minijail *j, const char *ns_path)
@@ -2863,7 +2874,8 @@ void API minijail_enter(const struct minijail *j)
 	} else if (j->flags.net) {
 		if (unshare(CLONE_NEWNET))
 			pdie("unshare(CLONE_NEWNET) failed");
-		config_net_loopback();
+		if (j->flags.net_loopback)
+			config_net_loopback();
 	}
 
 	if (j->flags.ns_cgroups && unshare(CLONE_NEWCGROUP))
