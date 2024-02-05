@@ -58,6 +58,36 @@ We've got a couple of contact points.
 [crbug.com/new]: https://bugs.chromium.org/p/chromium/issues/entry?components=OS>Systems>Minijail
 [Chromium Gerrit]: https://chromium-review.googlesource.com/q/project:chromiumos/platform/minijail
 
+## GitHub Pages homepage
+
+The https://google.github.io/minijail/ homepage is maintained in the `gh-pages`
+branch, not in the `main` branch.
+Changes to it can be sent via Gerrit, but requires a little extra work.
+
+```shell
+# Make sure you have all the branches, and not only the "main" one.
+$ git fetch
+
+# Create a new local branch tracking the remote "gh-pages".
+# Git should automatically detect the remote and track it for you.
+$ git checkout gh-pages
+# If git can't auto-detect the remote, try one of these.
+$ git checkout -b gh-pages origin/gh-pages
+$ git checkout -b gh-pages cros/gh-pages
+
+# Make your changes like normal, then push them to Gerrit for review.
+# Here's a couple of different ways to post changes; you only need one!
+$ repo upload -D gh-pages
+$ git push origin HEAD:refs/for/gh-pages
+$ git push cros HEAD:refs/for/gh-pages
+
+# Now review your changes via Gerrit like normal.
+```
+
+Once a change merges into the `gh-pages` branch, there is no additional work for
+you other than waiting -- GitHub periodically syncs with our host, and then it
+will automatically regenerate the homepage when the `gh-pages` branch updates.
+
 ## Talks and presentations
 
 The following talk serves as a good introduction to Minijail and how it can be used.
