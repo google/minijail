@@ -1,13 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 
 # Copyright 2012 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-read line
+read -r line
 
-if [ "$line" == "test" ]; then
-	exit 0
+if [ "${line}" = "test" ]; then
+  exit 0
 else
-	exit 1
+  exit 1
 fi
