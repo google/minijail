@@ -47,4 +47,3 @@ minijail.code-workspace
 
 # Generated code:
 /rust/minijail-sys/libminijail.rs
-

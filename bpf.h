@@ -178,7 +178,7 @@ static inline size_t set_bpf_instr(struct sock_filter *instr,
 
 #define set_bpf_ret_errno(_block, _errno)                                      \
 	set_bpf_stmt((_block), BPF_RET + BPF_K,                                \
-		     SECCOMP_RET_ERRNO | ((_errno)&SECCOMP_RET_DATA))
+		     SECCOMP_RET_ERRNO | ((_errno) & SECCOMP_RET_DATA))
 
 #define set_bpf_ret_log(_block)                                                \
 	set_bpf_stmt((_block), BPF_RET + BPF_K, SECCOMP_RET_LOG)
