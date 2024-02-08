@@ -20,8 +20,7 @@ static int get_si_syscall(const siginfo_t *info)
 {
 #if defined(si_syscall)
 	return info->si_syscall;
-#endif
-
+#else
 	typedef struct {
 		void *ip;
 		int nr;
@@ -35,6 +34,7 @@ static int get_si_syscall(const siginfo_t *info)
 	    .info = info,
 	};
 	return local_info.local_info->nr;
+#endif
 }
 
 void log_sigsys_handler(int sig attribute_unused, siginfo_t *info,
