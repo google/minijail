@@ -20,11 +20,11 @@ setup(
     description="A set of tools for Minijail",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: Apache Software License",
+        "License :: OSI Approved :: BSD License",
         "Operating System :: Linux",
     ],
     python_requires=">=3.6",
-    license="Apache License 2.0",
+    license="3-clause BSD",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Minijail Developers",
