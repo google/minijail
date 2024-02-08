@@ -16,14 +16,14 @@ with open(os.path.join(this_directory, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="minijail",
-    version="0.12",
+    version="18",
     description="A set of tools for Minijail",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: BSD License",
         "Operating System :: Linux",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     license="3-clause BSD",
     long_description=long_description,
     long_description_content_type="text/markdown",
