@@ -4,8 +4,6 @@
 
 """A BPF compiler for the Minijail policy file."""
 
-from __future__ import print_function
-
 import enum
 
 

@@ -4,10 +4,6 @@
 
 """A parser for the Minijail policy file."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 import itertools
 import os.path

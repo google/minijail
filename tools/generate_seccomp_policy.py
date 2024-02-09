@@ -8,8 +8,6 @@
 
 """Tool to generate a minijail seccomp filter from strace or audit output."""
 
-from __future__ import print_function
-
 import argparse
 import collections
 import datetime

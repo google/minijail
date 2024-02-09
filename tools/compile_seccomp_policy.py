@@ -9,8 +9,6 @@ This script will take a Minijail seccomp policy file and compile it into a
 BPF program suitable for use with Minijail in the current architecture.
 """
 
-from __future__ import print_function
-
 import argparse
 import os
 import sys

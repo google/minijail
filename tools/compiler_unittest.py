@@ -5,8 +5,6 @@
 
 """Unittests for the compiler module."""
 
-from __future__ import print_function
-
 import os
 import parser  # pylint: disable=wrong-import-order
 import random
