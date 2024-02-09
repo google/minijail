@@ -707,7 +707,7 @@ class PolicyParser:
         self._parser_states.append(ParserState(filename))
         try:
             frequency_mapping = collections.defaultdict(int)
-            with open(filename) as frequency_file:
+            with open(filename, encoding="utf-8") as frequency_file:
                 for tokens in self._parser_state.tokenize(frequency_file):
                     syscall_numbers = self._parse_syscall_descriptor(tokens)
                     if not tokens:
@@ -778,7 +778,7 @@ class PolicyParser:
         try:
             statements = []
             denylist_header = False
-            with open(filename) as policy_file:
+            with open(filename, encoding="utf-8") as policy_file:
                 for tokens in self._parser_state.tokenize(policy_file):
                     if tokens[0].type == "INCLUDE":
                         statements.extend(self._parse_include_statement(tokens))
@@ -827,7 +827,7 @@ class PolicyParser:
         """Parse a file and return the list of FilterStatements."""
         self._frequency_mapping = collections.defaultdict(int)
         try:
-            statements = [x for x in self._parse_policy_file(filename)]
+            statements = self._parse_policy_file(filename)
         except RecursionError:
             raise ParseException(
                 "recursion limit exceeded",

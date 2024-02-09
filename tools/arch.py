@@ -40,7 +40,7 @@ class Arch(
     @staticmethod
     def load_from_json(json_path):
         """Return an Arch from a .json file."""
-        with open(json_path, "r") as json_file:
+        with open(json_path, "rb") as json_file:
             constants = json.load(json_file)
             return Arch(
                 arch_nr=constants["arch_nr"],

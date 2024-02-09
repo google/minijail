@@ -536,7 +536,7 @@ class ParseFilterStatementTests(unittest.TestCase):
             actual.syscalls != expected.syscalls
             or actual.filters != expected.filters
         ):
-            self.fail("%r != %r" % (actual, expected), msg)
+            self.fail("%r != %r: %s" % (actual, expected, msg))
 
     def test_parse_filter_statement(self):
         """Accept valid filter statements."""
@@ -683,7 +683,7 @@ class ParseFileTests(unittest.TestCase):
     def _write_file(self, filename, contents):
         """Helper to write out a file for testing."""
         path = os.path.join(self.tempdir, filename)
-        with open(path, "w") as outf:
+        with open(path, "w", encoding="utf-8") as outf:
             outf.write(contents)
         return path
 
@@ -1138,7 +1138,7 @@ class ParseFileDenylistTests(unittest.TestCase):
     def _write_file(self, filename, contents):
         """Helper to write out a file for testing."""
         path = os.path.join(self.tempdir, filename)
-        with open(path, "w") as outf:
+        with open(path, "w", encoding="utf-8") as outf:
             outf.write(contents)
         return path
 

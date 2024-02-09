@@ -151,9 +151,6 @@ class SockFilter(
 class AbstractBlock(abc.ABC):
     """A class that implements the visitor pattern."""
 
-    def __init__(self):
-        super().__init__()
-
     @abc.abstractmethod
     def accept(self, visitor):
         pass
@@ -308,7 +305,9 @@ class SyscallEntry(AbstractBlock):
 class WideAtom(AbstractBlock):
     """A BasicBlock that represents a 32-bit wide atom."""
 
-    def __init__(self, arg_offset, op, value, jt, jf):
+    def __init__(
+        self, arg_offset, op, value, jt, jf
+    ):  # pylint: disable=redefined-outer-name
         super().__init__()
         self.arg_offset = arg_offset
         self.op = op
@@ -521,7 +520,7 @@ class CopyingVisitor(AbstractVisitor):
     def visitValidateArch(self, block):
         assert id(block) not in self._mapping
         self._mapping[id(block)] = ValidateArch(
-            block.arch, self._mapping[id(block.next_block)]
+            self._mapping[id(block.next_block)]
         )
 
     def visitSyscallEntry(self, block):
@@ -734,7 +733,6 @@ class FlatteningVisitor:
 
         self._instructions = instructions + self._instructions
         self._offsets[id(block)] = -len(self._instructions)
-        return
 
 
 class ArgFilterForwardingVisitor:
@@ -756,15 +754,18 @@ class ArgFilterForwardingVisitor:
             return
         # But the ALLOW, KILL_PROCESS, TRAP, etc. actions are too and we don't
         # want to visit them just yet.
-        if (
-            isinstance(block, KillProcess)
-            or isinstance(block, KillThread)
-            or isinstance(block, Trap)
-            or isinstance(block, ReturnErrno)
-            or isinstance(block, Trace)
-            or isinstance(block, UserNotify)
-            or isinstance(block, Log)
-            or isinstance(block, Allow)
+        if isinstance(
+            block,
+            (
+                KillProcess,
+                KillThread,
+                Trap,
+                ReturnErrno,
+                Trace,
+                UserNotify,
+                Log,
+                Allow,
+            ),
         ):
             return
         block.accept(self.visitor)

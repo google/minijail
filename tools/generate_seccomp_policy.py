@@ -89,7 +89,7 @@ class BucketInputFiles(argparse.Action):
         for filename in values:
             if not os.path.exists(filename):
                 parser.error(f"Input file {filename} not found.")
-            with open(filename, mode="r", encoding="utf8") as input_file:
+            with open(filename, mode="r", encoding="utf-8") as input_file:
                 for line in input_file.readlines():
                     if strace_line_re.search(line):
                         traces.append(filename)
@@ -191,7 +191,7 @@ def parse_trace_file(trace_filename, syscalls, arg_inspection):
         "x86" in trace_filename and "64" not in trace_filename
     )
 
-    with open(trace_filename, encoding="utf8") as trace_file:
+    with open(trace_filename, encoding="utf-8") as trace_file:
         for line in trace_file:
             matches = LINE_RE.match(line)
             if not matches:

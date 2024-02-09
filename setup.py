@@ -7,14 +7,14 @@
 
 import os
 
-from setuptools import setup
+import setuptools
 
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
-setup(
+setuptools.setup(
     name="minijail",
     version="18",
     description="A set of tools for Minijail",

@@ -387,7 +387,7 @@ class CompileFileTests(unittest.TestCase):
     def _write_file(self, filename, contents):
         """Helper to write out a file for testing."""
         path = os.path.join(self.tempdir, filename)
-        with open(path, "w") as outf:
+        with open(path, "w", encoding="utf-8") as outf:
             outf.write(contents)
         return path
 
