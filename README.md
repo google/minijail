@@ -98,7 +98,7 @@ The following talk serves as a good introduction to Minijail and how it can be u
 ## Example usage
 
 The ChromiumOS project has a comprehensive
-[sandboxing](https://chromium.googlesource.com/chromiumos/docs/+/HEAD/sandboxing.md)
+[sandboxing](https://www.chromium.org/chromium-os/developer-library/guides/development/sandboxing)
 document that is largely based on Minijail.
 
 After you play with the simple examples below, you should check that out.
