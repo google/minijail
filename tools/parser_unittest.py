@@ -10,15 +10,14 @@ import parser  # pylint: disable=wrong-import-order
 import shutil
 import tempfile
 import unittest
+from importlib import resources
 
 import arch
 import bpf
 
 
-ARCH_64 = arch.Arch.load_from_json(
-    os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "testdata/arch_64.json"
-    )
+ARCH_64 = arch.Arch.load_from_json_bytes(
+    resources.files("testdata").joinpath("arch_64.json").read_bytes()
 )
 
 

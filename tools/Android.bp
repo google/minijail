@@ -31,14 +31,6 @@ python_binary_host {
         "compiler.py",
         "parser.py",
     ],
-    version: {
-        py2: {
-            enabled: false,
-        },
-        py3: {
-            enabled: true,
-        },
-    },
 }
 
 python_test_host {
@@ -54,11 +46,8 @@ python_test_host {
         "testdata/arch_64.json",
     ],
     version: {
-        py2: {
-            enabled: false,
-        },
         py3: {
-            enabled: true,
+            embedded_launcher: true,
         },
     },
 }
@@ -77,11 +66,8 @@ python_test_host {
         "testdata/arch_64.json",
     ],
     version: {
-        py2: {
-            enabled: false,
-        },
         py3: {
-            enabled: true,
+            embedded_launcher: true,
         },
     },
 }
@@ -92,14 +78,6 @@ python_binary_host {
     srcs: [
         "generate_constants_json.py",
     ],
-    version: {
-        py2: {
-            enabled: false,
-        },
-        py3: {
-            enabled: true,
-        },
-    },
 }
 
 

@@ -41,12 +41,17 @@ class Arch(
     def load_from_json(json_path):
         """Return an Arch from a .json file."""
         with open(json_path, "rb") as json_file:
-            constants = json.load(json_file)
-            return Arch(
-                arch_nr=constants["arch_nr"],
-                arch_name=constants["arch_name"],
-                bits=constants["bits"],
-                syscalls=constants["syscalls"],
-                constants=constants["constants"],
-                syscall_groups=constants.get("syscall_groups", {}),
-            )
+            return Arch.load_from_json_bytes(json_file.read())
+
+    @staticmethod
+    def load_from_json_bytes(json_bytes):
+        """Return an Arch from a json string."""
+        constants = json.loads(json_bytes)
+        return Arch(
+            arch_nr=constants["arch_nr"],
+            arch_name=constants["arch_name"],
+            bits=constants["bits"],
+            syscalls=constants["syscalls"],
+            constants=constants["constants"],
+            syscall_groups=constants.get("syscall_groups", {}),
+        )
