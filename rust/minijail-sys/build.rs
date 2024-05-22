@@ -40,9 +40,6 @@ fn get_cross_compile_prefix() -> String {
 }
 
 fn set_up_libminijail() -> io::Result<PathBuf> {
-    // Minijail requires libcap at runtime.
-    pkg_config::Config::new().probe("libcap").unwrap();
-
     // Prefer a system-provided Minijail library.
     if let Ok(info) = pkg_config::Config::new().probe("libminijail") {
         for path in info.include_paths {
