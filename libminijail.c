@@ -723,6 +723,9 @@ void API minijail_enable_default_fs_restrictions(struct minijail *j)
 	minijail_add_fs_restriction_rx(j, "/sbin");
 	minijail_add_fs_restriction_rx(j, "/usr/sbin");
 	minijail_add_fs_restriction_rx(j, "/usr/bin");
+	// Common /etc locations.
+	minijail_add_fs_restriction_ro(j, "/etc/group");
+	minijail_add_fs_restriction_ro(j, "/etc/passwd");
 }
 
 void API minijail_use_caps(struct minijail *j, uint64_t capmask)

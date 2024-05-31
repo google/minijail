@@ -1971,6 +1971,51 @@ TEST_F(LandlockTest, test_rule_rw_cannot_exec) {
   EXPECT_NE(status, 0);
 }
 
+TEST_F(LandlockTest, test_access_default_paths) {
+  int mj_run_ret;
+  int status;
+  char* argv[4];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_enable_default_fs_restrictions(j.get());
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "exec cat /etc/group";
+  argv[3] = NULL;
+
+  mj_run_ret = minijail_run_no_preload(j.get(), argv[0], argv);
+  EXPECT_EQ(mj_run_ret, 0);
+  status = minijail_wait(j.get());
+  EXPECT_EQ(status, 0);
+}
+
+TEST_F(LandlockTest, test_cannot_access_default_paths) {
+  int mj_run_ret;
+  int status;
+  char* argv[4];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rw(j.get(), kBinPath);
+  minijail_add_fs_restriction_rw(j.get(), kLibPath);
+  minijail_add_fs_restriction_rw(j.get(), kLib64Path);
+  // No call to minijail_enable_default_fs_restrictions().
+
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "exec cat /etc/group";
+  argv[3] = NULL;
+
+  mj_run_ret = minijail_run_no_preload(j.get(), argv[0], argv);
+  EXPECT_EQ(mj_run_ret, 0);
+  status = minijail_wait(j.get());
+  EXPECT_NE(status, 0);
+}
+
 // Tests that LANDLOCK_ACCESS_FS_REFER is supported when the kernel supports
 // Landlock version ABI=2.
 TEST_F(LandlockTest, test_refer_supported) {
