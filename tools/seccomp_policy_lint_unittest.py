@@ -91,8 +91,8 @@ class CheckSeccompPolicyTests(unittest.TestCase):
             " so requires review from chromeos-security@",
             [
                 (
-                    f"{path.resolve()}, line 5: clone syscall is a dangerous "
-                    "syscall so requires a comment on the preceding line"
+                    f"{path.resolve()}:5:clone: syscall is dangerous "
+                    "and requires a comment on the preceding line"
                 )
             ],
         )
@@ -119,7 +119,7 @@ class CheckSeccompPolicyTests(unittest.TestCase):
         exp_out = seccomp_policy_lint.CheckPolicyReturn(
             f"seccomp: {path.resolve()} contains dangerous syscalls,"
             " so requires review from chromeos-security@",
-            [(f"{path.resolve()}, line 5: repeat syscall: clone")],
+            [f"{path.resolve()}:5:clone: duplicate entry found"],
         )
 
         with path.open("r", encoding="utf-8") as check_file:
