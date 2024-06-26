@@ -321,8 +321,8 @@ static int has_cap_setgid(void)
 	return cap_value == CAP_SET;
 }
 
-static void set_ugid_mapping(struct minijail *j, int set_uidmap, uid_t uid,
-			     char *uidmap, int set_gidmap, gid_t gid,
+static void set_ugid_mapping(struct minijail *j, bool set_uidmap, uid_t uid,
+			     char *uidmap, bool set_gidmap, gid_t gid,
 			     char *gidmap)
 {
 	if (set_uidmap) {
@@ -368,29 +368,29 @@ static void set_ugid_mapping(struct minijail *j, int set_uidmap, uid_t uid,
 	}
 }
 
-static void use_chroot(struct minijail *j, const char *path, int *chroot,
-		       int pivot_root)
+static void use_chroot(struct minijail *j, const char *path, bool *chroot,
+		       bool pivot_root)
 {
 	if (pivot_root)
 		errx(1, "Could not set chroot because -P was specified");
 	if (minijail_enter_chroot(j, path))
 		errx(1, "Could not set chroot");
-	*chroot = 1;
+	*chroot = true;
 }
 
 static void use_pivot_root(struct minijail *j, const char *path,
-			   int *pivot_root, int chroot)
+			   bool *pivot_root, bool chroot)
 {
 	if (chroot)
 		errx(1, "Could not set pivot_root because -C was specified");
 	if (minijail_enter_pivot_root(j, path))
 		errx(1, "Could not set pivot_root");
 	minijail_namespace_vfs(j);
-	*pivot_root = 1;
+	*pivot_root = true;
 }
 
 static void use_profile(struct minijail *j, const char *profile,
-			int *pivot_root, int chroot, size_t *tmp_size)
+			bool *pivot_root, bool chroot, size_t *tmp_size)
 {
 	/* Note: New profiles should be added in minijail0_cli_unittest.cc. */
 
@@ -842,7 +842,7 @@ static void set_child_env(char ***envp, char *arg, char *const environ[])
 }
 
 int parse_args(struct minijail *j, int argc, char *const argv[],
-	       char *const environ[], int *exit_immediately, ElfType *elftype,
+	       char *const environ[], bool *exit_immediately, ElfType *elftype,
 	       const char **preload_path, char ***envp)
 {
 	enum seccomp_type {
@@ -853,23 +853,29 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	};
 	enum seccomp_type seccomp = None;
 	int opt;
-	int use_seccomp_filter = 0;
-	int use_seccomp_filter_binary = 0;
-	int use_seccomp_log = 0;
-	int forward = 1;
-	int binding = 0;
-	int chroot = 0, pivot_root = 0;
-	int mount_ns = 0, change_remount = 0;
+	bool use_seccomp_filter = false;
+	bool use_seccomp_filter_binary = false;
+	bool use_seccomp_log = false;
+	bool forward_signals = true;
+	bool have_bind_mounts = false;
+	bool chroot = false;
+	bool pivot_root = false;
+	bool use_mount_ns = false;
+	bool change_remount = false;
 	char *remount_mode = NULL;
-	int inherit_suppl_gids = 0, keep_suppl_gids = 0;
-	int caps = 0, ambient_caps = 0;
-	bool use_uid = false, use_gid = false;
+	bool inherit_suppl_gids = false;
+	bool keep_suppl_gids = false;
+	bool caps = false;
+	bool use_ambient_caps = false;
+	bool use_uid = false;
+	bool use_gid = false;
 	uid_t uid = 0;
 	gid_t gid = 0;
 	gid_t *suppl_gids = NULL;
 	size_t suppl_gids_count = 0;
 	char *uidmap = NULL, *gidmap = NULL;
-	int set_uidmap = 0, set_gidmap = 0;
+	bool set_uidmap = false;
+	bool set_gidmap = false;
 	size_t tmp_size = 0;
 	attribute_cleanup_str char *filter_path = NULL;
 	int log_to_stderr = -1;
@@ -940,7 +946,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			minijail_use_seccomp_filter(j);
 			free(filter_path);
 			filter_path = xstrdup(optarg);
-			use_seccomp_filter = 1;
+			use_seccomp_filter = true;
 			break;
 		case 'l':
 			minijail_namespace_ipc(j);
@@ -950,19 +956,19 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				errx(1, "-L does not work with "
 					"--seccomp-bpf-binary");
 			}
-			use_seccomp_log = 1;
+			use_seccomp_log = true;
 			minijail_log_seccomp_filter_failures(j);
 			break;
 		case 'b':
 			if (!parse_mode)
 				add_binding(j, optarg);
-			binding = 1;
+			have_bind_mounts = true;
 			break;
 		case 'B':
 			skip_securebits(j, optarg);
 			break;
 		case 'c':
-			caps = 1;
+			caps = true;
 			use_caps(j, optarg);
 			break;
 		case 'C':
@@ -975,7 +981,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		case 'K':
 			free(remount_mode);
 			remount_mode = optarg == NULL ? NULL : xstrdup(optarg);
-			change_remount = 1;
+			change_remount = true;
 			break;
 		case 'P':
 			use_pivot_root(j, optarg, &pivot_root, chroot);
@@ -1032,7 +1038,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			 * won't do anything.
 			 */
 			minijail_remount_mode(j, MS_SLAVE);
-			mount_ns = 1;
+			use_mount_ns = true;
 			break;
 		case 'V':
 			if (!parse_mode)
@@ -1045,13 +1051,13 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			if (keep_suppl_gids)
 				errx(1, "-y and -G are not compatible");
 			minijail_inherit_usergroups(j);
-			inherit_suppl_gids = 1;
+			inherit_suppl_gids = true;
 			break;
 		case 'y':
 			if (inherit_suppl_gids)
 				errx(1, "-y and -G are not compatible");
 			minijail_keep_supplementary_gids(j);
-			keep_suppl_gids = 1;
+			keep_suppl_gids = true;
 			break;
 		case 'N':
 			minijail_namespace_cgroups(j);
@@ -1068,7 +1074,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			}
 			break;
 		case 'i':
-			*exit_immediately = 1;
+			*exit_immediately = true;
 			break;
 		case 'H':
 			seccomp_filter_usage(argv[0]);
@@ -1082,7 +1088,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			minijail_namespace_pids(j);
 			break;
 		case 'm':
-			set_uidmap = 1;
+			set_uidmap = true;
 			if (uidmap) {
 				free(uidmap);
 				uidmap = NULL;
@@ -1091,7 +1097,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				uidmap = xstrdup(optarg);
 			break;
 		case 'M':
-			set_gidmap = 1;
+			set_gidmap = true;
 			if (gidmap) {
 				free(gidmap);
 				gidmap = NULL;
@@ -1123,7 +1129,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			minijail_set_seccomp_filter_tsync(j);
 			break;
 		case 'z':
-			forward = 0;
+			forward_signals = false;
 			break;
 		case 'd':
 			minijail_namespace_vfs(j);
@@ -1131,7 +1137,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			break;
 		/* Long options. */
 		case OPT_AMBIENT:
-			ambient_caps = 1;
+			use_ambient_caps = true;
 			minijail_set_ambient_caps(j);
 			break;
 		case OPT_UTS:
@@ -1204,14 +1210,14 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				errx(1, "Do not use -s, -S, or "
 					"--seccomp-bpf-binary together");
 			}
-			if (use_seccomp_log == 1)
+			if (use_seccomp_log)
 				errx(1, "-L does not work with "
 					"--seccomp-bpf-binary");
 			seccomp = BpfBinaryFilter;
 			minijail_use_seccomp_filter(j);
 			free(filter_path);
 			filter_path = optarg == NULL ? NULL : xstrdup(optarg);
-			use_seccomp_filter_binary = 1;
+			use_seccomp_filter_binary = true;
 			break;
 		case OPT_ADD_SUPPL_GROUP:
 			suppl_group_add(&suppl_gids_count, &suppl_gids, optarg);
@@ -1365,20 +1371,20 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	}
 
 	/* Can only set ambient caps when using regular caps. */
-	if (ambient_caps && !caps) {
+	if (use_ambient_caps && !caps) {
 		errx(1, "Can't set ambient capabilities (--ambient) "
 			"without actually using capabilities (-c)");
 	}
 
 	/* Set up signal handlers in minijail unless asked not to. */
-	if (forward)
+	if (forward_signals)
 		minijail_forward_signals(j);
 
 	/*
 	 * Only allow bind mounts when entering a chroot, using pivot_root, or
 	 * a new mount namespace.
 	 */
-	if (binding && !(chroot || pivot_root || mount_ns)) {
+	if (have_bind_mounts && !(chroot || pivot_root || use_mount_ns)) {
 		errx(1, "Bind mounts require a chroot, pivot_root, or "
 			" new mount namespace");
 	}
@@ -1387,7 +1393,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	 * / is only remounted when entering a new mount namespace, so unless
 	 * that's set there is no need for the -K/-K<mode> flags.
 	 */
-	if (change_remount && !mount_ns) {
+	if (change_remount && !use_mount_ns) {
 		errx(1, "No need to use -K (skip remounting '/') or "
 			"-K<mode> (remount '/' as <mode>) "
 			"without -v (new mount namespace).\n"
@@ -1482,7 +1488,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	 * use of ambient capabilities for them to be able to survive an
 	 * execve(2).
 	 */
-	if (caps && *elftype == ELFSTATIC && !ambient_caps) {
+	if (caps && *elftype == ELFSTATIC && !use_ambient_caps) {
 		errx(1, "Can't run statically-linked binaries with capabilities"
 			" (-c) without also setting ambient capabilities. "
 			"Try passing --ambient.");

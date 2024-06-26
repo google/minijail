@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -21,7 +22,7 @@ int main(int argc, char *argv[], char *environ[])
 	struct minijail *j = minijail_new();
 	const char *dl_mesg = NULL;
 	const char *preload_path = PRELOADPATH;
-	int exit_immediately = 0;
+	bool exit_immediately = false;
 	ElfType elftype = ELFERROR;
 	char **envp = NULL;
 	int consumed = parse_args(j, argc, argv, environ, &exit_immediately,

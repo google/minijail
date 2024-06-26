@@ -41,7 +41,7 @@ class CliTest : public ::testing::Test {
   // need the backing memory to be writable.  The CLI might mutate the strings
   // as it parses things (which is normally permissible with argv).
   int parse_args_(const std::vector<std::string>& argv,
-                  int* exit_immediately,
+                  bool* exit_immediately,
                   ElfType* elftype) {
     // Make sure we reset the getopts state when scanning a new argv.  Setting
     // this to 0 is a GNU extension, but AOSP/BSD also checks this (as an alias
@@ -78,7 +78,7 @@ class CliTest : public ::testing::Test {
   }
 
   ElfType elftype_;
-  int exit_immediately_;
+  bool exit_immediately_;
 };
 
 }  // namespace
