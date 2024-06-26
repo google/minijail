@@ -881,9 +881,6 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 	char *config_path = NULL;
 	bool fs_path_flag_used = false;
 	bool fs_path_rules_enabled = true;
-	/* Variables for --preserve-fd. */
-	char *fd_end;
-	int fd_to_preserve;
 
 	while ((opt = getopt_conf_or_cli(argc, argv, &conf_entry_list,
 					 &conf_index)) != -1) {
@@ -1192,14 +1189,16 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		case OPT_NO_NEW_SESSIONS:
 			minijail_set_enable_new_sessions(j, false);
 			break;
-		case OPT_PRESERVE_FD:
-			fd_to_preserve = strtol(optarg, &fd_end, 10);
-			if ((*fd_end) != '\0') {
+		case OPT_PRESERVE_FD: {
+			char *fd_end;
+			int fd_to_preserve = strtol(optarg, &fd_end, 10);
+			if (*fd_end != '\0') {
 				errx(1, "--preserve-fd must be an integer");
 			}
 
 			minijail_preserve_fd(j, fd_to_preserve, fd_to_preserve);
 			break;
+		}
 		case OPT_SECCOMP_BPF_BINARY:
 			if (seccomp != None && seccomp != BpfBinaryFilter) {
 				errx(1, "Do not use -s, -S, or "
