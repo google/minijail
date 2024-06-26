@@ -33,6 +33,7 @@
  * from 1, not 0.  If no params are specified, then all function arguments are
  * marked as non-NULL.  Thus, params should only be specified if a function
  * accepts NULL pointers for any of the arguments.
+ * NB: Keep in sync with util.h style.
  */
 #define MINIJAIL_ATTRIBUTE_NONNULL(params) __attribute__((__nonnull__ params))
 

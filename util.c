@@ -283,9 +283,18 @@ static char *tokenize_parenthesized_expression(char **stringp)
 	return NULL;
 }
 
-long int parse_constant(char *constant_str, char **endptr)
+long int parse_constant(char *constant_str_nonnull, char **endptr)
 {
 	long int value = 0, current_value;
+	/*
+	 * The function API says both inputs have to be non-NULL.  The code
+	 * happens to handle NULL pointers because it resuses the input pointer
+	 * as it tokenizes/walks it until the tokenize functions sets it to
+	 * NULL.  But because of the attributes on the function arguments, the
+	 * compiler incorrectly assumes the variable can't become NULL in here,
+	 * so we have to create another variable to effectively cast it away.
+	 */
+	char *constant_str = constant_str_nonnull;
 	char *group, *lastpos = constant_str;
 
 	/*
