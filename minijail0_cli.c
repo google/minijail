@@ -1216,7 +1216,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 			seccomp = BpfBinaryFilter;
 			minijail_use_seccomp_filter(j);
 			free(filter_path);
-			filter_path = optarg == NULL ? NULL : xstrdup(optarg);
+			filter_path = xstrdup(optarg);
 			use_seccomp_filter_binary = true;
 			break;
 		case OPT_ADD_SUPPL_GROUP:
