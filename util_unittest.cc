@@ -340,7 +340,7 @@ TEST(parse_constant, parenthesized_expresions) {
 }
 
 TEST(parse_size, complete) {
-  size_t size;
+  uint64_t size;
 
   ASSERT_EQ(0, parse_size(&size, "42"));
   ASSERT_EQ(42U, size);
@@ -351,7 +351,7 @@ TEST(parse_size, complete) {
   ASSERT_EQ(0, parse_size(&size, "1M"));
   ASSERT_EQ(1024U * 1024, size);
 
-  uint64_t gigabyte = 1024ULL * 1024 * 1024;
+  uint64_t gigabyte = UINT64_C(1024) * 1024 * 1024;
   ASSERT_EQ(0, parse_size(&size, "3G"));
   ASSERT_EQ(3U, size / gigabyte);
   ASSERT_EQ(0U, size % gigabyte);
@@ -360,7 +360,6 @@ TEST(parse_size, complete) {
   ASSERT_EQ(3U, size / gigabyte);
   ASSERT_EQ(gigabyte - 2, size % gigabyte);
 
-#if __WORDSIZE == 64
   uint64_t exabyte = gigabyte * 1024 * 1024 * 1024;
   ASSERT_EQ(0, parse_size(&size, "9E"));
   ASSERT_EQ(9U, size / exabyte);
@@ -370,24 +369,34 @@ TEST(parse_size, complete) {
   ASSERT_EQ(15U, size / exabyte);
   ASSERT_EQ(0U, size % exabyte);
 
-  ASSERT_EQ(0, parse_size(&size, "18446744073709551614"));
-  ASSERT_EQ(15U, size / exabyte);
-  ASSERT_EQ(exabyte - 2, size % exabyte);
-
+  // Check values that don't fit in 64-bits.
+  ASSERT_EQ(-ERANGE, parse_size(&size, "16384P"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "1638400P"));
   ASSERT_EQ(-ERANGE, parse_size(&size, "16E"));
-  ASSERT_EQ(-ERANGE, parse_size(&size, "19E"));
+  ASSERT_EQ(-ERANGE, parse_size(&size, "16000000000E"));
+
+  // Check limits right around 64-bits.
+  ASSERT_EQ(0, parse_size(&size, "18446744073709551614"));
+  ASSERT_EQ(ULLONG_MAX - 1, size);
+  ASSERT_EQ(0, parse_size(&size, "18446744073709551615"));
+  ASSERT_EQ(ULLONG_MAX, size);
+  ASSERT_EQ(-ERANGE, parse_size(&size, "18446744073709551616"));
+
+  // Only allow 1 valid suffix.
   ASSERT_EQ(-EINVAL, parse_size(&size, "7GTPE"));
-#elif __WORDSIZE == 32
-  ASSERT_EQ(-ERANGE, parse_size(&size, "5G"));
-  ASSERT_EQ(-ERANGE, parse_size(&size, "9G"));
-  ASSERT_EQ(-ERANGE, parse_size(&size, "9E"));
-  ASSERT_EQ(-ERANGE, parse_size(&size, "7GTPE"));
-#endif
+
+  // Check edge cases that strto* APIs accept, but we don't.
+  ASSERT_EQ(-EINVAL, parse_size(&size, "-8"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "+8"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, " -8"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, " +8"));
 
   ASSERT_EQ(-EINVAL, parse_size(&size, ""));
   ASSERT_EQ(-EINVAL, parse_size(&size, "14u"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "14B"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "14Z"));
   ASSERT_EQ(-EINVAL, parse_size(&size, "14.2G"));
-  ASSERT_EQ(-EINVAL, parse_size(&size, "-1G"));
+  ASSERT_EQ(-EINVAL, parse_size(&size, "G"));
   ASSERT_EQ(-EINVAL, parse_size(&size, "; /bin/rm -- "));
 }
 

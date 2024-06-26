@@ -372,53 +372,51 @@ long int parse_constant(char *constant_str_nonnull, char **endptr)
 	return value;
 }
 
-/*
- * parse_size, specified as a string with a decimal number in bytes,
- * possibly with one 1-character suffix like "10K" or "6G".
- * Assumes both pointers are non-NULL.
- *
- * Returns 0 on success, negative errno on failure.
- * Only writes to result on success.
- */
-int parse_size(size_t *result, const char *sizespec)
+int parse_size(uint64_t *result, const char *sizespec)
 {
-	const char prefixes[] = "KMGTPE";
-	size_t i, multiplier = 1, nsize, size = 0;
+	uint64_t size;
 	unsigned long long parsed;
-	const size_t len = strlen(sizespec);
 	char *end;
 
-	if (len == 0 || sizespec[0] == '-')
+	/* strtoull supports leading whitespace, -, and + signs. */
+	if (sizespec[0] < '0' || sizespec[0] > '9')
 		return -EINVAL;
 
-	for (i = 0; i < sizeof(prefixes); ++i) {
-		if (sizespec[len - 1] == prefixes[i]) {
-#if __WORDSIZE == 32
-			if (i >= 3)
-				return -ERANGE;
-#endif
-			multiplier = 1024;
-			while (i-- > 0)
-				multiplier *= 1024;
-			break;
+	/* Clear+check errno so we handle ULLONG_MAX correctly. */
+	errno = 0;
+	parsed = strtoull(sizespec, &end, 10);
+	if (errno)
+		return -errno;
+	size = parsed;
+
+	/* See if there's a suffix. */
+	if (*end != '\0') {
+		static const char suffixes[] = "KMGTPE";
+		size_t i;
+
+		/* Only allow 1 suffix. */
+		if (end[1] != '\0')
+			return -EINVAL;
+
+		for (i = 0; i < sizeof(suffixes) - 1; ++i) {
+			if (*end == suffixes[i]) {
+				/* Make sure we don't overflow. */
+				const int scale = (i + 1) * 10;
+				uint64_t mask =
+				    ~((UINT64_C(1) << (64 - scale)) - 1);
+				if (size & mask)
+					return -ERANGE;
+				size <<= scale;
+				break;
+			}
 		}
+
+		/* Unknown suffix. */
+		if (i == sizeof(suffixes) - 1)
+			return -EINVAL;
 	}
 
-	/* We only need size_t but strtoul(3) is too small on IL32P64. */
-	parsed = strtoull(sizespec, &end, 10);
-	if (parsed == ULLONG_MAX)
-		return -errno;
-	if (parsed >= SIZE_MAX)
-		return -ERANGE;
-	if ((multiplier != 1 && end != sizespec + len - 1) ||
-	    (multiplier == 1 && end != sizespec + len))
-		return -EINVAL;
-	size = (size_t)parsed;
-
-	nsize = size * multiplier;
-	if (nsize / multiplier != size)
-		return -ERANGE;
-	*result = nsize;
+	*result = size;
 	return 0;
 }
 

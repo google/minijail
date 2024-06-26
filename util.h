@@ -10,6 +10,7 @@
 #define _UTIL_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -259,7 +260,19 @@ long int parse_single_constant(char *constant_str, char **endptr)
     attribute_nonnull();
 long int parse_constant(char *constant_str, char **endptr)
     attribute_nonnull((1));
-int parse_size(size_t *size, const char *sizespec) attribute_nonnull();
+
+/*
+ * parse_size: parse a string to a positive integer bytes with optional suffix.
+ * @size     The output parsed size, in bytes
+ * @sizespec The input string to parse
+ *
+ * A single 1-char suffix is supported like "10K" or "6G".  These use base 1024,
+ * not base 1000.  i.e. "1K" is "1024".  It is case-sensitive.
+ *
+ * Returns 0 on success, negative errno on failure.
+ * Only writes to |size| on success.
+ */
+int parse_size(uint64_t *size, const char *sizespec) attribute_nonnull();
 
 char *strip(char *s) attribute_nonnull();
 

@@ -1000,9 +1000,13 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				 */
 				tmp_size = DEFAULT_TMP_SIZE;
 			}
-			if (optarg != NULL &&
-			    0 != parse_size(&tmp_size, optarg)) {
-				errx(1, "Invalid /tmp tmpfs size");
+			if (optarg) {
+				uint64_t parsed_size;
+				if (parse_size(&parsed_size, optarg))
+					errx(1, "Invalid /tmp tmpfs size");
+				if (parsed_size > SIZE_MAX)
+					errx(1, "/tmp tmpfs size too large");
+				tmp_size = parsed_size;
 			}
 			break;
 		case 'v':
