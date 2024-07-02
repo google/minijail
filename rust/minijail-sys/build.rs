@@ -2,10 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Minijail's build script invoked by cargo.
-///
-/// This script prefers linking against a pkg-config provided libminijail, but will fall back to
-/// building libminijail statically.
+//! Minijail's build script invoked by cargo.
+//!
+//! This script prefers linking against a pkg-config provided libminijail, but will fall back to
+//! building libminijail statically.
+//!
+//! The build process can be modified with the following environment variables:
+//!
+//! MINIJAIL_DO_NOT_BUILD: Skip building minijail. This tends to result in a linker error later,
+//! but may be acceptable when just running clippy.
+//!
+//! MINIJAIL_BINDGEN_TARGET: Overrides which clang target is used to generate bindings.
+
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -50,27 +58,29 @@ fn set_up_libminijail() -> io::Result<PathBuf> {
         }
     }
 
-    let current_dir = env::var("CARGO_MANIFEST_DIR").unwrap() + "/../..";
-    let out_dir = env::var("OUT_DIR").unwrap();
-    let profile = env::var("PROFILE").unwrap();
-    let jobs = env::var("JOBS").unwrap_or("4".to_string());
+    if env::var("MINIJAIL_DO_NOT_BUILD").as_deref().unwrap_or("") == "" {
+        let current_dir = env::var("CARGO_MANIFEST_DIR").unwrap() + "/../..";
+        let out_dir = env::var("OUT_DIR").unwrap();
+        let profile = env::var("PROFILE").unwrap();
+        let jobs = env::var("JOBS").unwrap_or("4".to_string());
 
-    let status = Command::new("make")
-        .current_dir(&out_dir)
-        .env("OUT", &out_dir)
-        .env("MODE", if profile == "release" { "opt" } else { "debug" })
-        .env("CROSS_COMPILE", get_cross_compile_prefix())
-        .env("BUILD_STATIC_LIBS", "yes")
-        .arg("-C")
-        .arg(&current_dir)
-        .arg("-j")
-        .arg(&jobs)
-        .status()?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
+        let status = Command::new("make")
+            .current_dir(&out_dir)
+            .env("OUT", &out_dir)
+            .env("MODE", if profile == "release" { "opt" } else { "debug" })
+            .env("CROSS_COMPILE", get_cross_compile_prefix())
+            .env("BUILD_STATIC_LIBS", "yes")
+            .arg("-C")
+            .arg(&current_dir)
+            .arg("-j")
+            .arg(&jobs)
+            .status()?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+        println!("cargo:rustc-link-search=native={}", &out_dir);
+        println!("cargo:rustc-link-lib=static=minijail.pic");
     }
-    println!("cargo:rustc-link-search=native={}", &out_dir);
-    println!("cargo:rustc-link-lib=static=minijail.pic");
 
     let header_dir = Path::new("../../");
     let header_path = header_dir.join(HEADER_FILENAME);
@@ -81,7 +91,7 @@ fn bindings_generation(header_path: &str) -> io::Result<()> {
     println!("cargo:rerun-if-changed={}", header_path);
     println!("cargo:rerun-if-changed=build.rs");
 
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         .header(header_path)
         .default_enum_style(EnumVariation::Rust {
             non_exhaustive: false,
@@ -101,9 +111,14 @@ fn bindings_generation(header_path: &str) -> io::Result<()> {
         .clang_arg("-DUSE_BINDGEN")
         .clang_arg("-D_FILE_OFFSET_BITS=64")
         .clang_arg("-D_LARGEFILE_SOURCE")
-        .clang_arg("-D_LARGEFILE64_SOURCE")
-        .generate()
-        .expect("failed to generate bindings");
+        .clang_arg("-D_LARGEFILE64_SOURCE");
+
+    if let Ok(target) = env::var("MINIJAIL_BINDGEN_TARGET") {
+        builder = builder.clang_arg(format!("--target={}", target));
+    }
+
+    let bindings = builder.generate().expect("failed to generate bindings");
+
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings.write_to_file(out_path.join(OUT_FILENAME))
 }
