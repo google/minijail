@@ -128,12 +128,16 @@ bool parse_config_file(FILE *config_file, struct config_entry_list *list)
 		}
 		++list->num_entries;
 	}
+
 	/*
 	 * getmultiline() behaves similarly with getline(3). It returns -1
-	 * when read into EOF or the following errors.
-	 * Caveat: EINVAL may happen when EOF is encountered in a valid stream.
+	 * when read into EOF or an error occurs.  Since errno is not cleared
+	 * on success or when EOF is reached, the value might be held over from
+	 * a different call, so we can't rely on it directly, at least not w/out
+	 * refactoring the loop above to clear+check it around the getline call.
+	 * Instead, let's just check if the file has been completely read.
 	 */
-	if ((errno == EINVAL && config_file == NULL) || errno == ENOMEM) {
+	if (!feof(config_file)) {
 		return false;
 	}
 
