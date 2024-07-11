@@ -314,10 +314,15 @@ endif
 COMMON_CFLAGS-gcc := -fvisibility=internal -ggdb3 -Wa,--noexecstack
 COMMON_CFLAGS-clang := -fvisibility=hidden -ggdb -Wimplicit-fallthrough \
   -Wstring-plus-int
+# When a class is exported through __attribute__((visibility("default"))), we
+# still want to eliminate symbols from inline class member functions to reduce
+# symbol resolution overhead. Therefore, pass -fvisibility-inlines-hidden in
+# addition to -fvisibility=hidden. (go/cros-symbol-slimming)
 COMMON_CFLAGS := -Wall -Wunused -Wno-unused-parameter -Wunreachable-code \
   -Wbool-operation -Wstring-compare -Wxor-used-as-pow \
   -Wint-in-bool-context -Wfree-nonheap-object \
-  -Werror -Wformat=2 -fno-strict-aliasing $(SSP_CFLAGS) -O1
+  -Werror -Wformat=2 -fno-strict-aliasing -fvisibility-inlines-hidden \
+  $(SSP_CFLAGS) -O1
 CXXFLAGS += $(COMMON_CFLAGS) $(COMMON_CFLAGS-$(CXXDRIVER)) -std=gnu++20
 CFLAGS += $(COMMON_CFLAGS) $(COMMON_CFLAGS-$(CDRIVER)) -std=gnu17
 # We undefine _FORTIFY_SOURCE because some distros enable it by default in
@@ -352,7 +357,11 @@ ifeq ($(MODE),profiling)
   LDFLAGS := $(LDFLAGS) --coverage
 endif
 
-LDFLAGS := $(LDFLAGS) -Wl,-z,relro -Wl,-z,noexecstack -Wl,-z,now
+# Pass -Bsymbolic-non-weak which pre-binds symbols in the same DSO to improve
+# startup performance. We don't support interposing non-weak symbols.
+# (go/cros-symbol-slimming)
+LDFLAGS := $(LDFLAGS) -Wl,-z,relro -Wl,-z,noexecstack -Wl,-z,now \
+  -Wl,-Bsymbolic-non-weak
 
 # Fancy helpers for color if a prompt is defined
 ifeq ($(COLOR),1)
