@@ -321,9 +321,10 @@ COMMON_CFLAGS-clang := -fvisibility=hidden -ggdb -Wimplicit-fallthrough \
 COMMON_CFLAGS := -Wall -Wunused -Wno-unused-parameter -Wunreachable-code \
   -Wbool-operation -Wstring-compare -Wxor-used-as-pow \
   -Wint-in-bool-context -Wfree-nonheap-object \
-  -Werror -Wformat=2 -fno-strict-aliasing -fvisibility-inlines-hidden \
+  -Werror -Wformat=2 -fno-strict-aliasing  \
   $(SSP_CFLAGS) -O1
-CXXFLAGS += $(COMMON_CFLAGS) $(COMMON_CFLAGS-$(CXXDRIVER)) -std=gnu++20
+CXXFLAGS += $(COMMON_CFLAGS) $(COMMON_CFLAGS-$(CXXDRIVER)) -std=gnu++20 \
+  -fvisibility-inlines-hidden
 CFLAGS += $(COMMON_CFLAGS) $(COMMON_CFLAGS-$(CDRIVER)) -std=gnu17
 # We undefine _FORTIFY_SOURCE because some distros enable it by default in
 # their toolchains.  This makes the compiler issue warnings about redefines
@@ -360,8 +361,11 @@ endif
 # Pass -Bsymbolic-non-weak which pre-binds symbols in the same DSO to improve
 # startup performance. We don't support interposing non-weak symbols.
 # (go/cros-symbol-slimming)
-LDFLAGS := $(LDFLAGS) -Wl,-z,relro -Wl,-z,noexecstack -Wl,-z,now \
-  -Wl,-Bsymbolic-non-weak
+LDFLAGS := $(LDFLAGS) \
+  -z relro \
+  -z noexecstack \
+  -z now \
+  $(call check_cc,-Xlinker -Bsymbolic-non-weak)
 
 # Fancy helpers for color if a prompt is defined
 ifeq ($(COLOR),1)
