@@ -232,6 +232,8 @@ pub enum Error {
     ReturnCode(u8),
     /// Failed to wait the process.
     Wait(i32),
+    /// Failed to clone the log fd
+    CloneLogFd(io::Error),
 }
 
 impl Display for Error {
@@ -325,6 +327,7 @@ impl Display for Error {
                 "failed to wait: {}",
                 io::Error::from_raw_os_error(*errno)
             ),
+            CloneLogFd(e) => write!(f, "failed to clone log fd: {}", e),
         }
     }
 }
@@ -377,6 +380,9 @@ pub type Result<T> = StdResult<T, Error>;
 pub struct Minijail {
     jail: *mut minijail,
     disable_multithreaded_check: bool,
+    // Meant to hold on to log_fd for the duration of the Minijail
+    // Is a combination of log_fd and min priority.
+    log_fd: Option<(std::os::fd::OwnedFd, libc::c_int)>,
 }
 
 #[link(name = "c")]
@@ -424,6 +430,7 @@ impl Minijail {
         Ok(Minijail {
             jail: j,
             disable_multithreaded_check: false,
+            log_fd: None,
         })
     }
 
@@ -439,6 +446,13 @@ impl Minijail {
             if ret < 0 {
                 return Err(Error::ReturnCode(ret as u8));
             }
+        }
+
+        if let Some((log_fd, min_priority)) = &self.log_fd {
+            jail_out.log_to_fd(
+                log_fd.try_clone().map_err(Error::CloneLogFd)?,
+                *min_priority,
+            );
         }
 
         Ok(jail_out)
@@ -679,6 +693,16 @@ impl Minijail {
         }
         Ok(())
     }
+    pub fn log_to_fd(&mut self, fd: std::os::fd::OwnedFd, min_priority: c_int) {
+        // Minijail doesn't close the fd when it is destroyed, so this is safe.
+        unsafe {
+            minijail_log_to_fd(fd.as_raw_fd(), min_priority);
+        }
+        // minijail_log_to_fd "borrows" the fd  (in Rust parlance), so we need to store the
+        // fd as long as Minijail is alive for correctness.
+        self.log_fd = Some((fd, min_priority));
+    }
+
     pub fn enter_chroot<P: AsRef<Path>>(&mut self, dir: P) -> Result<()> {
         let pathstring = dir
             .as_ref()
