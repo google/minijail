@@ -376,6 +376,7 @@ pub type Result<T> = StdResult<T, Error>;
 /// process.
 pub struct Minijail {
     jail: *mut minijail,
+    disable_multithreaded_check: bool,
 }
 
 #[link(name = "c")]
@@ -420,13 +421,17 @@ impl Minijail {
         if j.is_null() {
             return Err(Error::CreatingMinijail);
         }
-        Ok(Minijail { jail: j })
+        Ok(Minijail {
+            jail: j,
+            disable_multithreaded_check: false,
+        })
     }
 
     /// Clones self to a new `Minijail`. Useful because `fork` can only be called once on a
     /// `Minijail`.
     pub fn try_clone(&self) -> Result<Minijail> {
-        let jail_out = Minijail::new()?;
+        let mut jail_out = Minijail::new()?;
+        jail_out.disable_multithreaded_check = self.disable_multithreaded_check;
         unsafe {
             // Safe to clone one minijail to the other as minijail_clone doesn't modify the source
             // jail(`self`) and leaves a valid minijail in the destination(`jail_out`).
@@ -812,6 +817,19 @@ impl Minijail {
         Ok(())
     }
 
+    /// Disables the check that prevents forking in a multithreaded environment.
+    /// This is only safe if the child process calls exec immediately after
+    /// forking. The state of locks, and whether or not they will unlock
+    /// is undefined. Additionally, objects allocated on other threads that
+    /// expect to be dropped when those threads cease execution will not be
+    /// dropped.
+    /// Thus, nothing should be called that relies on shared synchronization
+    /// primitives referenced outside of the current thread. The safest
+    /// way to use this is to immediately exec in the child.
+    pub fn disable_multithreaded_check(&mut self) {
+        self.disable_multithreaded_check = true;
+    }
+
     /// Forks and execs a child and puts it in the previously configured minijail.
     /// FDs 0, 1, and 2 are overwritten with /dev/null FDs unless they are included in the
     /// inheritable_fds list. This function may abort in the child on error because a partially
@@ -943,7 +961,9 @@ impl Minijail {
     /// # Safety
     /// See `fork`.
     pub unsafe fn fork_remap(&self, inheritable_fds: &[(RawFd, RawFd)]) -> Result<pid_t> {
-        if !is_single_threaded().map_err(Error::CheckingMultiThreaded)? {
+        if !self.disable_multithreaded_check
+            && !is_single_threaded().map_err(Error::CheckingMultiThreaded)?
+        {
             // This test will fail during `cargo test` because the test harness always spawns a test
             // thread. We will make an exception for that case because the tests for this module
             // should always be run in a serial fashion using `--test-threads=1`.
