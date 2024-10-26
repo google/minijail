@@ -101,3 +101,7 @@
 #define __NR_userfaultfd 282
 #endif
 #endif /* __NR_userfaultfd */
+
+#ifndef __NR_mseal
+#define __NR_mseal 462
+#endif /* __NR_mseal */
