@@ -319,7 +319,7 @@ COMMON_CFLAGS-clang := -fvisibility=hidden -ggdb -Wimplicit-fallthrough \
 # symbol resolution overhead. Therefore, pass -fvisibility-inlines-hidden in
 # addition to -fvisibility=hidden. (go/cros-symbol-slimming)
 COMMON_CFLAGS := -Wall -Wunused -Wno-unused-parameter -Wunreachable-code \
-  -Wbool-operation -Wstring-compare -Wxor-used-as-pow \
+  -Wbool-operation -Wstring-compare $(call check_cc,-Wxor-used-as-pow) \
   -Wint-in-bool-context -Wfree-nonheap-object \
   -Werror -Wformat=2 -fno-strict-aliasing  \
   $(SSP_CFLAGS) -O1
