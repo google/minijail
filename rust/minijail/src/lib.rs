@@ -1063,18 +1063,27 @@ impl Drop for Minijail {
     }
 }
 
-// Count the number of files in the directory specified by `path`.
-fn count_dir_entries<P: AsRef<Path>>(path: P) -> io::Result<usize> {
-    Ok(fs::read_dir(path)?.count())
+// Check if a `/proc/*/task/*` is a kthread.
+fn task_is_kthread(path: &Path) -> io::Result<bool> {
+    let status = fs::read_to_string(path.join("status"))?;
+    Ok(status.contains("\nKthread:\t1\n"))
+}
+
+// Count the number of threads in the current process.
+fn num_threads() -> io::Result<usize> {
+    let mut count = 0;
+    for entry in fs::read_dir("/proc/self/task")? {
+        let entry = entry?;
+        if !task_is_kthread(&entry.path())? {
+            count += 1;
+        }
+    }
+    Ok(count)
 }
 
 // Return true if the current thread is the only thread in the process.
 fn is_single_threaded() -> io::Result<bool> {
-    match count_dir_entries("/proc/self/task") {
-        Ok(1) => Ok(true),
-        Ok(_) => Ok(false),
-        Err(e) => Err(e),
-    }
+    Ok(num_threads()? == 1)
 }
 
 fn to_execve_cstring_array<S: AsRef<str>>(
