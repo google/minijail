@@ -194,14 +194,15 @@ bool insert_and_check_duplicate_syscall(struct parser_state **previous_syscalls,
 	return false;
 }
 
-void allow_logging_syscalls(struct filter_block *head)
+static void allow_selected_syscalls(struct filter_block *head,
+				    const char *const *allowlist,
+				    size_t allowlist_len)
 {
 	unsigned int i;
 
-	for (i = 0; i < log_syscalls_len; i++) {
-		warn("allowing syscall: %s", log_syscalls[i]);
-		append_allow_syscall(head,
-				     lookup_syscall(log_syscalls[i], NULL));
+	for (i = 0; i < allowlist_len; i++) {
+		warn("allowing syscall: %s", allowlist[i]);
+		append_allow_syscall(head, lookup_syscall(allowlist[i], NULL));
 	}
 }
 
@@ -796,7 +797,11 @@ int compile_filter(const char *filename, FILE *initial_file,
 	 * some syscalls need to be unconditionally allowed.
 	 */
 	if (filteropts->allow_syscalls_for_logging)
-		allow_logging_syscalls(head);
+		allow_selected_syscalls(head, log_syscalls, log_syscalls_len);
+
+	if (filteropts->include_libc_compatibility_allowlist)
+		allow_selected_syscalls(head, libc_compatibility_syscalls,
+					libc_compatibility_syscalls_len);
 
 	if (compile_file(filename, initial_file, head, &arg_blocks, &labels,
 			 filteropts, previous_syscalls,

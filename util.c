@@ -92,6 +92,23 @@ const char *const log_syscalls[] = {
 
 const size_t log_syscalls_len = ARRAY_SIZE(log_syscalls);
 
+/*
+ * These syscalls are globally allowed. ChromeOS devs: Do **not** add to this
+ * list without approval from the security team.
+ *
+ * This list should be made empty (and mostly remain so) after a better
+ * mechanism is implemented: b/393353891
+ */
+const char *const libc_compatibility_syscalls[] = {
+    "fstat",
+#if defined(__arm__)
+    "fstat64",
+#endif
+};
+
+const size_t libc_compatibility_syscalls_len =
+    ARRAY_SIZE(libc_compatibility_syscalls);
+
 /* clang-format off */
 static struct logging_config_t {
 	/* The logging system to use. The default is syslog. */

@@ -10,6 +10,7 @@
 #include <fcntl.h> /* For O_WRONLY. */
 
 #include <gtest/gtest.h>
+#include <span>
 #include <string>
 
 #include "bpf.h"
@@ -38,11 +39,14 @@ int test_compile_filter(const std::string& filename,
                         struct sock_fprog* prog,
                         enum block_action action = ACTION_RET_KILL,
                         enum use_logging allow_logging = NO_LOGGING,
-                        bool allow_dup_syscalls = true) {
+                        bool allow_dup_syscalls = true,
+                        bool include_libc_compatibility_allowlist = false) {
   struct filter_options filteropts {
     .action = action, .allow_logging = allow_logging != NO_LOGGING,
     .allow_syscalls_for_logging = allow_logging == USE_SIGSYS_LOGGING,
     .allow_duplicate_syscalls = allow_dup_syscalls,
+    .include_libc_compatibility_allowlist =
+        include_libc_compatibility_allowlist,
   };
   return compile_filter(filename.c_str(), policy_file, prog, &filteropts);
 }
@@ -60,6 +64,7 @@ int test_compile_file(std::string filename,
     .action = action, .allow_logging = allow_logging != NO_LOGGING,
     .allow_syscalls_for_logging = allow_logging == USE_SIGSYS_LOGGING,
     .allow_duplicate_syscalls = allow_dup_syscalls,
+    .include_libc_compatibility_allowlist = false,
   };
   size_t num_syscalls = get_num_syscalls();
   struct parser_state** previous_syscalls =
@@ -81,6 +86,10 @@ struct filter_block* test_compile_policy_line(
                              action);
 }
 
+std::span<const char *const> get_libc_compatibility_allowlist() {
+  return std::span(libc_compatibility_syscalls,
+                   libc_compatibility_syscalls_len);
+}
 }  // namespace
 
 /* Test that setting one BPF instruction works. */
@@ -1098,6 +1107,81 @@ TEST_F(FileTest, invalid_return) {
    */
   ASSERT_EQ(res, -1);
 }
+
+TEST_F(FileTest, seccomp_global_allowlist) {
+  std::string policy = "";
+  FILE *policy_file = write_to_pipe(policy);
+  ASSERT_NE(policy_file, nullptr);
+
+  struct sock_fprog actual;
+  int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_KILL,
+        NO_LOGGING, false /* allow_dup_syscalls */,
+        true /* include_libc_compatibility_allowlist */);
+  fclose(policy_file);
+
+  ASSERT_EQ(res, 0);
+  std::span<const char *const> allowlist = get_libc_compatibility_allowlist();
+  size_t offset_after_allowlist =
+    ARCH_VALIDATION_LEN + 1 + 2 * allowlist.size();
+  EXPECT_EQ(actual.len, offset_after_allowlist + 1);
+  EXPECT_ARCH_VALIDATION(actual.filter);
+  EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN,
+                 BPF_LD + BPF_W + BPF_ABS, syscall_nr);
+  for (size_t i = 0; i < allowlist.size(); ++i) {
+    int allowlist_entry_nr = lookup_syscall(allowlist[i], nullptr);
+    EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 1 + 2 * i,
+                         allowlist_entry_nr);
+  }
+  EXPECT_EQ_STMT(actual.filter + offset_after_allowlist, BPF_RET + BPF_K,
+                 SECCOMP_RET_KILL);
+
+  free(actual.filter);
+}
+
+TEST_F(FileTest, seccomp_global_allowlist_does_not_conflict) {
+  std::string policy;
+  for (const char *entry : get_libc_compatibility_allowlist()) {
+    policy += entry;
+    policy += ": 1\n";
+  }
+
+  FILE* policy_file = write_to_pipe(policy);
+  ASSERT_NE(policy_file, nullptr);
+
+  struct sock_fprog actual;
+  int res = test_compile_filter("policy", policy_file, &actual, ACTION_RET_KILL,
+        NO_LOGGING, false /* allow_dup_syscalls */,
+        true /* include_libc_compatibility_allowlist */);
+  fclose(policy_file);
+
+  ASSERT_EQ(res, 0);
+  std::span<const char *const> allowlist = get_libc_compatibility_allowlist();
+
+  /* NOTE: due to how the global allowlist is added, this results in duplicate
+   * allowlist entries in `actual` when both the global allowlist & the given
+   * policy share a syscall. This is suboptimal, but the existence of global
+   * allowlist entries is highly discouraged & the list should remain empty most
+   * of the time. When it does contain entries, it should generally contain
+   * fewer than five.
+   */
+  size_t offset_after_allowlist =
+      ARCH_VALIDATION_LEN + 1 + 4 * allowlist.size();
+  EXPECT_EQ(actual.len, offset_after_allowlist + 1);
+  EXPECT_ARCH_VALIDATION(actual.filter);
+  EXPECT_EQ_STMT(actual.filter + ARCH_VALIDATION_LEN, BPF_LD + BPF_W + BPF_ABS,
+                 syscall_nr);
+  for (size_t i = 0; i < allowlist.size() * 2; ++i) {
+    int allowlist_entry_nr = lookup_syscall(allowlist[i % allowlist.size()],
+                                            nullptr);
+    EXPECT_ALLOW_SYSCALL(actual.filter + ARCH_VALIDATION_LEN + 1 + 2 * i,
+                         allowlist_entry_nr);
+  }
+  EXPECT_EQ_STMT(actual.filter + offset_after_allowlist, BPF_RET + BPF_K,
+                 SECCOMP_RET_KILL);
+
+  free(actual.filter);
+}
+
 
 TEST_F(FileTest, seccomp_mode1) {
   std::string policy =

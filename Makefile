@@ -79,6 +79,14 @@ ifeq ($(BLOCK_SYMLINKS_IN_NONINIT_MOUNTNS_TMP),yes)
 CPPFLAGS += -DBLOCK_SYMLINKS_IN_NONINIT_MOUNTNS_TMP
 endif
 
+# If specified, the `libc_compatibility_syscalls` list will be silently added to
+# all allowlists. Intended for use when upgrading core libraries (mainly libc),
+# which can lead to new syscalls being introduced in many places.
+USE_LIBC_COMPATIBILITY_ALLOWLIST ?= no
+ifeq ($(USE_LIBC_COMPATIBILITY_ALLOWLIST),yes)
+CPPFLAGS += -DALLOW_LIBC_COMPATIBILITY_SYSCALLS
+endif
+
 ifeq ($(USE_ASAN),yes)
 CPPFLAGS += -fsanitize=address -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address -fno-omit-frame-pointer

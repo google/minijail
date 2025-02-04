@@ -43,6 +43,7 @@ struct filter_options {
 	int allow_logging;
 	int allow_syscalls_for_logging;
 	bool allow_duplicate_syscalls;
+	bool include_libc_compatibility_allowlist;
 };
 
 struct bpf_labels;
@@ -74,6 +75,14 @@ int seccomp_can_softfail(void);
 static inline bool allow_duplicate_syscalls(void)
 {
 #if defined(ALLOW_DUPLICATE_SYSCALLS)
+	return true;
+#endif
+	return false;
+}
+
+static inline bool allow_libc_compatibility_syscalls(void)
+{
+#if defined(ALLOW_LIBC_COMPATIBILITY_SYSCALLS)
 	return true;
 #endif
 	return false;

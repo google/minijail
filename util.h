@@ -153,6 +153,9 @@ static inline void _cleanup_str(char **ptr)
 extern const char *const log_syscalls[];
 extern const size_t log_syscalls_len;
 
+extern const char *const libc_compatibility_syscalls[];
+extern const size_t libc_compatibility_syscalls_len;
+
 enum logging_system_t {
 	/* Log to syslog. This is the default. */
 	LOG_TO_SYSLOG = 0,
