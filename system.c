@@ -500,9 +500,9 @@ static bool seccomp_action_is_available(const char *wanted)
 		 */
 		return false;
 	}
-	const char actions_avail_path[] =
+	static const char actions_avail_path[] =
 	    "/proc/sys/kernel/seccomp/actions_avail";
-	FILE *f = fopen(actions_avail_path, "re");
+	attribute_cleanup_fp FILE *f = fopen(actions_avail_path, "re");
 
 	if (!f) {
 		pwarn("fopen(%s) failed", actions_avail_path);
