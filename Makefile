@@ -258,7 +258,7 @@ $(eval $(call add_object_rules,libconstants.gen.o,CC,c,CFLAGS))
 ifeq ($(USE_SYSTEM_GTEST),no)
 # Points to the root of Google Test, relative to where this file is.
 # Remember to tweak this if you move this file.
-GTEST_DIR = googletest-1.14.0/googletest
+GTEST_DIR = googletest-1.16.0/googletest
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
