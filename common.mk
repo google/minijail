@@ -9,6 +9,10 @@
 #  The authoritative common.mk is located in:
 #    https://chromium.googlesource.com/chromiumos/platform2/+/HEAD/common-mk
 #  Please make all changes there, then copy into place in other repos.
+#
+#  The copybara service is used to automatically sync updates for projects
+#  hosted on Chromium GoB hosts.  Please see:
+#  //google3/third_party/copybara-gsubtreed/chromiumos_platform2/copy.bara.sky
 # NOTE NOTE NOTE
 #
 # This file provides a common architecture for building C/C++ source trees.
