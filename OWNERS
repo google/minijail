@@ -1,5 +1,9 @@
 set noparent
 include OWNERS_GENERAL
+
+# Robots.
+per-file common.mk=copybara-worker-blackhole@google.com #{LAST_RESORT_SUGGESTION}
+
 # Emeritus.
 drewry@google.com #{LAST_RESORT_SUGGESTION}
 keescook@google.com #{LAST_RESORT_SUGGESTION}
