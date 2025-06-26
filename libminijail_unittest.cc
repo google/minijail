@@ -332,7 +332,7 @@ TEST(WaitTest, killed_by_sigsys) {
   char* const argv[] = {"sh", "-c", "kill -SYS $$; sleep 1000", nullptr};
   set_preload_path(j.get());
   EXPECT_EQ(minijail_run(j.get(), kShellPath, argv), 0);
-  EXPECT_EQ(minijail_wait(j.get()), MINIJAIL_ERR_JAIL);
+  EXPECT_EQ(minijail_wait(j.get()), MINIJAIL_ERR_SECCOMP_VIOLATION);
 }
 
 TEST(WaitTest, command_not_found) {

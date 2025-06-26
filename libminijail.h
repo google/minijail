@@ -49,7 +49,9 @@ enum {
 	/* Command cannot be found */
 	MINIJAIL_ERR_NO_COMMAND = 127,
 
-	/* (MINIJAIL_ERR_SIG_BASE + n) if process killed by signal n != SIGSYS
+	/*
+	 * `MINIJAIL_ERR_SIG_BASE + n` if the process was killed by the signal
+	 * `n` other than `SIGSYS`
 	 */
 	MINIJAIL_ERR_SIG_BASE = 128,
 
@@ -58,7 +60,10 @@ enum {
 
 	MINIJAIL_ERR_PRELOAD = 252,
 
-	/* Process killed by SIGSYS */
+	/*
+	 * Process killed by `SIGSYS`, which is the sign of a SECCOMP violation
+	 */
+	MINIJAIL_ERR_SECCOMP_VIOLATION = 253,
 	MINIJAIL_ERR_JAIL = 253,
 
 	MINIJAIL_ERR_INIT = 254,
@@ -647,13 +652,16 @@ int minijail_kill(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
  * return its exit status. A process can only be waited once.
  *
  * Return:
- *   A negative error code if the process cannot be waited for (eg -ECHILD if no
- *   process has been started or if the process has already been waited for).
- *   MINIJAIL_ERR_NO_COMMAND if command cannot be found.
- *   MINIJAIL_ERR_NO_ACCESS if command cannot be run.
- *   MINIJAIL_ERR_JAIL if process was killed by SIGSYS.
- *   (MINIJAIL_ERR_SIG_BASE  + n) if process was killed by signal n != SIGSYS.
- *   (n & 0xFF) if process finished by returning code n.
+ *   * A negative error code if the process cannot be waited for (eg `-ECHILD`
+ *     if no process has been started or if the process has already been waited
+ *     for).
+ *   * `MINIJAIL_ERR_NO_COMMAND` if the command cannot be found.
+ *   * `MINIJAIL_ERR_NO_ACCESS` if the command can be found but cannot be run.
+ *   * `MINIJAIL_ERR_SECCOMP_VIOLATION` if the process was killed by `SIGSYS`,
+ *     which is the sign of a SECCOMP violation.
+ *   * `MINIJAIL_ERR_SIG_BASE  + n` if the process was killed by the signal `n`
+ *     other than `SIGSYS`.
+ *   * `n & 0xFF` if the process finished by returning the code `n`.
  */
 int minijail_wait(struct minijail *j) MINIJAIL_ATTRIBUTE_NONNULL();
 

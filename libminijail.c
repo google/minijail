@@ -4122,18 +4122,18 @@ static int minijail_wait_internal(struct minijail *j, int expected_signal)
 
 		int signum = WTERMSIG(st);
 		/*
-		 * We return MINIJAIL_ERR_JAIL if the process received
-		 * SIGSYS, which happens when a syscall is blocked by
-		 * seccomp filters.
-		 * If not, we do what bash(1) does:
-		 * $? = 128 + signum
+		 * We return MINIJAIL_ERR_SECCOMP_VIOLATION if the process
+		 * received SIGSYS, which happens when a syscall is blocked by
+		 * SECCOMP filters.
+		 *
+		 * If not, we do what bash(1) does: $? = 128 + signum
 		 */
 		if (signum == SIGSYS) {
 			warn("child process %d had a policy violation (%s)",
 			     j->initpid,
 			     j->seccomp_policy_path ? j->seccomp_policy_path
 						    : "NO-LABEL");
-			error_status = MINIJAIL_ERR_JAIL;
+			error_status = MINIJAIL_ERR_SECCOMP_VIOLATION;
 		} else {
 			if (signum != expected_signal) {
 				warn("child process %d received signal %d",
