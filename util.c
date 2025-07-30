@@ -48,6 +48,10 @@ const char *const log_syscalls[] = {
 #endif
 #elif defined(__i386__)
 #if defined(__ANDROID__)
+    // From Android 17, x86 uses the regular socket syscalls.
+    "socket",
+    "connect",
+    // Before Android 17, they were multiplexed through socketcall.
     "socketcall",
     "writev",
     "fcntl64",
