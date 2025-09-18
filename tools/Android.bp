@@ -45,11 +45,6 @@ python_test_host {
     data: [
         "testdata/arch_64.json",
     ],
-    version: {
-        py3: {
-            embedded_launcher: true,
-        },
-    },
 }
 
 python_test_host {
@@ -65,11 +60,6 @@ python_test_host {
     data: [
         "testdata/arch_64.json",
     ],
-    version: {
-        py3: {
-            embedded_launcher: true,
-        },
-    },
 }
 
 python_binary_host {
