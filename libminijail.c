@@ -297,6 +297,33 @@ static int write_exactly(int fd, const void *buf, size_t n)
 	return 0;
 }
 
+/*
+ * Reads exactly n bytes from file descriptor fd into buf.
+ * Returns 0 on success or a negative error code on error.
+ */
+static int read_exactly(int fd, void *buf, size_t n)
+{
+	char *p = buf;
+	while (n > 0) {
+		const ssize_t bytes = read(fd, p, n);
+		if (bytes < 0) {
+			if (errno == EINTR)
+				continue;
+
+			return -errno;
+		}
+		if (bytes == 0) {
+			errno = EPIPE;
+			return -EPIPE;
+		}
+
+		p += bytes;
+		n -= bytes;
+	}
+
+	return 0;
+}
+
 /* Closes *pfd and sets it to -1. */
 static void close_and_reset(int *pfd)
 {
@@ -3023,21 +3050,23 @@ static void init(pid_t rootpid)
 int API minijail_from_fd(int fd, struct minijail *j)
 {
 	size_t sz = 0;
-	size_t bytes = read(fd, &sz, sizeof(sz));
+	int err = read_exactly(fd, &sz, sizeof(sz));
 	attribute_cleanup_str char *buf = NULL;
-	int r;
-	if (sizeof(sz) != bytes)
-		return -EINVAL;
+	if (err) {
+		pwarn("failed to read marshalled minijail size");
+		return err;
+	}
 	if (sz > USHRT_MAX) /* arbitrary check */
 		return -E2BIG;
 	buf = malloc(sz);
 	if (!buf)
 		return -ENOMEM;
-	bytes = read(fd, buf, sz);
-	if (bytes != sz)
-		return -EINVAL;
-	r = minijail_unmarshal(j, buf, sz);
-	return r;
+	err = read_exactly(fd, buf, sz);
+	if (err) {
+		pwarn("failed to read marshalled minijail payload");
+		return err;
+	}
+	return minijail_unmarshal(j, buf, sz);
 }
 
 int API minijail_to_fd(struct minijail *j, int fd)
