@@ -1026,7 +1026,7 @@ impl Minijail {
         }
         if ret == 0 {
             // Safe because dev_null was remapped.
-            dev_null.into_raw_fd();
+            let _ = dev_null.into_raw_fd();
         }
         Ok(ret as pid_t)
     }
