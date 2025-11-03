@@ -462,6 +462,9 @@ TEST(Test, close_original_pipes_after_dup2) {
   ASSERT_EQ(pipe(to_wait), 0);
 
   const ScopedMinijail j(minijail_new());
+  // Ensure the child inherits a stable write fd for signaling.
+  const int preserved_fd = 3;
+  minijail_preserve_fd(j.get(), to_wait[1], preserved_fd);
   char* program;
   ASSERT_GT(asprintf(&program, R"(
       echo Hi >&1;
@@ -472,8 +475,7 @@ TEST(Test, close_original_pipes_after_dup2) {
       read line2;
       echo "$line1$line2 and Goodbye" >&%d;
       exit 42;
-    )",
-                     to_wait[1]),
+    )", preserved_fd),
             0);
   char* const argv[] = {"sh", "-c", program, nullptr};
 
