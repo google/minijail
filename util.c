@@ -81,6 +81,10 @@ const char *const log_syscalls[] = {
     "socket",
     "connect",
     "send",
+#elif defined(__loongarch64)
+    "socket",
+    "connect",
+    "sendto",
 #elif defined(__riscv)
 #if defined(__ANDROID__)
     "connect", "fcntl", "sendto", "socket", "writev",

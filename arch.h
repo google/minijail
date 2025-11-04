@@ -38,6 +38,9 @@
 #elif defined(__ia64__)
 #  define MINIJAIL_ARCH_NR AUDIT_ARCH_IA64
 #  define MINIJAIL_ARCH_NAME "ia64"
+#elif defined(__loongarch64)
+#  define MINIJAIL_ARCH_NR AUDIT_ARCH_LOONGARCH64
+#  define MINIJAIL_ARCH_NAME "loong64"
 #elif defined(__mips__)
 #  if defined(__mips64)
 #    if defined(__MIPSEB__)

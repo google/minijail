@@ -129,6 +129,8 @@ def main(argv=None):
         constants_json["arch_name"] = "arm64"
     elif constants_json["arch_nr"] == 0x40000028:
         constants_json["arch_name"] = "arm"
+    elif constants_json["arch_nr"] == 0xC0000102:
+        constants_json["arch_name"] = "loong64"
     elif constants_json["arch_nr"] == 0xC00000F3:
         constants_json["arch_name"] = "riscv64"
     else:
