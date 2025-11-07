@@ -18,11 +18,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 
 static int (*real_main)(int, char **, char **);
 static void *libc_handle;
+
+static void maybe_init_stderr_logging(void)
+{
+	const char *target = getenv(kLoggingEnvVar);
+	if (target && streq(target, kLoggingEnvValueStderr)) {
+		init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
+	}
+}
 
 static void truncate_preload_env(char **envp, const char *name)
 {
@@ -79,6 +86,7 @@ static int fake_main(int argc, char **argv, char **envp)
 	close(fd);
 
 	minijail_unsetenv(envp, kFdEnvVar);
+	minijail_unsetenv(envp, kLoggingEnvVar);
 
 	truncate_preload_env(envp, kLdPreloadEnvVar);
 
@@ -126,10 +134,12 @@ int API __libc_start_main(int (*main)(int, char **, char **), int argc,
 	 * We hold this handle for the duration of the real __libc_start_main()
 	 * and drop it just before calling the real main().
 	 */
+	maybe_init_stderr_logging();
+
 	libc_handle = dlopen("libc.so.6", RTLD_NOW);
 
 	if (!libc_handle) {
-		syslog(LOG_ERR, "can't dlopen() libc");
+		do_log(LOG_ERR, "can't dlopen() libc");
 		/*
 		 * We dare not use abort() here because it will run atexit()
 		 * handlers and try to flush stdio.
@@ -138,7 +148,7 @@ int API __libc_start_main(int (*main)(int, char **, char **), int argc,
 	}
 	sym = dlsym(libc_handle, "__libc_start_main");
 	if (!sym) {
-		syslog(LOG_ERR, "can't find the real __libc_start_main()");
+		do_log(LOG_ERR, "can't find the real __libc_start_main()");
 		_exit(1);
 	}
 	real_libc_start_main.symval = sym;

@@ -23,6 +23,7 @@
 
 #include <linux/filter.h>
 
+#include "libminijail-private.h"
 #include "libminijail.h"
 #include "libsyscalls.h"
 
@@ -1485,6 +1486,12 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 		/* Check if target is statically or dynamically linked. */
 		*elftype = get_elf_linkage(program_path);
 		free(program_path);
+	}
+
+	if (log_to_stderr && *elftype != ELFSTATIC) {
+		if (minijail_setenv(envp, kLoggingEnvVar,
+		                    kLoggingEnvValueStderr, 1))
+			err(1, "minijail_setenv() failed.");
 	}
 
 	/*

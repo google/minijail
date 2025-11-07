@@ -13,13 +13,18 @@
 #include <fstream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 
 #include "config_parser.h"
+#include "libminijail-private.h"
 #include "libminijail.h"
 #include "minijail0_cli.h"
 #include "test_util.h"
+#include "util.h"
+
+extern "C" char** environ;
 
 namespace {
 
@@ -27,6 +32,20 @@ constexpr char kValidUser[] = "nobody";
 constexpr char kValidUid[] = "100";
 constexpr char kValidGroup[] = "users";
 constexpr char kValidGid[] = "100";
+
+bool GetEnvValue(const std::vector<std::string>& env,
+                 const std::string& key,
+                 std::string* value_out = nullptr) {
+  const std::string prefix = key + "=";
+  for (const auto& entry : env) {
+    if (entry.rfind(prefix, 0) == 0) {
+      if (value_out)
+        *value_out = entry.substr(prefix.size());
+      return true;
+    }
+  }
+  return false;
+}
 
 class CliTest : public ::testing::Test {
  protected:
@@ -42,7 +61,8 @@ class CliTest : public ::testing::Test {
   // as it parses things (which is normally permissible with argv).
   int parse_args_(const std::vector<std::string>& argv,
                   bool* exit_immediately,
-                  ElfType* elftype) {
+                  ElfType* elftype,
+                  std::vector<std::string>* child_env = nullptr) {
     // Make sure we reset the getopts state when scanning a new argv.  Setting
     // this to 0 is a GNU extension, but AOSP/BSD also checks this (as an alias
     // to their "optreset").
@@ -62,19 +82,39 @@ class CliTest : public ::testing::Test {
     testing::internal::CaptureStdout();
 
     const char* preload_path = PRELOADPATH;
+    const char* default_preload_path = preload_path;
     char** envp = NULL;
     int ret =
         parse_args(j, pargv.size(), const_cast<char* const*>(pargv.data()),
                    NULL, exit_immediately, elftype, &preload_path, &envp);
     testing::internal::GetCapturedStdout();
 
+    if (child_env) {
+      child_env->clear();
+      if (envp) {
+        for (char** entry = envp; *entry; ++entry)
+          child_env->emplace_back(*entry);
+      }
+    }
+
+    if (envp && envp != environ)
+      minijail_free_env(envp);
+
+    if (preload_path && preload_path != default_preload_path)
+      free(const_cast<char*>(preload_path));
+
     minijail_destroy(j);
 
     return ret;
   }
 
+  int parse_args_(const std::vector<std::string>& argv,
+                  std::vector<std::string>* child_env) {
+    return parse_args_(argv, &exit_immediately_, &elftype_, child_env);
+  }
+
   int parse_args_(const std::vector<std::string>& argv) {
-    return parse_args_(argv, &exit_immediately_, &elftype_);
+    return parse_args_(argv, &exit_immediately_, &elftype_, nullptr);
   }
 
   ElfType elftype_;
@@ -605,6 +645,59 @@ TEST_F(CliTest, invalid_set_env) {
 
   argv2[1] = "=foo";
   ASSERT_EXIT(parse_args_(argv2), testing::ExitedWithCode(1), "");
+}
+
+TEST_F(CliTest, logging_stderr_sets_env_for_dynamic_targets) {
+  std::vector<std::string> argv = {"--logging=stderr", "/bin/sh"};
+  ElfType elftype = ELFDYNAMIC;
+  bool exit_immediately = false;
+  std::vector<std::string> child_env;
+
+  ASSERT_TRUE(parse_args_(argv, &exit_immediately, &elftype, &child_env));
+
+  std::string value;
+  ASSERT_TRUE(GetEnvValue(child_env, kLoggingEnvVar, &value));
+  EXPECT_EQ(value, kLoggingEnvValueStderr);
+}
+
+TEST_F(CliTest, logging_stderr_skips_env_for_static_targets) {
+  std::vector<std::string> argv = {"--logging=stderr", "/bin/sh"};
+  ElfType elftype = ELFSTATIC;
+  bool exit_immediately = false;
+  std::vector<std::string> child_env;
+
+  ASSERT_TRUE(parse_args_(argv, &exit_immediately, &elftype, &child_env));
+
+  EXPECT_FALSE(GetEnvValue(child_env, kLoggingEnvVar));
+}
+
+TEST_F(CliTest, logging_auto_defaults_to_syslog_without_tty) {
+  if (isatty(STDIN_FILENO)) {
+    GTEST_SKIP() << "stdin is a TTY; cannot assert auto behavior";
+  }
+
+  std::vector<std::string> argv = {"--logging=auto", "/bin/sh"};
+  ElfType elftype = ELFDYNAMIC;
+  bool exit_immediately = false;
+  std::vector<std::string> child_env;
+
+  ASSERT_TRUE(parse_args_(argv, &exit_immediately, &elftype, &child_env));
+
+  EXPECT_FALSE(GetEnvValue(child_env, kLoggingEnvVar));
+}
+
+TEST_F(CliTest, logging_stderr_respects_env_reset) {
+  std::vector<std::string> argv = {"--env-reset", "--logging=stderr",
+                                   "/bin/sh"};
+  ElfType elftype = ELFDYNAMIC;
+  bool exit_immediately = false;
+  std::vector<std::string> child_env;
+
+  ASSERT_TRUE(parse_args_(argv, &exit_immediately, &elftype, &child_env));
+
+  std::string value;
+  ASSERT_TRUE(GetEnvValue(child_env, kLoggingEnvVar, &value));
+  EXPECT_EQ(value, kLoggingEnvValueStderr);
 }
 
 // Valid calls to the gen-config option.

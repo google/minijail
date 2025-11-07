@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include <gtest/gtest.h>
@@ -190,6 +191,17 @@ TEST(environment, copy_and_modify) {
   EXPECT_EQ("dup=2\nval2=4\ndup=5\n", dump_env(env));
 
   minijail_free_env(env);
+}
+
+TEST(logging_to_syslog, reports_syslog_when_initialized) {
+  init_logging(LOG_TO_SYSLOG, -1, LOG_INFO);
+  EXPECT_TRUE(logging_to_syslog());
+}
+
+TEST(logging_to_syslog, reports_fd_when_initialized_to_fd) {
+  init_logging(LOG_TO_FD, STDERR_FILENO, LOG_INFO);
+  EXPECT_FALSE(logging_to_syslog());
+  init_logging(LOG_TO_SYSLOG, -1, LOG_INFO);
 }
 
 TEST(parse_single_constant, formats) {

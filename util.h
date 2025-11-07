@@ -341,6 +341,13 @@ char *consumestr(char **buf, size_t *buflength) attribute_nonnull();
 void init_logging(enum logging_system_t logger, int fd, int min_priority);
 
 /*
+ * logging_to_syslog: report whether the active logging backend is syslog.
+ *
+ * Returns true when logging is handled by syslog, false otherwise.
+ */
+bool logging_to_syslog(void);
+
+/*
  * minjail_free_env: Frees an environment array plus the environment strings it
  * points to. The environment and its constituent strings must have been
  * allocated (as opposed to pointing to static data), e.g. by using

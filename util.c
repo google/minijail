@@ -539,6 +539,11 @@ void init_logging(enum logging_system_t logger, int fd, int min_priority)
 	logging_config.min_priority = min_priority;
 }
 
+bool logging_to_syslog(void)
+{
+	return logging_config.logger == LOG_TO_SYSLOG;
+}
+
 void minijail_free_env(char **env)
 {
 	if (!env)

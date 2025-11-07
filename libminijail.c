@@ -1510,11 +1510,12 @@ static int parse_seccomp_filters(struct minijail *j, const char *filename,
 	}
 
 	/*
-	 * If SECCOMP_RET_LOG is not available, need to allow extra syscalls
-	 * for logging.
+	 * When logging to the system log, if SECCOMP_RET_LOG is not available,
+	 * need to allow extra syscalls for logging.
 	 */
 	filteropts.allow_syscalls_for_logging =
-	    filteropts.allow_logging && !seccomp_ret_log_available();
+	    filteropts.allow_logging && !seccomp_ret_log_available() &&
+	    logging_to_syslog();
 
 	/* Whether to also allow syscalls for libc compatibility. */
 	filteropts.include_libc_compatibility_allowlist =

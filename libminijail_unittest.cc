@@ -363,6 +363,51 @@ TEST(WaitTest, can_wait_only_once) {
   EXPECT_EQ(minijail_wait(j.get()), -ECHILD);
 }
 
+TEST(Test, seccomp_logging_emits_warning_to_stderr_when_logging_to_fd) {
+  if (!debug_logging_allowed())
+    GTEST_SKIP() << "seccomp logging disabled in this build";
+
+  std::string policy_path = source_path("test/seccomp.policy");
+
+  int pipefd[2];
+  ASSERT_EQ(pipe(pipefd), 0);
+
+  pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    close(pipefd[0]);
+    minijail_log_to_fd(pipefd[1], LOG_INFO);
+
+    ScopedMinijail j(minijail_new());
+    minijail_no_new_privs(j.get());
+    minijail_use_seccomp_filter(j.get());
+    minijail_log_seccomp_filter_failures(j.get());
+    minijail_parse_seccomp_filters(j.get(), policy_path.c_str());
+
+    minijail_enter(j.get());
+    _exit(0);
+  }
+
+  close(pipefd[1]);
+
+  std::string log_output;
+  char buffer[256];
+  ssize_t read_ret;
+  while ((read_ret = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
+    log_output.append(buffer, static_cast<size_t>(read_ret));
+  }
+  close(pipefd[0]);
+
+  int status;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+
+  EXPECT_NE(log_output.find("logging seccomp filter failures"),
+            std::string::npos);
+}
+
 TEST(Test, minijail_preserve_fd_no_leak) {
   const ScopedMinijail j(minijail_new());
   char* const script = R"(
@@ -794,6 +839,44 @@ TEST(Test, minijail_run_env_pid_pipes_with_local_preload) {
   EXPECT_GE(read_ret, 0);
   EXPECT_STREQ(buf, "|test\n");
 
+  EXPECT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(Test, preload_clears_logging_env_var_for_child) {
+  if (kCompiledWithCoverage || running_with_asan())
+    GTEST_SKIP();
+
+  ScopedMinijail j(minijail_new());
+  set_preload_path(j.get());
+
+  char* argv[4];
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = "env | grep '^__MINIJAIL_LOGGING=' || echo missing";
+  argv[3] = nullptr;
+
+  char* envp[2];
+  envp[0] = "__MINIJAIL_LOGGING=stderr";
+  envp[1] = nullptr;
+
+  pid_t pid;
+  int child_stdin, child_stdout;
+  int mj_run_ret =
+      minijail_run_env_pid_pipes(j.get(), argv[0], argv, envp, &pid,
+                                 &child_stdin, &child_stdout, nullptr);
+  ASSERT_EQ(mj_run_ret, 0);
+
+  ASSERT_EQ(close(child_stdin), 0);
+
+  char buf[kBufferSize] = {};
+  ssize_t read_ret = read(child_stdout, buf, sizeof(buf) - 1);
+  ASSERT_GT(read_ret, 0);
+  EXPECT_STREQ(buf, "missing\n");
+  ASSERT_EQ(close(child_stdout), 0);
+
+  int status;
   EXPECT_EQ(waitpid(pid, &status, 0), pid);
   ASSERT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 0);
