@@ -10,6 +10,7 @@
 #define _TEST_UTIL_H_
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <memory>
