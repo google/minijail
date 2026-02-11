@@ -34,6 +34,7 @@
  * build errors on such broken systems.
  */
 #undef BLKTRACESETUP
+#undef BLKTRACESETUP2
 #undef FS_IOC_FIEMAP
 
 /* The old glibc bundled with the Android host toolchain is missing some ioctl
