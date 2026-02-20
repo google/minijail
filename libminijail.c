@@ -412,6 +412,10 @@ static int add_fs_restriction_path(struct minijail *j, const char *path,
 	if (!r)
 		return -ENOMEM;
 	r->path = strdup(path);
+	if (!r->path) {
+		free(r);
+		return -ENOMEM;
+	}
 	r->landlock_flags = landlock_flags;
 
 	if (j->fs_rules_tail) {
