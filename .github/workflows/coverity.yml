@@ -26,7 +26,7 @@ jobs:
     env:
       CC: ${{ matrix.cc }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - name: Install system packages
       run: sudo apt-get install -y libcap-dev
     - uses: vapier/coverity-scan-action@v1
