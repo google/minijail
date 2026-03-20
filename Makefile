@@ -9,6 +9,12 @@ PRELOADNAME = libminijailpreload.so
 PRELOADPATH = "$(LIBDIR)/$(PRELOADNAME)"
 CPPFLAGS += -DPRELOADPATH='$(PRELOADPATH)'
 
+# Paths to newuidmap/newgidmap helpers for unprivileged ID mapping fallback.
+NEWUIDMAP_PATH ?= /usr/bin/newuidmap
+NEWGIDMAP_PATH ?= /usr/bin/newgidmap
+CPPFLAGS += -DNEWUIDMAP_PATH='"$(NEWUIDMAP_PATH)"'
+CPPFLAGS += -DNEWGIDMAP_PATH='"$(NEWGIDMAP_PATH)"'
+
 # We don't build static libs by default.
 BUILD_STATIC_LIBS ?= no
 

@@ -5,6 +5,7 @@
 
 #include "system.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
@@ -12,12 +13,14 @@
 #include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <linux/securebits.h>
@@ -179,6 +182,104 @@ int write_proc_file(pid_t pid, const char *content, const char *basename)
 	if ((size_t)written < len) {
 		warn("failed to write %zu bytes to '%s'", len, filename);
 		return -1;
+	}
+	return 0;
+}
+
+/*
+ * Run newuidmap or newgidmap helper to set up a uid/gid map.
+ * These are privileged helper binaries that consult /etc/subuid and /etc/subgid
+ * to allow unprivileged users to set up multi-range ID mappings.
+ *
+ * The map string is in the format "inside outside count\n..." (newlines
+ * between entries, as converted from commas by minijail_uidmap/gidmap).
+ * We convert this to the helper's argv format:
+ *   newuidmap <pid> <inside> <outside> <count> [<inside> <outside> <count>...]
+ */
+int run_id_map_helper(pid_t pid, const char *map, const char *helper)
+{
+	/*
+	 * Count tokens in the map string to size argv.
+	 * Each entry is "inside outside count" (3 tokens), separated by
+	 * whitespace. We over-count slightly since we start at 1,
+	 * but that just means a few extra NULL slots from calloc.
+	 */
+	size_t token_count = 1;
+	const char *p;
+	for (p = map; *p; p++) {
+		if (isspace(*p))
+			token_count++;
+	}
+
+	/* Allocate argv: helper + pid_str + tokens + NULL terminator. */
+	size_t max_args = 2 + token_count + 1;
+	const char **argv = calloc(max_args, sizeof(char *));
+	if (!argv)
+		return -ENOMEM;
+
+	char pid_str[32];
+	snprintf(pid_str, sizeof(pid_str), "%d", pid);
+
+	argv[0] = helper;
+	argv[1] = pid_str;
+
+	/*
+	 * Tokenize the map string on whitespace.
+	 * The tokens are already the numeric strings we need for argv.
+	 */
+	char *map_copy = strdup(map);
+	if (!map_copy) {
+		free(argv);
+		return -ENOMEM;
+	}
+
+	int argc = 2;
+	char *saveptr = NULL;
+	char *token = strtok_r(map_copy, " \t\n", &saveptr);
+	while (token) {
+		argv[argc++] = token;
+		token = strtok_r(NULL, " \t\n", &saveptr);
+	}
+	argv[argc] = NULL;
+
+	if (argc == 2) {
+		warn("id map is empty");
+		free(map_copy);
+		free(argv);
+		return -EINVAL;
+	}
+
+	if ((argc - 2) % 3 != 0) {
+		warn("id map has %d tokens, expected a multiple of 3",
+		     argc - 2);
+		free(map_copy);
+		free(argv);
+		return -EINVAL;
+	}
+
+	pid_t child = fork();
+	if (child < 0) {
+		pwarn("failed to fork for %s", helper);
+		free(map_copy);
+		free(argv);
+		return -errno;
+	}
+	if (child == 0) {
+		execv(helper, (char *const *)argv);
+		pwarn("execv(%s) failed", helper);
+		_exit(EXIT_FAILURE);
+	}
+
+	free(map_copy);
+	free(argv);
+
+	int status;
+	if (waitpid(child, &status, 0) < 0)
+		return -errno;
+	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+		warn("%s failed with status %d", helper,
+		     WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+		return -EPERM;
 	}
 	return 0;
 }

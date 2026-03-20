@@ -267,3 +267,26 @@ TEST(is_canonical_path, trailing_slash) {
   EXPECT_TRUE(is_canonical_path("/proc/1/"));
   EXPECT_FALSE(is_canonical_path("/proc/1//"));
 }
+
+// Valid maps with a helper that always succeeds.
+TEST(run_id_map_helper, success) {
+  EXPECT_EQ(0, run_id_map_helper(getpid(), "0 1000 1", "/bin/true"));
+  EXPECT_EQ(0, run_id_map_helper(getpid(), "0 1000 1\n100 2000 50",
+                                 "/bin/true"));
+}
+
+// Token count must be a positive multiple of 3.
+TEST(run_id_map_helper, invalid_map) {
+  EXPECT_EQ(-EINVAL, run_id_map_helper(getpid(), "", "/bin/true"));
+  EXPECT_EQ(-EINVAL, run_id_map_helper(getpid(), "  \t\n  ", "/bin/true"));
+  EXPECT_EQ(-EINVAL, run_id_map_helper(getpid(), "0 1000", "/bin/true"));
+  EXPECT_EQ(-EINVAL,
+            run_id_map_helper(getpid(), "0 1000 1 extra", "/bin/true"));
+}
+
+// Helper failure or missing helper should return -EPERM.
+TEST(run_id_map_helper, helper_failure) {
+  EXPECT_EQ(-EPERM, run_id_map_helper(getpid(), "0 1000 1", "/bin/false"));
+  EXPECT_EQ(-EPERM, run_id_map_helper(getpid(), "0 1000 1",
+                                      "/nonexistent/path/to/helper"));
+}

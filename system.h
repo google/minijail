@@ -49,6 +49,8 @@ int config_net_loopback(void);
 int write_pid_to_path(pid_t pid, const char *path);
 int write_proc_file(pid_t pid, const char *content, const char *basename);
 
+int run_id_map_helper(pid_t pid, const char *map, const char *helper);
+
 int mkdir_p(const char *path, mode_t mode, bool isdir);
 
 int get_mount_flags(const char *source, unsigned long *mnt_flags);

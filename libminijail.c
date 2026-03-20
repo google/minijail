@@ -60,6 +60,14 @@
 
 #define MAX_PRESERVED_FDS 128U
 
+/* Paths to newuidmap/newgidmap helper binaries for unprivileged ID mapping. */
+#ifndef NEWUIDMAP_PATH
+#define NEWUIDMAP_PATH "/usr/bin/newuidmap"
+#endif
+#ifndef NEWGIDMAP_PATH
+#define NEWGIDMAP_PATH "/usr/bin/newgidmap"
+#endif
+
 /* Keyctl commands. */
 #define KEYCTL_JOIN_SESSION_KEYRING 1
 
@@ -1517,9 +1525,9 @@ static int parse_seccomp_filters(struct minijail *j, const char *filename,
 	 * When logging to the system log, if SECCOMP_RET_LOG is not available,
 	 * need to allow extra syscalls for logging.
 	 */
-	filteropts.allow_syscalls_for_logging =
-	    filteropts.allow_logging && !seccomp_ret_log_available() &&
-	    logging_to_syslog();
+	filteropts.allow_syscalls_for_logging = filteropts.allow_logging &&
+						!seccomp_ret_log_available() &&
+						logging_to_syslog();
 
 	/* Whether to also allow syscalls for libc compatibility. */
 	filteropts.include_libc_compatibility_allowlist =
@@ -2451,8 +2459,17 @@ static void set_rlimits_or_die(const struct minijail *j)
 
 static void write_ugid_maps_or_die(const struct minijail *j)
 {
-	if (j->uidmap && write_proc_file(j->initpid, j->uidmap, "uid_map") != 0)
-		kill_child_and_die(j, "failed to write uid_map");
+	if (j->uidmap) {
+		int ret = write_proc_file(j->initpid, j->uidmap, "uid_map");
+		if (ret == -EPERM) {
+			warn("direct uid_map write failed (EPERM), "
+			     "falling back to newuidmap helper");
+			ret = run_id_map_helper(j->initpid, j->uidmap,
+						NEWUIDMAP_PATH);
+		}
+		if (ret != 0)
+			kill_child_and_die(j, "failed to write uid_map");
+	}
 	if (j->gidmap && j->flags.disable_setgroups) {
 		/*
 		 * Older kernels might not have the /proc/<pid>/setgroups files.
@@ -2470,8 +2487,17 @@ static void write_ugid_maps_or_die(const struct minijail *j)
 				    j, "failed to disable setgroups(2)");
 		}
 	}
-	if (j->gidmap && write_proc_file(j->initpid, j->gidmap, "gid_map") != 0)
-		kill_child_and_die(j, "failed to write gid_map");
+	if (j->gidmap) {
+		int ret = write_proc_file(j->initpid, j->gidmap, "gid_map");
+		if (ret == -EPERM) {
+			warn("direct gid_map write failed (EPERM), "
+			     "falling back to newgidmap helper");
+			ret = run_id_map_helper(j->initpid, j->gidmap,
+						NEWGIDMAP_PATH);
+		}
+		if (ret != 0)
+			kill_child_and_die(j, "failed to write gid_map");
+	}
 }
 
 static void enter_user_namespace(const struct minijail *j)
