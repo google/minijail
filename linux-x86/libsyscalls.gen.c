@@ -1008,6 +1008,12 @@ const struct syscall_entry syscall_table[] = {
 #ifdef __NR_rseq
 { "rseq", __NR_rseq },
 #endif
+#ifdef __NR_uretprobe
+{ "uretprobe", __NR_uretprobe },
+#endif
+#ifdef __NR_uprobe
+{ "uprobe", __NR_uprobe },
+#endif
 #ifdef __NR_pidfd_send_signal
 { "pidfd_send_signal", __NR_pidfd_send_signal },
 #endif
@@ -1058,6 +1064,93 @@ const struct syscall_entry syscall_table[] = {
 #endif
 #ifdef __NR_process_madvise
 { "process_madvise", __NR_process_madvise },
+#endif
+#ifdef __NR_epoll_pwait2
+{ "epoll_pwait2", __NR_epoll_pwait2 },
+#endif
+#ifdef __NR_mount_setattr
+{ "mount_setattr", __NR_mount_setattr },
+#endif
+#ifdef __NR_quotactl_fd
+{ "quotactl_fd", __NR_quotactl_fd },
+#endif
+#ifdef __NR_landlock_create_ruleset
+{ "landlock_create_ruleset", __NR_landlock_create_ruleset },
+#endif
+#ifdef __NR_landlock_add_rule
+{ "landlock_add_rule", __NR_landlock_add_rule },
+#endif
+#ifdef __NR_landlock_restrict_self
+{ "landlock_restrict_self", __NR_landlock_restrict_self },
+#endif
+#ifdef __NR_memfd_secret
+{ "memfd_secret", __NR_memfd_secret },
+#endif
+#ifdef __NR_process_mrelease
+{ "process_mrelease", __NR_process_mrelease },
+#endif
+#ifdef __NR_futex_waitv
+{ "futex_waitv", __NR_futex_waitv },
+#endif
+#ifdef __NR_set_mempolicy_home_node
+{ "set_mempolicy_home_node", __NR_set_mempolicy_home_node },
+#endif
+#ifdef __NR_cachestat
+{ "cachestat", __NR_cachestat },
+#endif
+#ifdef __NR_fchmodat2
+{ "fchmodat2", __NR_fchmodat2 },
+#endif
+#ifdef __NR_map_shadow_stack
+{ "map_shadow_stack", __NR_map_shadow_stack },
+#endif
+#ifdef __NR_futex_wake
+{ "futex_wake", __NR_futex_wake },
+#endif
+#ifdef __NR_futex_wait
+{ "futex_wait", __NR_futex_wait },
+#endif
+#ifdef __NR_futex_requeue
+{ "futex_requeue", __NR_futex_requeue },
+#endif
+#ifdef __NR_statmount
+{ "statmount", __NR_statmount },
+#endif
+#ifdef __NR_listmount
+{ "listmount", __NR_listmount },
+#endif
+#ifdef __NR_lsm_get_self_attr
+{ "lsm_get_self_attr", __NR_lsm_get_self_attr },
+#endif
+#ifdef __NR_lsm_set_self_attr
+{ "lsm_set_self_attr", __NR_lsm_set_self_attr },
+#endif
+#ifdef __NR_lsm_list_modules
+{ "lsm_list_modules", __NR_lsm_list_modules },
+#endif
+#ifdef __NR_mseal
+{ "mseal", __NR_mseal },
+#endif
+#ifdef __NR_setxattrat
+{ "setxattrat", __NR_setxattrat },
+#endif
+#ifdef __NR_getxattrat
+{ "getxattrat", __NR_getxattrat },
+#endif
+#ifdef __NR_listxattrat
+{ "listxattrat", __NR_listxattrat },
+#endif
+#ifdef __NR_removexattrat
+{ "removexattrat", __NR_removexattrat },
+#endif
+#ifdef __NR_open_tree_attr
+{ "open_tree_attr", __NR_open_tree_attr },
+#endif
+#ifdef __NR_file_getattr
+{ "file_getattr", __NR_file_getattr },
+#endif
+#ifdef __NR_file_setattr
+{ "file_setattr", __NR_file_setattr },
 #endif
   { NULL, -1 },
 };

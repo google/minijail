@@ -79,3 +79,11 @@ struct fscrypt_policy_v1 {
 #if !defined(MADV_FREE)
 #define MADV_FREE 8
 #endif
+
+#if !defined(MADV_GUARD_INSTALL)
+#define MADV_GUARD_INSTALL 102
+#endif
+
+#if !defined(MADV_GUARD_REMOVE)
+#define MADV_GUARD_REMOVE 103
+#endif
