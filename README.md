@@ -16,6 +16,16 @@ Minijail is a sandboxing and containment tool used in ChromeOS and Android.
 It provides an executable that can be used to launch and sandbox other programs,
 and a library that can be used by code to sandbox itself.
 
+## Purpose and threat model
+
+Minijail is intended for sandboxing known binaries on a system. It is intended
+to mitigate the risk if a service is compromised through a bug, or a
+confused-deputy scenario.
+
+It is not designed for safely running malicious code, including
+attacker-controlled binaries or binaries that may use attacker-controlled
+shared object libraries.
+
 ## Getting the code
 
 You're one `git clone` away from happiness.
