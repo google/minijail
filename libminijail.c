@@ -445,8 +445,16 @@ static int add_fs_restriction_path(struct minijail *j, const char *path,
 	 * minijail_enter(), that's this process. For minijail_run_internal(),
 	 * that's the child process.
 	 */
-	if (j->fs_rules_count == 0)
-		setup_fs_rules_fd(j);
+	if (j->fs_rules_count == 0) {
+		int ret = setup_fs_rules_fd(j);
+		if (ret && ret != ENOSYS && ret != EOPNOTSUPP) {
+			j->fs_rules_head = NULL;
+			j->fs_rules_tail = NULL;
+			free(r->path);
+			free(r);
+			return -ret;
+		}
+	}
 
 	j->fs_rules_count++;
 	return 0;
@@ -3843,7 +3851,9 @@ static int minijail_run_internal(struct minijail *j,
 	 * before logic for the child process.
 	 */
 	if (j->fs_rules_head) {
-		setup_fs_rules_fd(j);
+		int ret = setup_fs_rules_fd(j);
+		if (ret && ret != ENOSYS && ret != EOPNOTSUPP)
+			pdie("failed to create Landlock ruleset");
 		minijail_preserve_fd(j, j->fs_rules_fd, j->fs_rules_fd);
 	}
 
