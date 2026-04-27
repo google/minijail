@@ -1872,11 +1872,11 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 	}
 
 	count = j->cgroup_count;
+	j->cgroup_count = 0;   /* zero early so cleanup is safe if we jump */
 	if (count > MAX_CGROUPS) {
 		ret = -EINVAL;
 		goto bad_cgroups;
 	}
-	j->cgroup_count = 0;
 	for (i = 0; i < count; ++i) {
 		char *cgroup = consumestr(&serialized, &length);
 		if (!cgroup)
