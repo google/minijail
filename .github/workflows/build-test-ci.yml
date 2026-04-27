@@ -28,6 +28,8 @@ jobs:
       CC: ${{ matrix.cc }}
     steps:
     - uses: actions/checkout@v6
+    - name: Update distro sources
+      run: sudo apt-get update
     - name: Install system packages
       run: sudo apt-get install libcap-dev
     - name: Install Googletest (gtest/gmock)
