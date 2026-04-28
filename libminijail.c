@@ -1896,7 +1896,7 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 		void *landlock_flags_bytes =
 		    consumebytes(sizeof(landlock_flags), &serialized, &length);
 
-		if (!path)
+		if (!path || !landlock_flags_bytes)
 			goto bad_fs_rules;
 		memcpy(&landlock_flags, landlock_flags_bytes,
 		       sizeof(landlock_flags));
@@ -1908,6 +1908,8 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 	/* Unmarshal fs_rules_fd. */
 	void *fs_rules_fd_bytes =
 	    consumebytes(sizeof(j->fs_rules_fd), &serialized, &length);
+	if (!fs_rules_fd_bytes)
+		return -EINVAL;
 	memcpy(&j->fs_rules_fd, fs_rules_fd_bytes, sizeof(j->fs_rules_fd));
 	if (!j->fs_rules_fd)
 		goto bad_cgroups;

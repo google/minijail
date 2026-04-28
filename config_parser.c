@@ -113,7 +113,10 @@ bool parse_config_file(FILE *config_file, struct config_entry_list *list)
 		 * capacity if so.
 		 */
 		if (list->num_entries >= list->num_allocated_) {
-			list->num_allocated_ = list->num_allocated_ * 2;
+			size_t new_size = list->num_allocated_ * 2;
+			if (new_size == 0)
+				new_size = LIST_DEFAULT_SIZE;
+			list->num_allocated_ = new_size;
 			list->entries = realloc(
 			    list->entries,
 			    list->num_allocated_ * sizeof(struct config_entry));
