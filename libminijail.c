@@ -58,7 +58,7 @@
 
 #define MAX_RLIMITS 32 /* Currently there are 15 supported by Linux. */
 
-#define MAX_PRESERVED_FDS 128U
+#define MAX_PRESERVED_FDS 256U
 
 /* Paths to newuidmap/newgidmap helper binaries for unprivileged ID mapping. */
 #ifndef NEWUIDMAP_PATH
