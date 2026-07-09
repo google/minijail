@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <limits.h>
 #include <linux/capability.h>
 #include <linux/filter.h>
 #include <sched.h>
@@ -2137,6 +2138,183 @@ done:
 	return ret;
 }
 
+// Cleans |path| in-place by resolving . and .. components.
+// Ensures it does not go back past |limit|.
+static void clean_path_limit(char *path, const char *limit)
+{
+	char *src = path;
+	char *dst = path;
+
+	// Preserve leading slash.
+	if (*src == '/') {
+		*dst++ = *src++;
+	}
+
+	while (*src) {
+		// Skip consecutive slashes.
+		if (*src == '/') {
+			src++;
+			continue;
+		}
+
+		// Check for "." component.
+		if (src[0] == '.') {
+			if (src[1] == '\0') {
+				src += 1; // Skip "." at the end of the path.
+				continue;
+			}
+			if (src[1] == '/') {
+				src += 2; // Skip "./".
+				continue;
+			}
+		}
+
+		// Check for ".." component.
+		if (src[0] == '.' && src[1] == '.') {
+			bool is_double_dot = false;
+			size_t skip_len = 0;
+
+			if (src[2] == '\0') {
+				is_double_dot = true;
+				skip_len =
+				    2; // Skip ".." at the end of the path.
+			} else if (src[2] == '/') {
+				is_double_dot = true;
+				skip_len = 3; // Skip "../".
+			}
+
+			if (is_double_dot) {
+				src += skip_len;
+				// Pop the last component from dst, but do not
+				// go back past limit.
+				if (dst > limit) {
+					dst--; // Move past the trailing slash
+					       // of the last component.
+					// Move back until we hit the slash
+					// before the last component.
+					while (dst > limit &&
+					       *(dst - 1) != '/') {
+						dst--;
+					}
+				}
+				continue;
+			}
+		}
+
+		// Copy the current component.
+		while (*src && *src != '/') {
+			*dst++ = *src++;
+		}
+		// Copy the trailing slash of the component.
+		if (*src == '/') {
+			*dst++ = *src++;
+		}
+	}
+
+	// Remove trailing slash if it's not the root directory.
+	if (dst > path + 1 && *(dst - 1) == '/') {
+		dst--;
+	}
+	*dst = '\0';
+}
+
+// Resolves symlinks in |path| safely, ensuring they do not escape |chrootdir|.
+// |path| must be dynamically allocated (will be freed and updated if resolved).
+// Returns 0 on success, or negative error code.
+static int resolve_mount_destination(const char *chrootdir, char **path)
+{
+	int symlink_loop_limit = 8;
+	struct stat st;
+	char link_target[PATH_MAX];
+	ssize_t target_len;
+	char *current_path = *path;
+	size_t chroot_len = chrootdir ? strlen(chrootdir) : 0;
+
+	while (symlink_loop_limit--) {
+		if (lstat(current_path, &st) < 0) {
+			if (errno == ENOENT) {
+				break;
+			}
+			return -errno;
+		}
+
+		if (!S_ISLNK(st.st_mode)) {
+			break;
+		}
+
+		target_len = readlink(current_path, link_target,
+				      sizeof(link_target) - 1);
+		if (target_len < 0) {
+			return -errno;
+		}
+		link_target[target_len] = '\0';
+
+		char *next_path = NULL;
+		if (link_target[0] == '/') {
+			if (asprintf(&next_path, "%s%s", chrootdir ?: "",
+				     link_target) < 0) {
+				return -ENOMEM;
+			}
+		} else {
+			char *dir = strdup(current_path);
+			if (!dir) {
+				return -ENOMEM;
+			}
+			char *parent = ".";
+			char *last_slash = strrchr(dir, '/');
+			if (last_slash) {
+				if (last_slash == dir) {
+					parent = "/";
+				} else {
+					*last_slash = '\0';
+					parent = dir;
+				}
+			}
+			if (asprintf(&next_path, "%s/%s", parent, link_target) <
+			    0) {
+				free(dir);
+				return -ENOMEM;
+			}
+			free(dir);
+		}
+
+		// Calculate limit offset for next_path.
+		size_t limit_offset = 1;
+		if (chroot_len > 0) {
+			limit_offset = chroot_len;
+			if (next_path[limit_offset] == '/') {
+				limit_offset++;
+			}
+		}
+
+		clean_path_limit(next_path, next_path + limit_offset);
+
+		// Verify it didn't escape (should start with chrootdir if set).
+		if (chroot_len > 0) {
+			size_t check_len = chroot_len;
+			if (chrootdir[chroot_len - 1] == '/') {
+				check_len--;
+			}
+			if (strncmp(next_path, chrootdir, check_len) != 0 ||
+			    (next_path[check_len] != '\0' &&
+			     next_path[check_len] != '/')) {
+				free(next_path);
+				return -EACCES;
+			}
+		}
+
+		free(current_path);
+		current_path = next_path;
+		*path = current_path;
+	}
+
+	if (symlink_loop_limit < 0) {
+		return -ELOOP;
+	}
+
+	return 0;
+}
+
 /*
  * mount_one: Applies mounts from @m for @j, recursing as needed.
  * @j Minijail these mounts are for
@@ -2164,6 +2342,12 @@ static int mount_one(const struct minijail *j, struct mountpoint *m,
 	} else {
 		if (asprintf(&dest, "%s%s", j->chrootdir ?: "", m->dest) < 0)
 			return -ENOMEM;
+	}
+
+	ret = resolve_mount_destination(j->chrootdir, &dest);
+	if (ret) {
+		warn("cannot resolve mount target '%s'", dest);
+		goto error;
 	}
 
 	ret = setup_mount_destination(m->src, dest, j->uid, j->gid,

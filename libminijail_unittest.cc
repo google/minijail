@@ -1388,6 +1388,67 @@ TEST_F(NamespaceTest, test_namespaces) {
   }
 }
 
+TEST_F(NamespaceTest, test_bind_mount_symlink_dest) {
+  if (!userns_supported_ || running_with_asan())
+    GTEST_SKIP();
+
+  TemporaryDir chroot_dir;
+  ASSERT_TRUE(chroot_dir.is_valid());
+
+  std::string chroot_etc = chroot_dir.path + "/etc";
+  ASSERT_EQ(mkdir(chroot_etc.c_str(), 0755), 0);
+
+  std::string symlink_path = chroot_etc + "/resolv.conf";
+  ASSERT_EQ(symlink("../run/shill/resolv.conf", symlink_path.c_str()), 0);
+
+  std::string chroot_run = chroot_dir.path + "/run";
+  ASSERT_EQ(mkdir(chroot_run.c_str(), 0755), 0);
+
+  TemporaryFile src_file;
+  ASSERT_TRUE(src_file.is_valid());
+  const char test_content[] = "nameserver 8.8.8.8\n";
+  int fd = open(src_file.path.c_str(), O_WRONLY | O_CLOEXEC);
+  ASSERT_GE(fd, 0);
+  ASSERT_EQ(write(fd, test_content, strlen(test_content)),
+            (ssize_t)strlen(test_content));
+  close(fd);
+
+  std::string uidmap = "0 " + std::to_string(getuid()) + " 1";
+  std::string gidmap = "0 " + std::to_string(getgid()) + " 1";
+
+  ScopedMinijail j(minijail_new());
+  set_preload_path(j.get());
+
+  minijail_namespace_user(j.get());
+  minijail_namespace_vfs(j.get());
+  minijail_uidmap(j.get(), uidmap.c_str());
+  minijail_gidmap(j.get(), gidmap.c_str());
+  minijail_namespace_user_disable_setgroups(j.get());
+
+  minijail_enter_chroot(j.get(), chroot_dir.path.c_str());
+
+  ASSERT_EQ(
+      minijail_bind(j.get(), src_file.path.c_str(), "/etc/resolv.conf", 0),
+      0);
+
+  char* const argv[] = {const_cast<char*>("/bin/true"), nullptr};
+  pid_t pid;
+  int mj_run_ret = minijail_run_pid_pipes_no_preload(
+      j.get(), argv[0], argv, &pid, nullptr, nullptr, nullptr);
+  ASSERT_EQ(mj_run_ret, 0);
+
+  int status = minijail_wait(j.get());
+  EXPECT_EQ(status, 0);
+
+  std::string expected_target_path = chroot_run + "/shill/resolv.conf";
+  struct stat st;
+  EXPECT_EQ(stat(expected_target_path.c_str(), &st), 0);
+  EXPECT_TRUE(S_ISREG(st.st_mode));
+
+  EXPECT_EQ(unlink(expected_target_path.c_str()), 0);
+  EXPECT_EQ(rmdir((chroot_run + "/shill").c_str()), 0);
+}
+
 TEST_F(NamespaceTest, test_enter_ns) {
   char uidmap[kBufferSize], gidmap[kBufferSize];
 

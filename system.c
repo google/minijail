@@ -457,7 +457,12 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 	struct stat st_buf;
 	bool domkdir;
 
-	rc = stat(dest, &st_buf);
+	/*
+	 * Use lstat so an untrusted symlink at |dest| is treated as
+	 * "exists" and we fall straight through to mount() instead of
+	 * creating/chowning the symlink target as root.
+	 */
+	rc = lstat(dest, &st_buf);
 	if (rc == 0) /* destination exists */
 		return 0;
 
@@ -516,15 +521,23 @@ int setup_mount_destination(const char *source, const char *dest, uid_t uid,
 	if (rc)
 		return rc;
 	if (!domkdir) {
-		attribute_cleanup_fd int fd =
-		    open(dest, O_RDWR | O_CREAT | O_CLOEXEC, 0700);
+		attribute_cleanup_fd int fd = open(
+		    dest, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+		    0700);
 		if (fd < 0) {
 			rc = errno;
+			if (rc == EEXIST) {
+				struct stat lspec_st;
+				if (lstat(dest, &lspec_st) == 0 &&
+				    S_ISREG(lspec_st.st_mode)) {
+					return 0;
+				}
+			}
 			pwarn("open(%s) failed", dest);
 			return -rc;
 		}
 	}
-	if (chown(dest, uid, gid)) {
+	if (lchown(dest, uid, gid)) {
 		rc = errno;
 		pwarn("chown(%s, %u, %u) failed", dest, uid, gid);
 		return -rc;
