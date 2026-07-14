@@ -100,10 +100,7 @@ will automatically regenerate the homepage when the `gh-pages` branch updates.
 
 ## Talks and presentations
 
-The following talk serves as a good introduction to Minijail and how it can be used.
-
-[Video](https://drive.google.com/file/d/0BwPS_JpKyELWZTFBcTVsa1hhYjA/preview),
-[slides](https://docs.google.com/presentation/d/e/2PACX-1vRBqpin5xR9sng6lIBPjG0XQtu-uWWgr0ds-M3zW13XpDO-bTcMERLwoHUEB9078p1yqr9L-su9n5dk/pub).
+The following talk serves as a good introduction to Minijail and how it can be used: [slides](https://docs.google.com/presentation/d/e/2PACX-1vRBqpin5xR9sng6lIBPjG0XQtu-uWWgr0ds-M3zW13XpDO-bTcMERLwoHUEB9078p1yqr9L-su9n5dk/pub).
 
 ## Example usage
 
