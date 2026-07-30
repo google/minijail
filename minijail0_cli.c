@@ -514,6 +514,7 @@ enum {
 	OPT_FS_PATH_ADVANCED_RW,
 	OPT_GEN_CONFIG,
 	OPT_LOGGING,
+	OPT_LANDLOCK_ABI,
 	OPT_NO_DEFAULT_RUNTIME,
 	OPT_NO_FS_RESTRICTIONS,
 	OPT_NO_NEW_SESSIONS,
@@ -559,6 +560,7 @@ static const struct option long_options[] = {
     {"fs-path-ro", required_argument, 0, OPT_FS_PATH_RO},
     {"fs-path-rw", required_argument, 0, OPT_FS_PATH_RW},
     {"fs-path-advanced-rw", required_argument, 0, OPT_FS_PATH_ADVANCED_RW},
+    {"landlock-abi", required_argument, 0, OPT_LANDLOCK_ABI},
     {"no-default-runtime-environment", no_argument, 0, OPT_NO_DEFAULT_RUNTIME},
     {"no-fs-restrictions", no_argument, 0, OPT_NO_FS_RESTRICTIONS},
     {"no-new-sessions", no_argument, 0, OPT_NO_NEW_SESSIONS},
@@ -698,6 +700,11 @@ static const char help_text[] =
 "               Adds an allowed read-write path.\n"
 "  --fs-path-advanced-rw\n"
 "               Adds an allowed advanced read-write path.\n"
+"  --landlock-abi <version>\n"
+"               Set the Landlock ABI version to target.\n"
+"               Defaults to 2 to prevent implicit behavior changes\n"
+"               when running on newer kernels. Set to 3 or 5 to\n"
+"               explicitly enable newer restrictions.\n"
 "  --no-fs-restrictions\n"
 "               Disables path-based filesystem restrictions.\n"
 "  --no-default-runtime-environment\n"
@@ -1176,6 +1183,16 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 				errx(1,
 				     "--logger must be 'syslog' or 'stderr'");
 			break;
+		case OPT_LANDLOCK_ABI: {
+			char *end;
+			long abi = strtol(optarg, &end, 10);
+			if (*end != '\0' || abi < 0) {
+				errx(1, "--landlock-abi must be a positive "
+					"integer");
+			}
+			minijail_set_landlock_abi(j, abi);
+			break;
+		}
 		case OPT_PROFILE:
 			use_profile(j, optarg, &pivot_root, chroot, &tmp_size);
 			break;

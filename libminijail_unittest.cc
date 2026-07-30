@@ -1743,6 +1743,34 @@ TEST_F(NamespaceTest, test_remount_ro_using_mount) {
 
 namespace {
 
+constexpr char kInvokeDevIoctlCmd[] = R"(exec python3 -B -c '
+import fcntl, termios, ctypes, sys
+try:
+  fd = open("/dev/zero", "r")
+except OSError as e:
+  sys.exit(100 + e.errno)
+try:
+  fcntl.ioctl(fd, termios.FIONREAD, b" " * ctypes.sizeof(ctypes.c_int))
+except OSError as e:
+  if e.errno == 25:
+    sys.exit(0)
+  else:
+    sys.exit(200 + e.errno)
+')";
+
+int RunIoctlTestProcess(struct minijail* j) {
+  char* argv[4];
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = const_cast<char*>(kInvokeDevIoctlCmd);
+  argv[3] = NULL;
+  int run_ret = minijail_run_no_preload(j, argv[0], argv);
+  if (run_ret != 0) {
+    return run_ret;
+  }
+  return minijail_wait(j);
+}
+
 // Tests that require Landlock support.
 //
 // These subclass NamespaceTest because they also require  userns access.
@@ -1750,8 +1778,9 @@ namespace {
 // namespace_pids or namespace_user.
 class LandlockTest : public NamespaceTest {
  protected:
-  static void SetUpTestCase() {
-    run_landlock_tests_ = LandlockSupported() && UsernsSupported();
+  static void SetUpTestSuite() {
+    NamespaceTest::SetUpTestCase();
+    run_landlock_tests_ = LandlockSupported() && userns_supported_;
   }
 
   // Whether Landlock tests should be run.
@@ -2201,18 +2230,17 @@ TEST_F(LandlockTest, test_cannot_access_default_paths) {
 }
 
 // Tests that LANDLOCK_ACCESS_FS_REFER is supported when the kernel supports
-// Landlock version ABI=2.
+// Landlock version ABI=2 (introduced in Linux 5.19).
 TEST_F(LandlockTest, test_refer_supported) {
-  int mj_run_ret;
-  int status;
   char* argv[4];
   if (!run_landlock_tests_)
     GTEST_SKIP();
   const int landlock_version =
       landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
   if (landlock_version < LANDLOCK_ABI_FS_REFER_SUPPORTED) {
-    warn("Skipping LandlockTest test_refer_supported ABI=%i", landlock_version);
-    GTEST_SKIP();
+    GTEST_SKIP() << "Test requires Landlock ABI "
+                 << LANDLOCK_ABI_FS_REFER_SUPPORTED
+                 << ", but system only supports ABI " << landlock_version;
   }
 
   ScopedMinijail j(minijail_new());
@@ -2228,24 +2256,22 @@ TEST_F(LandlockTest, test_refer_supported) {
   argv[2] = "exec echo 'bar' > /tmp/baz";
   argv[3] = NULL;
 
-  mj_run_ret = minijail_run_no_preload(j.get(), argv[0], argv);
-  EXPECT_EQ(mj_run_ret, 0);
-  status = minijail_wait(j.get());
-  EXPECT_EQ(status, 0);
+  EXPECT_EQ(0, minijail_run_no_preload(j.get(), argv[0], argv));
+  EXPECT_EQ(0, minijail_wait(j.get()));
 }
 
+// Tests that LANDLOCK_ACCESS_FS_REFER is NOT supported when the kernel only
+// supports Landlock version ABI < 2 (ABI=1 was introduced in Linux 5.13).
 TEST_F(LandlockTest, test_refer_not_supported) {
-  int mj_run_ret;
-  int status;
   char* argv[4];
   if (!run_landlock_tests_)
     GTEST_SKIP();
   const int landlock_version =
       landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
   if (landlock_version >= LANDLOCK_ABI_FS_REFER_SUPPORTED) {
-    warn("Skipping LandlockTest test_refer_not_supported ABI=%i",
-         landlock_version);
-    GTEST_SKIP();
+    GTEST_SKIP() << "Test requires Landlock ABI < "
+                 << LANDLOCK_ABI_FS_REFER_SUPPORTED
+                 << ", but system supports ABI " << landlock_version;
   }
 
   ScopedMinijail j(minijail_new());
@@ -2263,10 +2289,198 @@ TEST_F(LandlockTest, test_refer_not_supported) {
   argv[2] = "exec echo 'bar' > /tmp/baz";
   argv[3] = NULL;
 
-  mj_run_ret = minijail_run_no_preload(j.get(), argv[0], argv);
-  EXPECT_EQ(mj_run_ret, 0);
-  status = minijail_wait(j.get());
-  EXPECT_NE(status, 0);
+  EXPECT_EQ(0, minijail_run_no_preload(j.get(), argv[0], argv));
+  EXPECT_NE(0, minijail_wait(j.get()));
+}
+
+// Landlock version ABI=3 (Truncate, introduced in Linux 6.2)
+// - Default behavior (no restriction)
+TEST_F(LandlockTest, test_truncate_default) {
+  char* argv[4];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+
+  TemporaryDir dir;
+  ASSERT_TRUE(dir.is_valid());
+  std::string file_path = dir.path + "/test_file";
+
+  FILE* f = fopen(file_path.c_str(), "w");
+  ASSERT_NE(f, nullptr);
+  fprintf(f, "hello");
+  fclose(f);
+
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), "/");
+  minijail_add_fs_restriction_rw(j.get(), dir.path.c_str());
+
+  std::string cmd = "exec echo -n > " + file_path;
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = const_cast<char*>(cmd.c_str());
+  argv[3] = NULL;
+
+  EXPECT_EQ(0, minijail_run_no_preload(j.get(), argv[0], argv));
+  EXPECT_EQ(0, minijail_wait(j.get()));
+
+  struct stat st;
+  EXPECT_EQ(stat(file_path.c_str(), &st), 0);
+  EXPECT_EQ(st.st_size, 0);
+}
+
+// Landlock version ABI=3 (Truncate, introduced in Linux 6.2)
+// - Restricted behavior (opt-in)
+TEST_F(LandlockTest, test_truncate_restricted) {
+  char* argv[4];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+
+  const int landlock_version =
+      landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+  if (landlock_version < LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED) {
+    GTEST_SKIP() << "Test requires Landlock ABI "
+                 << LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED
+                 << ", but system only supports ABI " << landlock_version;
+  }
+
+  TemporaryDir dir;
+  ASSERT_TRUE(dir.is_valid());
+  std::string file_path = dir.path + "/test_file";
+
+  FILE* f = fopen(file_path.c_str(), "w");
+  ASSERT_NE(f, nullptr);
+  fprintf(f, "hello");
+  fclose(f);
+
+  ScopedMinijail j(minijail_new());
+  minijail_set_landlock_abi(j.get(), LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED);
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), "/");
+  minijail_add_fs_restriction_access_rights(
+      j.get(), dir.path.c_str(),
+      ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_BASIC_WRITE);
+
+  std::string cmd = "exec echo -n > " + file_path;
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = const_cast<char*>(cmd.c_str());
+  argv[3] = NULL;
+
+  EXPECT_EQ(0, minijail_run_no_preload(j.get(), argv[0], argv));
+  EXPECT_NE(0, minijail_wait(j.get()));
+
+  struct stat st;
+  EXPECT_EQ(stat(file_path.c_str(), &st), 0);
+  EXPECT_EQ(st.st_size, 5);
+}
+
+// Landlock version ABI=3 (Truncate, introduced in Linux 6.2)
+// - Allowed behavior (opt-in + explicitly allowed)
+TEST_F(LandlockTest, test_truncate_allowed) {
+  char* argv[4];
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+
+  const int landlock_version =
+      landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+  if (landlock_version < LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED) {
+    GTEST_SKIP() << "Test requires Landlock ABI "
+                 << LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED
+                 << ", but system only supports ABI " << landlock_version;
+  }
+
+  TemporaryDir dir;
+  ASSERT_TRUE(dir.is_valid());
+  std::string file_path = dir.path + "/test_file";
+
+  FILE* f = fopen(file_path.c_str(), "w");
+  ASSERT_NE(f, nullptr);
+  fprintf(f, "hello");
+  fclose(f);
+
+  ScopedMinijail j(minijail_new());
+  minijail_set_landlock_abi(j.get(), LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED);
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), "/");
+  minijail_add_fs_restriction_access_rights(
+      j.get(), dir.path.c_str(),
+      ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_BASIC_WRITE |
+          LANDLOCK_ACCESS_FS_TRUNCATE);
+
+  std::string cmd = "exec echo -n > " + file_path;
+  argv[0] = const_cast<char*>(kShellPath);
+  argv[1] = "-c";
+  argv[2] = const_cast<char*>(cmd.c_str());
+  argv[3] = NULL;
+
+  EXPECT_EQ(0, minijail_run_no_preload(j.get(), argv[0], argv));
+  EXPECT_EQ(0, minijail_wait(j.get()));
+
+  struct stat st;
+  EXPECT_EQ(stat(file_path.c_str(), &st), 0);
+  EXPECT_EQ(st.st_size, 0);
+}
+
+// Landlock version ABI=5 (Ioctl, introduced in Linux 6.10)
+// - Default behavior (no restriction)
+TEST_F(LandlockTest, test_ioctl_default) {
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+
+  ScopedMinijail j(minijail_new());
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), "/");
+  minijail_add_fs_restriction_ro(j.get(), "/dev/zero");
+
+  EXPECT_EQ(0, RunIoctlTestProcess(j.get()));
+}
+
+// Landlock version ABI=5 (Ioctl, introduced in Linux 6.10)
+// - Restricted behavior (opt-in)
+TEST_F(LandlockTest, test_ioctl_restricted) {
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+
+  const int landlock_version =
+      landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+  if (landlock_version < LANDLOCK_ABI_FS_IOCTL_DEV_SUPPORTED) {
+    GTEST_SKIP() << "Test requires Landlock ABI "
+                 << LANDLOCK_ABI_FS_IOCTL_DEV_SUPPORTED
+                 << ", but system only supports ABI " << landlock_version;
+  }
+
+  ScopedMinijail j(minijail_new());
+  minijail_set_landlock_abi(j.get(), LANDLOCK_ABI_FS_IOCTL_DEV_SUPPORTED);
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), "/");
+  minijail_add_fs_restriction_ro(j.get(), "/dev/zero");
+
+  EXPECT_EQ(200 + EACCES, RunIoctlTestProcess(j.get()));
+}
+
+// Landlock version ABI=5 (Ioctl, introduced in Linux 6.10)
+// - Allowed behavior (opt-in + explicitly allowed)
+TEST_F(LandlockTest, test_ioctl_allowed) {
+  if (!run_landlock_tests_)
+    GTEST_SKIP();
+
+  const int landlock_version =
+      landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+  if (landlock_version < LANDLOCK_ABI_FS_IOCTL_DEV_SUPPORTED) {
+    GTEST_SKIP() << "Test requires Landlock ABI "
+                 << LANDLOCK_ABI_FS_IOCTL_DEV_SUPPORTED
+                 << ", but system only supports ABI " << landlock_version;
+  }
+
+  ScopedMinijail j(minijail_new());
+  minijail_set_landlock_abi(j.get(), LANDLOCK_ABI_FS_IOCTL_DEV_SUPPORTED);
+  SetupLandlockTestingNamespaces(j.get());
+  minijail_add_fs_restriction_rx(j.get(), "/");
+  minijail_add_fs_restriction_access_rights(
+      j.get(), "/dev/zero",
+      LANDLOCK_ACCESS_FS_IOCTL_DEV);
+
+  EXPECT_EQ(0, RunIoctlTestProcess(j.get()));
 }
 
 void TestCreateSession(bool create_session) {

@@ -296,6 +296,8 @@ int minijail_add_to_cgroup(struct minijail *j, const char *path)
  * succeed, however without any actual effects.
  */
 bool minijail_is_fs_restriction_available(void);
+void minijail_set_landlock_abi(struct minijail *j, int abi)
+    MINIJAIL_ATTRIBUTE_NONNULL();
 
 /* Adds a read-execute path. */
 int minijail_add_fs_restriction_rx(struct minijail *j, const char *path)

@@ -133,4 +133,12 @@ struct minijail_landlock_path_beneath_attr {
 #define LANDLOCK_ACCESS_FS_REFER (1ULL << 13)
 #endif
 
+#ifndef LANDLOCK_ACCESS_FS_TRUNCATE
+#define LANDLOCK_ACCESS_FS_TRUNCATE (1ULL << 14)
+#endif
+
+#ifndef LANDLOCK_ACCESS_FS_IOCTL_DEV
+#define LANDLOCK_ACCESS_FS_IOCTL_DEV (1ULL << 15)
+#endif
+
 #endif /* _LANDLOCK_H */

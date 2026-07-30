@@ -10,6 +10,7 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/param.h>
 
 #include "util.h"
 
@@ -31,6 +32,60 @@ int landlock_add_rule(const int ruleset_fd,
 int landlock_restrict_self(const int ruleset_fd, const __u32 flags)
 {
 	return syscall(__NR_landlock_restrict_self, ruleset_fd, flags);
+}
+
+uint64_t landlock_get_handled_fs_mask(const int abi)
+{
+	static const uint64_t masks[] = {
+	    [0] = 0,
+	    [1] = HANDLED_ACCESS_TYPES,
+	    [2] = HANDLED_ACCESS_TYPES | LANDLOCK_ACCESS_FS_REFER,
+	    [3] = HANDLED_ACCESS_TYPES | LANDLOCK_ACCESS_FS_REFER |
+		  LANDLOCK_ACCESS_FS_TRUNCATE,
+	    [4] = HANDLED_ACCESS_TYPES | LANDLOCK_ACCESS_FS_REFER |
+		  LANDLOCK_ACCESS_FS_TRUNCATE,
+	    [5] = HANDLED_ACCESS_TYPES | LANDLOCK_ACCESS_FS_REFER |
+		  LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_IOCTL_DEV,
+	};
+	const size_t max_supported_abi = sizeof(masks) / sizeof(masks[0]) - 1;
+	if (abi < 0) {
+		return 0;
+	}
+	size_t index = MIN((size_t)abi, max_supported_abi);
+	return masks[index];
+}
+
+uint64_t landlock_get_rw_mask(const int abi)
+{
+	uint64_t mask = ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_BASIC_WRITE;
+	if (abi >= LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED) {
+		mask |= LANDLOCK_ACCESS_FS_TRUNCATE;
+	}
+	return mask;
+}
+
+uint64_t landlock_get_advanced_rw_mask(const int abi)
+{
+	uint64_t mask = ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_FULL_WRITE;
+	if (abi >= LANDLOCK_ABI_FS_REFER_SUPPORTED) {
+		mask |= LANDLOCK_ACCESS_FS_REFER;
+	}
+	if (abi >= LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED) {
+		mask |= LANDLOCK_ACCESS_FS_TRUNCATE;
+	}
+	if (abi >= LANDLOCK_ABI_FS_IOCTL_DEV_SUPPORTED) {
+		mask |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+	}
+	return mask;
+}
+
+uint64_t landlock_get_edit_mask(const int abi)
+{
+	uint64_t mask = ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_EDIT;
+	if (abi >= LANDLOCK_ABI_FS_TRUNCATE_SUPPORTED) {
+		mask |= LANDLOCK_ACCESS_FS_TRUNCATE;
+	}
+	return mask;
 }
 
 bool populate_ruleset_internal(const char *const path, const int ruleset_fd,

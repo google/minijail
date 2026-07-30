@@ -200,7 +200,8 @@ struct minijail {
 	int mountns_fd;
 	int netns_fd;
 	int fs_rules_fd;
-	int fs_rules_landlock_abi;
+	int effective_landlock_abi;
+	int target_landlock_abi;
 	char *chrootdir;
 	char *pid_file_path;
 	char *uidmap;
@@ -370,32 +371,31 @@ void minijail_preenter(struct minijail *j)
 	free_remounts_list(j);
 }
 
-static bool fs_refer_restriction_supported(struct minijail *j)
+static int get_effective_landlock_abi(struct minijail *j)
 {
-	if (j->fs_rules_landlock_abi < 0) {
+	if (j->effective_landlock_abi < 0) {
 		const int abi = landlock_create_ruleset(
 		    NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
 		/*
-		 * If we have a valid ABI, save the result. Otherwise, leave
-		 * the struct field unmodified to make sure it's correctly
-		 * marshaled and unmarshaled.
+		 * If we have a valid ABI, save the result. Otherwise, use 0.
 		 */
-		if (abi > 0) {
-			j->fs_rules_landlock_abi = abi;
+		int system_abi = abi > 0 ? abi : 0;
+		int target = j->target_landlock_abi;
+		if (target < 0) {
+			target = LANDLOCK_ABI_DEFAULT;
 		}
+		j->effective_landlock_abi = MIN(system_abi, target);
 	}
-
-	return j->fs_rules_landlock_abi >= LANDLOCK_ABI_FS_REFER_SUPPORTED;
+	return j->effective_landlock_abi;
 }
 
 /* Sets fs_rules_fd to an empty ruleset, if Landlock is available. */
 static int setup_fs_rules_fd(struct minijail *j)
 {
+	int effective_abi = get_effective_landlock_abi(j);
 	struct minijail_landlock_ruleset_attr ruleset_attr = {
-	    .handled_access_fs = HANDLED_ACCESS_TYPES};
-	if (fs_refer_restriction_supported(j)) {
-		ruleset_attr.handled_access_fs |= LANDLOCK_ACCESS_FS_REFER;
-	}
+	    .handled_access_fs = landlock_get_handled_fs_mask(effective_abi),
+	};
 
 	j->fs_rules_fd =
 	    landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
@@ -526,7 +526,8 @@ struct minijail API *minijail_new(void)
 	if (j) {
 		j->remount_mode = MS_PRIVATE;
 		j->fs_rules_fd = -1;
-		j->fs_rules_landlock_abi = -1;
+		j->effective_landlock_abi = -1;
+		j->target_landlock_abi = LANDLOCK_ABI_DEFAULT;
 		j->flags.using_minimalistic_mountns = false;
 		j->flags.enable_fs_restrictions = true;
 		j->flags.enable_profile_fs_restrictions = true;
@@ -534,6 +535,12 @@ struct minijail API *minijail_new(void)
 		j->flags.enable_new_sessions = true;
 	}
 	return j;
+}
+
+void API minijail_set_landlock_abi(struct minijail *j, int abi)
+{
+	j->target_landlock_abi = abi;
+	j->effective_landlock_abi = -1;
 }
 
 void API minijail_change_uid(struct minijail *j, uid_t uid)
@@ -1126,26 +1133,24 @@ int API minijail_add_fs_restriction_ro(struct minijail *j, const char *path)
 
 int API minijail_add_fs_restriction_rw(struct minijail *j, const char *path)
 {
-	return !add_fs_restriction_path(
-	    j, path, ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_BASIC_WRITE);
+	int effective_abi = get_effective_landlock_abi(j);
+	return !add_fs_restriction_path(j, path,
+					landlock_get_rw_mask(effective_abi));
 }
 
 int API minijail_add_fs_restriction_advanced_rw(struct minijail *j,
 						const char *path)
 {
-	uint16_t landlock_flags =
-	    ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_FULL_WRITE;
-	if (fs_refer_restriction_supported(j)) {
-		landlock_flags |= LANDLOCK_ACCESS_FS_REFER;
-	}
-
-	return !add_fs_restriction_path(j, path, landlock_flags);
+	int effective_abi = get_effective_landlock_abi(j);
+	return !add_fs_restriction_path(
+	    j, path, landlock_get_advanced_rw_mask(effective_abi));
 }
 
 int API minijail_add_fs_restriction_edit(struct minijail *j, const char *path)
 {
-	return !add_fs_restriction_path(
-	    j, path, ACCESS_FS_ROUGHLY_READ | ACCESS_FS_ROUGHLY_EDIT);
+	int effective_abi = get_effective_landlock_abi(j);
+	return !add_fs_restriction_path(j, path,
+					landlock_get_edit_mask(effective_abi));
 }
 
 int API minijail_add_fs_restriction_access_rights(struct minijail *j,
@@ -1762,6 +1767,7 @@ int minijail_unmarshal(struct minijail *j, char *serialized, size_t length)
 	j->hooks_tail = NULL;
 	j->fs_rules_head = NULL;
 	j->fs_rules_tail = NULL;
+	j->effective_landlock_abi = -1;
 
 	if (j->user) { /* stale pointer */
 		char *user = consumestr(&serialized, &length);
