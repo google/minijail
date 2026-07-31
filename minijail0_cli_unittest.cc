@@ -556,6 +556,16 @@ TEST_F(CliTest, invalid_mount) {
   // Unknown MS constant.
   argv[2] = "none,/,none,MS_WHOOPS";
   ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  // Extra arguments for bind mount (MS_BIND).
+  argv[2] = "none,/,none,MS_BIND,extra";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+  // Extra arguments for bind mount (MS_BIND) with empty data.
+  argv[2] = "none,/,none,MS_BIND,";
+  ASSERT_EXIT(parse_args_(argv), testing::ExitedWithCode(1), "");
+
+
 }
 
 // Valid calls to the remount mode option.

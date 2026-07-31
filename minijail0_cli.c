@@ -254,35 +254,50 @@ static void add_mount(struct minijail *j, char *arg)
 	char *dest = tokenize(&arg, ",");
 	char *type = tokenize(&arg, ",");
 	char *flags = tokenize(&arg, ",");
-	char *data = tokenize(&arg, ",");
-	char *end;
+	char *data = NULL;
+
 	if (!src || src[0] == '\0' || !dest || dest[0] == '\0' || !type ||
 	    type[0] == '\0') {
 		errx(1, "Bad mount: %s %s %s", src, dest, type);
 	}
 
-	/*
-	 * Fun edge case: the data option itself is comma delimited.  If there
-	 * were no more options, then arg would be set to NULL.  But if we had
-	 * more pending, it'll be pointing to the next token.  Back up and undo
-	 * the null byte so it'll be merged back.
-	 * An example:
-	 *   none,/tmp,tmpfs,0xe,mode=0755,uid=10,gid=10
-	 * The tokenize calls above will turn this memory into:
-	 *   none\0/tmp\0tmpfs\00xe\0mode=0755\0uid=10,gid=10
-	 * With data pointing at mode=0755 and arg pointing at uid=10,gid=10.
-	 */
-	if (arg != NULL)
-		arg[-1] = ',';
-
 	unsigned long mountflags;
 	if (flags == NULL || flags[0] == '\0') {
 		mountflags = 0;
 	} else {
-		end = NULL;
+		char *end = NULL;
 		mountflags = parse_constant(flags, &end);
 		if (flags == end)
 			errx(1, "Bad mount flags: %s", flags);
+	}
+
+	bool data_is_used = true;
+	if (mountflags & MS_BIND) {
+		data_is_used = false;
+	}
+
+	if (data_is_used) {
+		data = tokenize(&arg, ",");
+		/*
+		 * Fun edge case: the data option itself is comma delimited.  If
+		 * there were no more options, then arg would be set to NULL.
+		 * But if we had more pending, it'll be pointing to the next
+		 * token.  Back up and undo the null byte so it'll be merged
+		 * back.
+		 * An example:
+		 *   none,/tmp,tmpfs,0xe,mode=0755,uid=10,gid=10
+		 * The tokenize calls above will turn this memory into:
+		 *   none\0/tmp\0tmpfs\00xe\0mode=0755\0uid=10,gid=10
+		 * With data pointing at mode=0755 and arg pointing at
+		 * uid=10,gid=10.
+		 */
+		if (arg != NULL)
+			arg[-1] = ',';
+	} else {
+		if (arg != NULL) {
+			errx(1, "Bad mount: extra arguments after flags: %s",
+			     arg);
+		}
 	}
 
 	if (minijail_mount_with_data(j, src, dest, type, mountflags, data))
@@ -1490,7 +1505,7 @@ int parse_args(struct minijail *j, int argc, char *const argv[],
 
 	if (log_to_stderr && *elftype != ELFSTATIC) {
 		if (minijail_setenv(envp, kLoggingEnvVar,
-		                    kLoggingEnvValueStderr, 1))
+				    kLoggingEnvValueStderr, 1))
 			err(1, "minijail_setenv() failed.");
 	}
 
