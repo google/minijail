@@ -510,31 +510,43 @@ TEST(Test, close_original_pipes_after_dup2) {
   // Ensure the child inherits a stable write fd for signaling.
   const int preserved_fd = 3;
   minijail_preserve_fd(j.get(), to_wait[1], preserved_fd);
+
   char* program;
   ASSERT_GT(asprintf(&program, R"(
       echo Hi >&1;
       echo There >&2;
       exec 1>&-;
       exec 2>&-;
+      echo ready >&%d;         # Signal parent that we closed fd 1 and 2
       read line1;
       read line2;
       echo "$line1$line2 and Goodbye" >&%d;
       exit 42;
-    )", preserved_fd),
+    )",
+                     preserved_fd, preserved_fd),
             0);
   char* const argv[] = {"sh", "-c", program, nullptr};
 
+  pid_t child_pid = -1;
   int in = -1;
   int out = -1;
   int err = -1;
   EXPECT_EQ(minijail_run_pid_pipes_no_preload(j.get(), kShellPath, argv,
-                                              nullptr, &in, &out, &err),
+                                               &child_pid, &in, &out, &err),
             0);
   free(program);
 
+  // Close parent's copy of child's write end of signaling pipe.
+  ASSERT_EQ(close(to_wait[1]), 0);
+
+  EXPECT_GT(child_pid, 0);
   EXPECT_GT(in, 0);
   EXPECT_GT(out, 0);
   EXPECT_GT(err, 0);
+
+  struct stat st;
+  ASSERT_EQ(fstat(err, &st), 0);
+  ino_t pipe_inode = st.st_ino;
 
   char buf[PIPE_BUF];
   ssize_t n;
@@ -548,13 +560,33 @@ TEST(Test, close_original_pipes_after_dup2) {
   ASSERT_GT(n, 0);
   EXPECT_EQ(std::string(buf, n), "There\n");
 
-  // Check that the write ends of stdout and stderr pipes got closed by the
-  // child process. If the child process kept other file descriptors connected
-  // to stdout and stderr, then the parent process wouldn't be able to detect
-  // that all write ends of these pipes are closed and it would block here.
+  // Check that the write end of stdout pipe got closed by the child.
   EXPECT_EQ(read(out, buf, PIPE_BUF), 0);
   ASSERT_EQ(close(out), 0);
-  EXPECT_EQ(read(err, buf, PIPE_BUF), 0);
+
+  // Read "ready" signal from child.
+  n = read(to_wait[0], buf, PIPE_BUF);
+  ASSERT_GT(n, 0);
+  EXPECT_EQ(std::string(buf, n), "ready\n");
+
+  // Now verify that fd 2 is closed in the child via /proc.
+  // Note: we do not check read(err) == 0 here because mksh keeps the pipe
+  // open on a high fd internally.
+  auto is_fd_open_in_child = [](pid_t pid, int fd, ino_t inode) -> bool {
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "/proc/%d/fd/%d", pid, fd);
+    char link_target[PATH_MAX];
+    ssize_t len = readlink(path, link_target, sizeof(link_target) - 1);
+    if (len <= 0) {
+      return false;
+    }
+    link_target[len] = '\0';
+    char expected_target[64];
+    snprintf(expected_target, sizeof(expected_target),
+             "pipe:[%lu]", (unsigned long)inode);
+    return strcmp(link_target, expected_target) == 0;
+  };
+  EXPECT_FALSE(is_fd_open_in_child(child_pid, 2, pipe_inode));
   ASSERT_EQ(close(err), 0);
 
   // Check that stdin pipe works.
@@ -570,6 +602,8 @@ TEST(Test, close_original_pipes_after_dup2) {
   n = read(to_wait[0], buf, PIPE_BUF);
   ASSERT_GT(n, 0);
   EXPECT_EQ(std::string(buf, n), "Greetings and Goodbye\n");
+  ASSERT_EQ(close(to_wait[0]), 0);
+
   EXPECT_EQ(minijail_wait(j.get()), 42);
 }
 
