@@ -58,7 +58,7 @@ cat <<-EOF > "${OUTFILE}"
 const struct constant_entry constant_table[] = {
 $(build | \
   grep -E '^#define [[:upper:]][[:upper:]0-9_]*[[:space:]]+[[:alnum:]_(]' | \
-  grep -Ev '(FLT_|SIGRTMAX|SIGRTMIN|SIG_|NULL)' | \
+  grep -Ev '(FLT_|HOST_|SIGRTMAX|SIGRTMIN|SIG_|NULL)' | \
   sort -u | \
   sed -Ee "${SED_MULTILINE}")
   { NULL, 0 },
