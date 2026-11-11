@@ -365,22 +365,20 @@ int config_net_loopback(void)
 
 int write_pid_to_path(pid_t pid, const char *path)
 {
-	FILE *fp = fopen(path, "we");
+	int fd = open(
+	    path, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0644);
 
-	if (!fp) {
+	if (fd < 0) {
 		pwarn("failed to open '%s'", path);
 		return -errno;
 	}
-	if (fprintf(fp, "%d\n", (int)pid) < 0) {
-		/* fprintf(3) does not set errno on failure. */
-		warn("fprintf(%s) failed", path);
-		fclose(fp);
-		return -1;
-	}
-	if (fclose(fp)) {
-		pwarn("fclose(%s) failed", path);
+	if (dprintf(fd, "%d\n", (int)pid) < 0) {
+		pwarn("dprintf(%s) failed", path);
+		close(fd);
 		return -errno;
 	}
+	/* This function may not fail. */
+	close(fd);
 
 	return 0;
 }
